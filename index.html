@@ -1,0 +1,981 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LuxeProperty - Premium Real Estate</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            color: #333;
+            line-height: 1.6;
+        }
+
+        header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 1rem 0;
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        nav {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logo {
+            font-size: 1.8rem;
+            font-weight: bold;
+            letter-spacing: 1px;
+        }
+
+        nav ul {
+            list-style: none;
+            display: flex;
+            gap: 2rem;
+            align-items: center;
+        }
+
+        nav a {
+            color: white;
+            text-decoration: none;
+            transition: opacity 0.3s;
+            cursor: pointer;
+        }
+
+        nav a:hover {
+            opacity: 0.8;
+        }
+
+        .hero {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 6rem 2rem;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .hero::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            right: -10%;
+            width: 500px;
+            height: 500px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 50%;
+            animation: float 6s ease-in-out infinite;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(20px); }
+        }
+
+        .hero-content {
+            position: relative;
+            z-index: 1;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        .hero h1 {
+            font-size: 3.5rem;
+            margin-bottom: 1rem;
+            animation: slideInDown 0.8s ease;
+        }
+
+        .hero p {
+            font-size: 1.3rem;
+            margin-bottom: 2rem;
+            opacity: 0.95;
+        }
+
+        @keyframes slideInDown {
+            from {
+                opacity: 0;
+                transform: translateY(-30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .search-bar {
+            display: flex;
+            gap: 1rem;
+            margin-top: 2rem;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .search-bar input,
+        .search-bar select {
+            padding: 0.8rem 1rem;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            min-width: 150px;
+        }
+
+        .search-bar button {
+            padding: 0.8rem 2rem;
+            background: #ff6b6b;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .search-bar button:hover {
+            background: #ee5a52;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        }
+
+        section {
+            padding: 4rem 2rem;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .section-title {
+            text-align: center;
+            font-size: 2.5rem;
+            margin-bottom: 3rem;
+            color: #333;
+        }
+
+        .section-title span {
+            color: #667eea;
+        }
+
+        .featured-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 2rem;
+            margin-bottom: 3rem;
+        }
+
+        .property-card {
+            background: white;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            cursor: pointer;
+        }
+
+        .property-card:hover {
+            transform: translateY(-10px);
+            box-shadow: 0 15px 40px rgba(0,0,0,0.2);
+        }
+
+        .property-image {
+            width: 100%;
+            height: 250px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .property-image img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transition: transform 0.3s;
+        }
+
+        .property-card:hover .property-image img {
+            transform: scale(1.1);
+        }
+
+        .property-badge {
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+            background: #ff6b6b;
+            color: white;
+            padding: 0.5rem 1rem;
+            border-radius: 20px;
+            font-weight: bold;
+            font-size: 0.9rem;
+        }
+
+        .property-info {
+            padding: 1.5rem;
+        }
+
+        .property-price {
+            font-size: 1.8rem;
+            font-weight: bold;
+            color: #667eea;
+            margin-bottom: 0.5rem;
+        }
+
+        .property-address {
+            color: #666;
+            margin-bottom: 1rem;
+        }
+
+        .property-details {
+            display: flex;
+            justify-content: space-around;
+            padding: 1rem 0;
+            border-top: 1px solid #eee;
+            border-bottom: 1px solid #eee;
+            margin: 1rem 0;
+        }
+
+        .detail-item {
+            text-align: center;
+        }
+
+        .detail-label {
+            font-size: 0.8rem;
+            color: #999;
+            text-transform: uppercase;
+        }
+
+        .detail-value {
+            font-size: 1.3rem;
+            font-weight: bold;
+            color: #333;
+        }
+
+        .property-description {
+            color: #666;
+            font-size: 0.95rem;
+            margin-bottom: 1rem;
+        }
+
+        .filter-section {
+            background: #f8f9fa;
+            padding: 2rem;
+            border-radius: 12px;
+            margin-bottom: 2rem;
+        }
+
+        .filter-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .filter-row label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: bold;
+            color: #333;
+        }
+
+        .filter-row input,
+        .filter-row select {
+            width: 100%;
+            padding: 0.8rem;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 1rem;
+        }
+
+        .filter-row input:focus,
+        .filter-row select:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .agents-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 2rem;
+        }
+
+        .agent-card {
+            background: white;
+            border-radius: 12px;
+            overflow: hidden;
+            text-align: center;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            transition: all 0.3s;
+        }
+
+        .agent-card:hover {
+            transform: translateY(-8px);
+            box-shadow: 0 15px 40px rgba(0,0,0,0.2);
+        }
+
+        .agent-image {
+            width: 100%;
+            height: 250px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 3rem;
+        }
+
+        .agent-info {
+            padding: 1.5rem;
+        }
+
+        .agent-name {
+            font-size: 1.3rem;
+            font-weight: bold;
+            margin-bottom: 0.5rem;
+        }
+
+        .agent-title {
+            color: #667eea;
+            margin-bottom: 1rem;
+        }
+
+        .agent-contact {
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+            margin-top: 1rem;
+        }
+
+        .agent-contact a {
+            text-decoration: none;
+            color: white;
+            background: #667eea;
+            padding: 0.5rem 1rem;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            transition: background 0.3s;
+        }
+
+        .agent-contact a:hover {
+            background: #764ba2;
+        }
+
+        .testimonials {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .testimonial-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 2rem;
+        }
+
+        .testimonial-card {
+            background: rgba(255,255,255,0.1);
+            padding: 2rem;
+            border-radius: 12px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+
+        .stars {
+            color: #ffd700;
+            margin-bottom: 1rem;
+            font-size: 1.2rem;
+        }
+
+        .testimonial-text {
+            margin-bottom: 1rem;
+            font-style: italic;
+        }
+
+        .testimonial-author {
+            font-weight: bold;
+            text-align: right;
+        }
+
+        .contact-section {
+            background: #f8f9fa;
+        }
+
+        .contact-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 3rem;
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+
+        .contact-form {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .contact-form input,
+        .contact-form textarea {
+            padding: 1rem;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-family: inherit;
+        }
+
+        .contact-form input:focus,
+        .contact-form textarea:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .contact-form button {
+            padding: 1rem;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .contact-form button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        }
+
+        .contact-info {
+            display: flex;
+            flex-direction: column;
+            gap: 2rem;
+        }
+
+        .info-item {
+            display: flex;
+            gap: 1rem;
+            align-items: flex-start;
+        }
+
+        .info-icon {
+            font-size: 1.5rem;
+            color: #667eea;
+            min-width: 30px;
+        }
+
+        .info-text h3 {
+            margin-bottom: 0.5rem;
+        }
+
+        .info-text p {
+            color: #666;
+        }
+
+        footer {
+            background: #333;
+            color: white;
+            text-align: center;
+            padding: 2rem;
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 2rem;
+            margin: 3rem 0;
+        }
+
+        .stat-item {
+            text-align: center;
+        }
+
+        .stat-number {
+            font-size: 2.5rem;
+            font-weight: bold;
+            color: #667eea;
+            margin-bottom: 0.5rem;
+        }
+
+        .stat-label {
+            color: #666;
+        }
+
+        @media (max-width: 768px) {
+            .hero h1 {
+                font-size: 2rem;
+            }
+
+            nav ul {
+                gap: 1rem;
+                font-size: 0.9rem;
+            }
+
+            .contact-container {
+                grid-template-columns: 1fr;
+            }
+
+            .search-bar {
+                flex-direction: column;
+            }
+
+            .section-title {
+                font-size: 2rem;
+            }
+
+            .hero {
+                padding: 3rem 1rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Navigation -->
+    <header>
+        <nav>
+            <div class="logo">🏠 LuxeProperty</div>
+            <ul>
+                <li><a onclick="scrollToSection('featured')">Featured</a></li>
+                <li><a onclick="scrollToSection('listings')">Listings</a></li>
+                <li><a onclick="scrollToSection('agents')">Agents</a></li>
+                <li><a onclick="scrollToSection('contact')">Contact</a></li>
+            </ul>
+        </nav>
+    </header>
+
+    <!-- Hero Section -->
+    <section class="hero">
+        <div class="hero-content">
+            <h1>Find Your Dream Home</h1>
+            <p>Discover premium properties in the most desirable locations</p>
+            <div class="search-bar">
+                <input type="text" id="locationSearch" placeholder="Location...">
+                <select id="priceFilter">
+                    <option value="">Price Range</option>
+                    <option value="0-500000">$0 - $500K</option>
+                    <option value="500000-1000000">$500K - $1M</option>
+                    <option value="1000000-2000000">$1M - $2M</option>
+                    <option value="2000000-999999999">$2M+</option>
+                </select>
+                <select id="bedroomFilter">
+                    <option value="">Bedrooms</option>
+                    <option value="1">1 Bedroom</option>
+                    <option value="2">2 Bedrooms</option>
+                    <option value="3">3 Bedrooms</option>
+                    <option value="4">4+ Bedrooms</option>
+                </select>
+                <button onclick="performSearch()">Search Properties</button>
+            </div>
+        </div>
+    </section>
+
+    <!-- Statistics -->
+    <section>
+        <div class="stats">
+            <div class="stat-item">
+                <div class="stat-number">2500+</div>
+                <div class="stat-label">Properties Listed</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-number">1200+</div>
+                <div class="stat-label">Happy Clients</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-number">50+</div>
+                <div class="stat-label">Expert Agents</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-number">$2B+</div>
+                <div class="stat-label">In Sales</div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Featured Properties -->
+    <section id="featured">
+        <h2 class="section-title">Featured <span>Properties</span></h2>
+        <div class="featured-grid" id="featuredGrid"></div>
+    </section>
+
+    <!-- All Listings with Filters -->
+    <section id="listings">
+        <h2 class="section-title">Browse <span>Listings</span></h2>
+
+        <div class="filter-section">
+            <h3>Filter Properties</h3>
+            <div class="filter-row">
+                <div>
+                    <label>Location</label>
+                    <input type="text" id="filterLocation" placeholder="City or area" onkeyup="applyFilters()">
+                </div>
+                <div>
+                    <label>Min Price</label>
+                    <input type="number" id="filterMinPrice" placeholder="Min price" onchange="applyFilters()">
+                </div>
+                <div>
+                    <label>Max Price</label>
+                    <input type="number" id="filterMaxPrice" placeholder="Max price" onchange="applyFilters()">
+                </div>
+                <div>
+                    <label>Bedrooms</label>
+                    <select id="filterBedrooms" onchange="applyFilters()">
+                        <option value="">Any</option>
+                        <option value="1">1+</option>
+                        <option value="2">2+</option>
+                        <option value="3">3+</option>
+                        <option value="4">4+</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <div class="featured-grid" id="listingsGrid"></div>
+    </section>
+
+    <!-- Agents Section -->
+    <section id="agents">
+        <h2 class="section-title">Our <span>Expert Agents</span></h2>
+        <div class="agents-grid" id="agentsGrid"></div>
+    </section>
+
+    <!-- Testimonials -->
+    <section class="testimonials">
+        <h2 class="section-title" style="color: white;">Client <span style="color: #ffd700;">Reviews</span></h2>
+        <div class="testimonial-grid" id="testimonialGrid"></div>
+    </section>
+
+    <!-- Contact Section -->
+    <section id="contact" class="contact-section">
+        <h2 class="section-title">Get In <span>Touch</span></h2>
+        <div class="contact-container">
+            <form class="contact-form" onsubmit="handleContactSubmit(event)">
+                <input type="text" placeholder="Your Name" required>
+                <input type="email" placeholder="Your Email" required>
+                <input type="tel" placeholder="Your Phone" required>
+                <textarea rows="5" placeholder="Your Message" required></textarea>
+                <button type="submit">Send Message</button>
+            </form>
+            <div class="contact-info">
+                <div class="info-item">
+                    <div class="info-icon">📍</div>
+                    <div class="info-text">
+                        <h3>Address</h3>
+                        <p>123 Luxury Lane, Premium City, PC 12345</p>
+                    </div>
+                </div>
+                <div class="info-item">
+                    <div class="info-icon">📞</div>
+                    <div class="info-text">
+                        <h3>Phone</h3>
+                        <p>+1 (555) 123-4567</p>
+                    </div>
+                </div>
+                <div class="info-item">
+                    <div class="info-icon">✉️</div>
+                    <div class="info-text">
+                        <h3>Email</h3>
+                        <p>hello@luxeproperty.com</p>
+                    </div>
+                </div>
+                <div class="info-item">
+                    <div class="info-icon">⏰</div>
+                    <div class="info-text">
+                        <h3>Hours</h3>
+                        <p>Mon-Fri: 9AM - 6PM<br>Sat-Sun: 10AM - 4PM</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer>
+        <p>&copy; 2024 LuxeProperty. All rights reserved.</p>
+    </footer>
+
+    <script>
+        // Sample Property Data
+        const properties = [
+            {
+                id: 1,
+                name: "Modern Downtown Penthouse",
+                price: 2500000,
+                location: "Downtown",
+                address: "456 Sky Tower, Downtown City",
+                bedrooms: 4,
+                bathrooms: 3,
+                sqft: 3500,
+                description: "Stunning penthouse with panoramic city views and luxury finishes",
+                badge: "Featured",
+                image: "🏢"
+            },
+            {
+                id: 2,
+                name: "Beachfront Villa",
+                price: 1800000,
+                location: "Coastal Area",
+                address: "789 Beach Street, Coastal City",
+                bedrooms: 3,
+                bathrooms: 2,
+                sqft: 2800,
+                description: "Gorgeous beach house with private access to pristine sandy beaches",
+                badge: "Hot",
+                image: "🏖️"
+            },
+            {
+                id: 3,
+                name: "Suburban Family Home",
+                price: 750000,
+                location: "Suburbs",
+                address: "123 Green Lane, Suburb City",
+                bedrooms: 4,
+                bathrooms: 2.5,
+                sqft: 2200,
+                description: "Perfect family home in quiet neighborhood with great schools",
+                badge: "New",
+                image: "🏡"
+            },
+            {
+                id: 4,
+                name: "Luxury Mountain Retreat",
+                price: 3200000,
+                location: "Mountain Area",
+                address: "999 Peak Road, Mountain City",
+                bedrooms: 5,
+                bathrooms: 4,
+                sqft: 4000,
+                description: "Exclusive mountain estate with breathtaking views and privacy",
+                badge: "Luxury",
+                image: "⛰️"
+            },
+            {
+                id: 5,
+                name: "Historic Downtown Loft",
+                price: 950000,
+                location: "Downtown",
+                address: "321 Heritage Ave, Downtown City",
+                bedrooms: 2,
+                bathrooms: 2,
+                sqft: 1800,
+                description: "Charming converted loft with original architectural details",
+                badge: "Featured",
+                image: "🏬"
+            },
+            {
+                id: 6,
+                name: "Gated Community Mansion",
+                price: 4500000,
+                location: "Exclusive Area",
+                address: "888 Prestige Drive, Exclusive City",
+                bedrooms: 6,
+                bathrooms: 5,
+                sqft: 5500,
+                description: "Ultimate luxury mansion in prestigious gated community",
+                badge: "Elite",
+                image: "👑"
+            },
+            {
+                id: 7,
+                name: "Cozy Urban Apartment",
+                price: 550000,
+                location: "Downtown",
+                address: "555 Urban Street, Downtown City",
+                bedrooms: 1,
+                bathrooms: 1,
+                sqft: 900,
+                description: "Trendy downtown apartment perfect for young professionals",
+                badge: "New",
+                image: "🏢"
+            },
+            {
+                id: 8,
+                name: "Lakefront Manor",
+                price: 2100000,
+                location: "Lake Area",
+                address: "777 Lakeside Road, Lake City",
+                bedrooms: 4,
+                bathrooms: 3,
+                sqft: 3200,
+                description: "Elegant home with direct lake access and boat dock",
+                badge: "Hot",
+                image: "🏔️"
+            }
+        ];
+
+        // Sample Agent Data
+        const agents = [
+            { name: "Sarah Mitchell", title: "Senior Agent", email: "sarah@luxeproperty.com", sales: "500+", emoji: "👩‍💼" },
+            { name: "Michael Chen", title: "Luxury Specialist", email: "michael@luxeproperty.com", sales: "450+", emoji: "👨‍💼" },
+            { name: "Jessica Rodriguez", title: "Investment Expert", email: "jessica@luxeproperty.com", sales: "380+", emoji: "👩‍💼" }
+        ];
+
+        // Sample Testimonials
+        const testimonials = [
+            { author: "John Smith", rating: 5, text: "LuxeProperty found me the perfect home! Their agents were professional and attentive." },
+            { author: "Emma Davis", rating: 5, text: "Outstanding service from start to finish. Highly recommend to anyone looking to buy or sell!" },
+            { author: "Robert Wilson", rating: 5, text: "Best real estate experience ever. They handled everything with expertise and care." }
+        ];
+
+        // Render Featured Properties
+        function renderFeaturedProperties() {
+            const featured = properties.slice(0, 3);
+            const grid = document.getElementById('featuredGrid');
+            grid.innerHTML = featured.map(prop => createPropertyCard(prop)).join('');
+        }
+
+        // Render All Properties
+        function renderAllProperties(propsToRender = properties) {
+            const grid = document.getElementById('listingsGrid');
+            grid.innerHTML = propsToRender.length > 0
+                ? propsToRender.map(prop => createPropertyCard(prop)).join('')
+                : '<div style="grid-column: 1/-1; text-align: center; padding: 2rem; color: #999;">No properties found matching your criteria</div>';
+        }
+
+        // Create Property Card HTML
+        function createPropertyCard(prop) {
+            return `
+                <div class="property-card">
+                    <div class="property-image">
+                        <span style="font-size: 5rem;">${prop.image}</span>
+                        <span class="property-badge">${prop.badge}</span>
+                    </div>
+                    <div class="property-info">
+                        <div class="property-price">$${prop.price.toLocaleString()}</div>
+                        <div class="property-address">${prop.address}</div>
+                        <div class="property-details">
+                            <div class="detail-item">
+                                <div class="detail-label">Beds</div>
+                                <div class="detail-value">${prop.bedrooms}</div>
+                            </div>
+                            <div class="detail-item">
+                                <div class="detail-label">Baths</div>
+                                <div class="detail-value">${prop.bathrooms}</div>
+                            </div>
+                            <div class="detail-item">
+                                <div class="detail-label">SqFt</div>
+                                <div class="detail-value">${(prop.sqft / 1000).toFixed(1)}K</div>
+                            </div>
+                        </div>
+                        <div class="property-description">${prop.description}</div>
+                        <button onclick="contactAboutProperty('${prop.name}')" style="width: 100%; padding: 0.8rem; background: #667eea; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; transition: all 0.3s;">
+                            Schedule Viewing
+                        </button>
+                    </div>
+                </div>
+            `;
+        }
+
+        // Render Agents
+        function renderAgents() {
+            const grid = document.getElementById('agentsGrid');
+            grid.innerHTML = agents.map(agent => `
+                <div class="agent-card">
+                    <div class="agent-image">${agent.emoji}</div>
+                    <div class="agent-info">
+                        <div class="agent-name">${agent.name}</div>
+                        <div class="agent-title">${agent.title}</div>
+                        <p>Sales: ${agent.sales}</p>
+                        <div class="agent-contact">
+                            <a href="mailto:${agent.email}">Email</a>
+                            <a href="tel:+15551234567">Call</a>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // Render Testimonials
+        function renderTestimonials() {
+            const grid = document.getElementById('testimonialGrid');
+            grid.innerHTML = testimonials.map(test => `
+                <div class="testimonial-card">
+                    <div class="stars">${'⭐'.repeat(test.rating)}</div>
+                    <div class="testimonial-text">"${test.text}"</div>
+                    <div class="testimonial-author">- ${test.author}</div>
+                </div>
+            `).join('');
+        }
+
+        // Filter Properties
+        function applyFilters() {
+            const location = document.getElementById('filterLocation').value.toLowerCase();
+            const minPrice = parseFloat(document.getElementById('filterMinPrice').value) || 0;
+            const maxPrice = parseFloat(document.getElementById('filterMaxPrice').value) || Infinity;
+            const bedrooms = parseFloat(document.getElementById('filterBedrooms').value) || 0;
+
+            const filtered = properties.filter(prop => {
+                return (prop.location.toLowerCase().includes(location)) &&
+                       (prop.price >= minPrice) &&
+                       (prop.price <= maxPrice) &&
+                       (prop.bedrooms >= bedrooms);
+            });
+
+            renderAllProperties(filtered);
+        }
+
+        // Search from Hero
+        function performSearch() {
+            const location = document.getElementById('locationSearch').value.toLowerCase();
+            const price = document.getElementById('priceFilter').value;
+            const bedrooms = document.getElementById('bedroomFilter').value;
+
+            let filtered = properties;
+
+            if (location) {
+                filtered = filtered.filter(p => p.location.toLowerCase().includes(location));
+            }
+
+            if (price) {
+                const [min, max] = price.split('-').map(Number);
+                filtered = filtered.filter(p => p.price >= min && p.price <= max);
+            }
+
+            if (bedrooms) {
+                filtered = filtered.filter(p => p.bedrooms >= parseInt(bedrooms));
+            }
+
+            renderAllProperties(filtered);
+            scrollToSection('listings');
+        }
+
+        // Scroll to Section
+        function scrollToSection(id) {
+            const element = document.getElementById(id);
+            if (element) {
+                element.scrollIntoView({ behavior: 'smooth' });
+            }
+        }
+
+        // Contact Form Handler
+        function handleContactSubmit(e) {
+            e.preventDefault();
+            alert('Thank you for your inquiry! We will contact you shortly.');
+            e.target.reset();
+        }
+
+        // Contact About Property
+        function contactAboutProperty(propertyName) {
+            alert(`You're interested in: ${propertyName}\nOur agent will contact you soon!`);
+        }
+
+        // Initialize
+        window.addEventListener('DOMContentLoaded', () => {
+            renderFeaturedProperties();
+            renderAllProperties();
+            renderAgents();
+            renderTestimonials();
+        });
+    </script>
+</body>
+</html>
