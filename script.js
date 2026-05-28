@@ -108,9 +108,9 @@ const properties = [
 
 // Sample Agent Data
 const agents = [
-    { name: "Sarah Mitchell", title: "Senior Agent", email: "sarah@luxeproperty.com", sales: "500+", emoji: "👩‍💼" },
-    { name: "Michael Chen", title: "Luxury Specialist", email: "michael@luxeproperty.com", sales: "450+", emoji: "👨‍💼" },
-    { name: "Jessica Rodriguez", title: "Investment Expert", email: "jessica@luxeproperty.com", sales: "380+", emoji: "👩‍💼" }
+    { name: "Sarah Mitchell", title: "Senior Agent", email: "sarah@nixmitah.com", sales: "500+", emoji: "👩‍💼" },
+    { name: "Michael Chen", title: "Luxury Specialist", email: "michael@nixmitah.com", sales: "450+", emoji: "👨‍💼" },
+    { name: "Jessica Rodriguez", title: "Investment Expert", email: "jessica@nixmitah.com", sales: "380+", emoji: "👩‍💼" }
 ];
 
 // Sample Testimonials
