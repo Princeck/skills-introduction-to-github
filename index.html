@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NixMitah Capital & Real Estate - Premium Properties</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <!-- Navigation -->
+    <header>
+        <nav>
+            <div class="logo">🏠 NixMitah</div>
+            <ul>
+                <li><a onclick="scrollToSection('featured')">Featured</a></li>
+                <li><a onclick="scrollToSection('listings')">Listings</a></li>
+                <li><a onclick="scrollToSection('agents')">Agents</a></li>
+                <li><a onclick="scrollToSection('contact')">Contact</a></li>
+            </ul>
+        </nav>
+    </header>
+
+    <!-- Hero Section -->
+    <section class="hero">
+        <div class="hero-content">
+            <h1>Find Your Dream Home</h1>
+            <p>Discover premium properties in the most desirable locations</p>
+            <div class="search-bar">
+                <input type="text" id="locationSearch" placeholder="Location...">
+                <select id="priceFilter">
+                    <option value="">Price Range</option>
+                    <option value="0-500000">$0 - $500K</option>
+                    <option value="500000-1000000">$500K - $1M</option>
+                    <option value="1000000-2000000">$1M - $2M</option>
+                    <option value="2000000-999999999">$2M+</option>
+                </select>
+                <select id="bedroomFilter">
+                    <option value="">Bedrooms</option>
+                    <option value="1">1 Bedroom</option>
+                    <option value="2">2 Bedrooms</option>
+                    <option value="3">3 Bedrooms</option>
+                    <option value="4">4+ Bedrooms</option>
+                </select>
+                <button onclick="performSearch()">Search Properties</button>
+            </div>
+        </div>
+    </section>
+
+    <!-- Statistics -->
+    <section>
+        <div class="stats">
+            <div class="stat-item">
+                <div class="stat-number">2500+</div>
+                <div class="stat-label">Properties Listed</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-number">1200+</div>
+                <div class="stat-label">Happy Clients</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-number">50+</div>
+                <div class="stat-label">Expert Agents</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-number">$2B+</div>
+                <div class="stat-label">In Sales</div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Featured Properties -->
+    <section id="featured">
+        <h2 class="section-title">Featured <span>Properties</span></h2>
+        <div class="featured-grid" id="featuredGrid"></div>
+    </section>
+
+    <!-- All Listings with Filters -->
+    <section id="listings">
+        <h2 class="section-title">Browse <span>Listings</span></h2>
+
+        <div class="filter-section">
+            <h3>Filter Properties</h3>
+            <div class="filter-row">
+                <div>
+                    <label>Location</label>
+                    <input type="text" id="filterLocation" placeholder="City or area" onkeyup="applyFilters()">
+                </div>
+                <div>
+                    <label>Min Price</label>
+                    <input type="number" id="filterMinPrice" placeholder="Min price" onchange="applyFilters()">
+                </div>
+                <div>
+                    <label>Max Price</label>
+                    <input type="number" id="filterMaxPrice" placeholder="Max price" onchange="applyFilters()">
+                </div>
+                <div>
+                    <label>Bedrooms</label>
+                    <select id="filterBedrooms" onchange="applyFilters()">
+                        <option value="">Any</option>
+                        <option value="1">1+</option>
+                        <option value="2">2+</option>
+                        <option value="3">3+</option>
+                        <option value="4">4+</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <div class="featured-grid" id="listingsGrid"></div>
+    </section>
+
+    <!-- Agents Section -->
+    <section id="agents">
+        <h2 class="section-title">Our <span>Expert Agents</span></h2>
+        <div class="agents-grid" id="agentsGrid"></div>
+    </section>
+
+    <!-- Testimonials -->
+    <section class="testimonials">
+        <h2 class="section-title" style="color: white;">Client <span style="color: #ffd700;">Reviews</span></h2>
+        <div class="testimonial-grid" id="testimonialGrid"></div>
+    </section>
+
+    <!-- Contact Section -->
+    <section id="contact" class="contact-section">
+        <h2 class="section-title">Get In <span>Touch</span></h2>
+        <div class="contact-container">
+            <form class="contact-form" onsubmit="handleContactSubmit(event)">
+                <input type="text" placeholder="Your Name" required>
+                <input type="email" placeholder="Your Email" required>
+                <input type="tel" placeholder="Your Phone" required>
+                <textarea rows="5" placeholder="Your Message" required></textarea>
+                <button type="submit">Send Message</button>
+            </form>
+            <div class="contact-info">
+                <div class="info-item">
+                    <div class="info-icon">📍</div>
+                    <div class="info-text">
+                        <h3>Address</h3>
+                        <p>123 Luxury Lane, Premium City, PC 12345</p>
+                    </div>
+                </div>
+                <div class="info-item">
+                    <div class="info-icon">📞</div>
+                    <div class="info-text">
+                        <h3>Phone</h3>
+                        <p>+1 (555) 123-4567</p>
+                    </div>
+                </div>
+                <div class="info-item">
+                    <div class="info-icon">✉️</div>
+                    <div class="info-text">
+                        <h3>Email</h3>
+                        <p>hello@nixmitah.com</p>
+                    </div>
+                </div>
+                <div class="info-item">
+                    <div class="info-icon">⏰</div>
+                    <div class="info-text">
+                        <h3>Hours</h3>
+                        <p>Mon-Fri: 9AM - 6PM<br>Sat-Sun: 10AM - 4PM</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer>
+        <p>&copy; 2024 NixMitah Capital & Real Estate. All rights reserved.</p>
+    </footer>
+
+    <script src="script.js"></script>
+</body>
+</html>
