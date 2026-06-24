@@ -1344,3 +1344,48 @@ footer#foot b{color:var(--sky);font-weight:700;margin-left:6px;letter-spacing:1p
 }
 /* a coarse pointer (touch) has no hover cursor — hide the spotlight there */
 @media (hover:none){#spotlight{display:none}}
+
+/* ============================================================
+   UI POLISH PASS  —  crisper type, keyboard accessibility,
+   lit panel edges, calmer mobile taps. Additive refinements
+   that build on the existing gold / navy / ivory system.
+   ============================================================ */
+
+/* crisper text rendering across the app */
+body{-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;
+  text-rendering:optimizeLegibility}
+/* native controls (checkboxes/radios/range) pick up the brand gold by default */
+:root{accent-color:var(--gold-deep)}
+/* no grey flash when tapping controls on mobile */
+a,button,input,select,textarea,.cls,.qopt,.qlabel,label{-webkit-tap-highlight-color:transparent}
+
+/* — keyboard focus rings —
+   Many controls set outline:none, which leaves keyboard users with no
+   visible focus. :focus-visible restores a clean gold ring for keyboard /
+   assistive navigation ONLY — mouse clicks never trigger it, so the polished
+   pointer experience is unchanged. */
+a:focus-visible,button:focus-visible,
+.cls:focus-visible,.qopt:focus-visible,.qlabel:focus-visible,
+.cls.focus-visible,#classToggle:focus-visible,.next:focus-visible,
+.welcome-cta:focus-visible,.s-btn:focus-visible,.back-btn:focus-visible,
+.auth-link:focus-visible,.view-d:focus-visible,.buy:focus-visible{
+  outline:2px solid var(--gold);
+  outline-offset:3px;
+}
+/* inputs already show a gold glow on focus — strengthen it for keyboard users */
+input:focus-visible,textarea:focus-visible,select:focus-visible{
+  outline:2px solid var(--gold);outline-offset:1px}
+
+/* — lit panel edges —
+   A hairline highlight along the top of the white surfaces catches the light
+   like a real card edge, adding depth against the navy backdrop. */
+.bubble,.auth-card,.name-card,.coming-soon{
+  box-shadow:var(--shadow),inset 0 1px 0 rgba(255,255,255,.65)}
+
+/* — chat bubble refinement — a touch more breathing room + smoother corner */
+.bubble{border-radius:6px 18px 18px 18px}
+
+/* — warmer depth on the listing card when hovered (no positional shift; the
+   card is full-bleed absolute, so only the shadow deepens) — */
+.lcard{transition:opacity .5s var(--ease),box-shadow .35s var(--ease)}
+.lcard.show:hover{box-shadow:0 30px 64px -26px rgba(0,0,0,.6),inset 0 1px 0 rgba(255,255,255,.65)}
