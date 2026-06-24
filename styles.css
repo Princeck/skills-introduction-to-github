@@ -1327,12 +1327,12 @@ footer#foot b{color:var(--sky);font-weight:700;margin-left:6px;letter-spacing:1p
 #spotlight.lit{opacity:1}
 
 /* — CTA sheen: a gentle light sweep across primary buttons on hover — */
-.next,.s-btn,.back-btn{position:relative;overflow:hidden;isolation:isolate}
-.next::after,.s-btn::after,.back-btn::after{content:"";position:absolute;inset:0;z-index:-1;
+.next,.s-btn,.back-btn,.welcome-cta{position:relative;overflow:hidden;isolation:isolate}
+.next::after,.s-btn::after,.back-btn::after,.welcome-cta::after{content:"";position:absolute;inset:0;z-index:-1;
   pointer-events:none;border-radius:inherit;
   background:linear-gradient(115deg,transparent 30%,rgba(255,255,255,.45) 50%,transparent 70%);
   transform:translateX(-120%);transition:transform .6s var(--ease)}
-.next:hover:not(:disabled)::after,.s-btn:hover::after,.back-btn:hover::after{transform:translateX(120%)}
+.next:hover:not(:disabled)::after,.s-btn:hover::after,.back-btn:hover::after,.welcome-cta:hover::after{transform:translateX(120%)}
 
 /* keep the new decorative layers calm for reduced-motion users */
 @media (prefers-reduced-motion:reduce){
@@ -1389,3 +1389,38 @@ input:focus-visible,textarea:focus-visible,select:focus-visible{
    card is full-bleed absolute, so only the shadow deepens) — */
 .lcard{transition:opacity .5s var(--ease),box-shadow .35s var(--ease)}
 .lcard.show:hover{box-shadow:0 30px 64px -26px rgba(0,0,0,.6),inset 0 1px 0 rgba(255,255,255,.65)}
+
+/* ============================================================
+   SIGNATURE MOTION  —  kinetic typography + couture accents.
+   Display text reveals word-by-word (app.js wraps each word in
+   .kw > .kw-i); words rise out of a soft blur in sequence, so
+   every screen shares one elegant, futuristic cadence.
+   ============================================================ */
+.kw{display:inline-block}
+.kw-i{display:inline-block;will-change:transform,opacity,filter;
+  opacity:0;transform:translateY(.5em) scale(.985);filter:blur(6px);
+  animation:kwRise .62s var(--ease) both}
+@keyframes kwRise{
+  0%{opacity:0;transform:translateY(.5em) scale(.985);filter:blur(6px)}
+  55%{opacity:1;filter:blur(0)}
+  100%{opacity:1;transform:none;filter:blur(0)}}
+
+/* couture accent — a slow champagne sheen drifts across key words */
+.welcome h1 .accent{
+  background:linear-gradient(100deg,#b9863f 0%,#cf9b50 30%,#fff3d4 50%,#cf9b50 70%,#b9863f 100%);
+  background-size:240% 100%;background-position:120% 0;
+  -webkit-background-clip:text;background-clip:text;
+  -webkit-text-fill-color:transparent;color:transparent;
+  animation:accentSheen 5.5s ease-in-out 1.6s infinite}
+@keyframes accentSheen{0%,100%{background-position:120% 0}50%{background-position:-30% 0}}
+
+/* the CTA arrow breathes gently to invite the click, then locks forward on hover */
+.welcome-cta .cta-arrow{animation:arrowIdle 2.6s ease-in-out 2.2s infinite}
+.welcome-cta:hover .cta-arrow{animation:none;transform:translateX(5px)}
+@keyframes arrowIdle{0%,100%{transform:translateX(0)}50%{transform:translateX(5px)}}
+
+@media (prefers-reduced-motion:reduce){
+  .kw-i{opacity:1!important;transform:none!important;filter:none!important;animation:none!important}
+  .welcome h1 .accent{-webkit-text-fill-color:var(--gold);color:var(--gold);background:none;animation:none}
+  .welcome-cta .cta-arrow{animation:none}
+}

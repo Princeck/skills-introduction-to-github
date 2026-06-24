@@ -61,7 +61,60 @@ function showPage(buildFn){
   deck.appendChild(np);
   if(old){old.classList.remove('active');old.classList.add('leaving');
     setTimeout(()=>old.remove(),160);}
-  requestAnimationFrame(()=>np.classList.add('active'));
+  requestAnimationFrame(()=>{np.classList.add('active');kineticize(np);});
+}
+
+/* ============================ SIGNATURE MOTION ============================
+   Kinetic typography — display text reveals word-by-word with a soft de-blur
+   and rise, giving every screen the same quietly futuristic, couture cadence.
+   Plain text reveals per word; inline-styled bits (.accent, <b>, links) reveal
+   as a single unit so gradient-clip / emphasis stays intact. Interactive and
+   decorative nodes are left untouched. Honoured only when motion is welcome. */
+function prefersReducedMotion(){
+  return window.matchMedia('(prefers-reduced-motion:reduce)').matches;
+}
+const KW_SEL='.bubble, .welcome-eyebrow, .welcome h1, .welcome p, .auth-h, .auth-p, .cs-t, .cs-d, .llp-intro';
+function revealWords(root,opts){
+  if(!root||root.dataset.kw==='1')return;
+  root.dataset.kw='1';
+  const base=(opts&&opts.delay)||0, step=(opts&&opts.step)||30;
+  let i=0;
+  const SKIP=el=>el.matches&&el.matches('.who,button,input,textarea,select,svg,img,.nkm-img,.sparkle,.cta-arrow,br');
+  const WHOLE=el=>el.matches&&el.matches('.accent,b,strong,i,em,code,a,.tag');
+  const wrapUnit=node=>{
+    const w=document.createElement('span');w.className='kw';
+    const inner=document.createElement('span');inner.className='kw-i';
+    inner.style.animationDelay=(base+i*step)+'ms';i++;
+    w.appendChild(inner);return {w,inner};
+  };
+  const walk=node=>{
+    [...node.childNodes].forEach(n=>{
+      if(n.nodeType===3){                       // text → split into words
+        const parts=n.nodeValue.split(/(\s+)/);
+        const frag=document.createDocumentFragment();
+        parts.forEach(part=>{
+          if(part===''){return;}
+          if(/^\s+$/.test(part)){frag.appendChild(document.createTextNode(part));return;}
+          const {w,inner}=wrapUnit();inner.textContent=part;frag.appendChild(w);
+        });
+        node.replaceChild(frag,n);
+      } else if(n.nodeType===1){
+        if(SKIP(n))return;                       // leave control/decorative nodes alone
+        if(WHOLE(n)){                            // wrap inline-styled element as one unit
+          const {w,inner}=wrapUnit();
+          n.parentNode.replaceChild(w,n);inner.appendChild(n);
+        } else { walk(n); }                      // recurse into plain containers
+      }
+    });
+  };
+  // neutralise any container-level entrance so the word cadence leads
+  root.style.animation='none';root.style.opacity='1';root.style.transform='none';root.style.filter='none';
+  walk(root);
+}
+function kineticize(page){
+  if(prefersReducedMotion())return;
+  const targets=page.querySelectorAll(KW_SEL);
+  targets.forEach((el,idx)=>revealWords(el,{delay:60+idx*120,step:30}));
 }
 
 /* ---------- back navigation ----------
