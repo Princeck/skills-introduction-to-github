@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>NKM · NicMitah Consultant & Real Estate</title>
+<meta name="description" content="NicMitah Consultant & Real Estate (NKM) — a private, premium property consultation. Find your home by city, budget and class across Kenya.">
+<meta name="theme-color" content="#102140">
+<meta name="color-scheme" content="dark">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta property="og:title" content="NKM · NicMitah Consultant & Real Estate">
+<meta property="og:description" content="A private, premium property consultation. Find your home by city, budget and class.">
+<meta property="og:type" content="website">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23102140'/%3E%3Ctext x='32' y='45' font-family='Georgia,serif' font-size='36' font-weight='700' fill='%23d9a85f' text-anchor='middle'%3EN%3C/text%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700;800&family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<div id="scene">
+  <div class="goldgrid" aria-hidden="true"></div>
+  <div class="stars" id="stars" aria-hidden="true"></div>
+  <div class="beam" aria-hidden="true"></div>
+  <div class="orbs" id="orbs" aria-hidden="true"></div>
+  <div class="scene-grain" aria-hidden="true"></div>
+  <div class="scene-overlay" aria-hidden="true"></div>
+  <div id="spotlight" aria-hidden="true"></div>
+</div>
+
+<div id="intro">
+  <div class="intro-stack">
+    <div class="intro-welcome"><span class="lead">Welcome to </span><span class="nkm-drop"><span class="drop">N</span><span class="drop">K</span><span class="drop">M</span></span></div>
+    <div class="intro-tag">We strive to serve everyone equally.</div>
+    <div class="intro-by">powered by <b>novarixcore</b></div>
+  </div>
+</div>
+
+<div id="wipe"></div>
+
+<div id="app">
+  <div id="headerScrim"></div>
+  <div class="logo">
+    <span class="mark" id="logoMark"></span>
+    <span class="name"><span class="big">NicMitah</span><span class="sub">Consultant &amp; Real Estate</span></span>
+  </div>
+
+  <div id="searchWrap">
+    <div class="search-pill">
+      <svg class="search-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+      <input id="searchBar" placeholder="Search a city or budget…">
+      <button class="s-btn" id="searchBtn" aria-label="Search">Go</button>
+    </div>
+  </div>
+
+  <div id="classWrap">
+    <button id="classToggle" aria-label="Choose class">
+      <span class="ct-lab">Class</span><span class="ct-cur" id="ctCur">B</span><span class="ct-caret">▾</span>
+    </button>
+    <div id="classes">
+      <h4>Choose a class</h4>
+      <button class="cls" data-cls="S"><div class="t">S</div><div class="d">Luxury · 55–80M</div></button>
+      <button class="cls" data-cls="A"><div class="t">A</div><div class="d">Premium · 30–50M</div></button>
+      <button class="cls" data-cls="B"><div class="t">B</div><div class="d">Family · 12–28M</div></button>
+      <button class="cls" data-cls="C"><div class="t">C</div><div class="d">Affordable · 3.5–10M</div></button>
+      <button class="cls" data-cls="D"><div class="t">D</div><div class="d">Starter · from 800K · rent 8–60K</div></button>
+    </div>
+  </div>
+
+  <main id="deck"></main>
+  <div id="progress"></div>
+</div>
+
+<footer id="foot">powered by <b>novarixcore</b></footer>
+
+<script src="app.js"></script>
+</body>
+</html>
