@@ -23,7 +23,11 @@ function tierRange(k){
    is built and connected — N.zero will be wired to that same data. Until then the
    listings page shows an honest "coming soon" state. */
 const LIVE_DATA=false;
-const CITIES=["Nairobi","Mombasa","Kisumu","Nakuru","Diani","Eldoret","Thika","Machakos"];
+/* Cities NKM knows about. Kept to Nairobi only for now so no other city is ever
+   shown or named anywhere in the UI. More cities will be added later via the
+   admin panel. (Previous roster, for reference when expanding:
+   "Nairobi","Mombasa","Kisumu","Nakuru","Diani","Eldoret","Thika","Machakos") */
+const CITIES=["Nairobi"];
 /* Cities currently open to consultation (Nairobi only for now). */
 const OPEN_CITIES=["Nairobi"];
 const GMIN=25000,GMAX=80000000;
