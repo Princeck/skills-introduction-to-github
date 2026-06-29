@@ -277,7 +277,11 @@ function startFlow(){
   searchWrap.classList.remove('show');
   progress.classList.remove('show');
   stepIndex=0;
-  pageWelcome();   // login removed — straight into Zero's consultation
+  // §2.1/§2.5 — buyer signs in first. A remembered buyer (demo: localStorage)
+  // skips straight in and N.zero greets them by name; otherwise show sign-in.
+  const u=demoGetUser();
+  if(u && u.name){ state.name=parseName(u.name)||u.name; pageWelcome(); }
+  else { pageLogin('signin'); }
 }
 function freshStateIfNeeded(){if(!state.tier)freshState();}
 
@@ -288,9 +292,27 @@ function freshStateIfNeeded(){if(!state.tier)freshState();}
    real API call. For now it validates the form shape and proceeds; it never
    stores or checks a real password client-side. Users can also continue as a
    guest. */
+/* ---- DEMO-ONLY account store ----
+   A browser cannot securely store or hash credentials. This fakes "the company
+   database remembers you" with localStorage so the owner can click through the
+   returning-buyer experience. The REAL version is a PHP `users` table with
+   password_hash() + a server session. This is NOT secure and must never be
+   presented as such. */
+const DEMO_USER_KEY='nkm_demo_user';
+function demoSaveUser(u){try{localStorage.setItem(DEMO_USER_KEY,JSON.stringify(u));}catch(e){}}
+function demoGetUser(){try{return JSON.parse(localStorage.getItem(DEMO_USER_KEY)||'null');}catch(e){return null;}}
+function demoClearUser(){try{localStorage.removeItem(DEMO_USER_KEY);}catch(e){}}
+
 async function authSubmit(mode, data){
-  // BACKEND: POST to /api/login or /api/signup, verify server-side, set session.
-  // Returns {ok:true} on success. For now, accept any well-formed input.
+  // BACKEND: POST to /api/login or /api/signup, verify server-side, hash the
+  // password, set a session cookie. Returns {ok:true} on success.
+  // DEMO ONLY: remember the buyer locally so N.zero can greet them next time.
+  if(mode==='signup' || mode==='google'){
+    demoSaveUser({name:data.name||'',email:data.email||'',phone:data.phone||'',ts:Date.now()});
+  } else if(mode==='signin'){
+    const prev=demoGetUser()||{};
+    demoSaveUser({name:prev.name||'',email:data.email||prev.email||'',phone:prev.phone||'',ts:Date.now()});
+  }
   return {ok:true};
 }
 function validEmail(e){return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e||'');}
@@ -317,6 +339,10 @@ function pageLogin(mode){
           <div class="auth-field">
             <label>Full name</label>
             <input id="auName" placeholder="e.g. Ethan Rich" autocomplete="name">
+          </div>
+          <div class="auth-field">
+            <label>Phone</label>
+            <input id="auPhone" type="tel" inputmode="tel" placeholder="07xx xxx xxx" autocomplete="tel">
           </div>`:''}
           <div class="auth-field">
             <label>Email</label>
@@ -353,7 +379,7 @@ function pageLogin(mode){
           <span>Continue with Google</span>
         </button>
         <button class="auth-guest" id="auGuest">Continue as guest</button>
-        <p class="auth-fineprint">🔒 Your details are kept private. Authentication is processed securely.</p>
+        <p class="auth-fineprint">⚙️ Demo mode — details are saved only on this device. Secure accounts &amp; private storage arrive with the live system.</p>
       </div>`;
 
     const hint=p.querySelector('#auHint');
@@ -364,20 +390,23 @@ function pageLogin(mode){
       const pass=p.querySelector('#auPass').value;
       if(isSignup){
         const nm=p.querySelector('#auName').value.trim();
+        const phone=(p.querySelector('#auPhone').value||'').trim();
         const p2=p.querySelector('#auPass2').value;
         if(!nm || nm.split(' ').filter(Boolean).length<2){hint.textContent='Please enter your first and last name.';return;}
+        if(phone.replace(/\D/g,'').length<9){hint.textContent='Please enter a valid phone number.';return;}
         if(!validEmail(email)){hint.textContent='Please enter a valid email address.';return;}
         if(pass.length<6){hint.textContent='Password should be at least 6 characters.';return;}
         if(pass!==p2){hint.textContent='Passwords do not match.';return;}
         // capture name so Zero can greet them and skip re-asking
         state.name=parseName(nm)||'';
-        const r=await authSubmit('signup',{name:nm,email,pass});
+        const r=await authSubmit('signup',{name:nm,email,phone,pass});
         if(r.ok)proceed(); else hint.textContent=r.message||'Could not create account. Please try again.';
       }else{
         if(!validEmail(email)){hint.textContent='Please enter a valid email address.';return;}
         if(!pass){hint.textContent='Please enter your password.';return;}
         const r=await authSubmit('signin',{email,pass});
-        if(r.ok)proceed(); else hint.textContent=r.message||'Incorrect email or password.';
+        if(r.ok){ const su=demoGetUser(); if(su&&su.name)state.name=parseName(su.name)||su.name; proceed(); }
+        else hint.textContent=r.message||'Incorrect email or password.';
       }
     };
 
@@ -398,6 +427,7 @@ function pageLogin(mode){
 
 /* PAGE 0 — welcome */
 function pageWelcome(){window.__parallaxOff=false;
+  const first=(state.name||'').split(' ').filter(Boolean)[0]||'';
   showPage(p=>{
     p.innerHTML=`
       <div class="welcome">
@@ -405,7 +435,7 @@ function pageWelcome(){window.__parallaxOff=false;
         <div class="welcome-eyebrow">NKM Property Consultation</div>
         <div class="welcome-divider" aria-hidden="true"><span></span><i>◆</i><span></span></div>
         <h1>Hi, I'm <span class="accent">N.zero</span>.</h1>
-        <p>Your property consultant. A few details,<br>and I'll match you with homes that fit.</p>
+        <p>${first?`Welcome, ${first}.`:`Your property consultant.`} A few details,<br>and I'll match you with homes that fit.</p>
         <button class="welcome-cta" id="begin">Begin consultation <span class="cta-arrow">→</span></button>
       </div>`;
     p.querySelector('#begin').onclick=(e)=>{
@@ -414,13 +444,10 @@ function pageWelcome(){window.__parallaxOff=false;
       btn.classList.add('filling');                  // fill gold + white text
       setTimeout(()=>{
         navReset();   // fresh flow → clear back history
-        // if sign-up already captured a full (two-part) name, skip the name step
-        if(state.name && state.name.split(' ').filter(Boolean).length>=2){
-          searchWrap.classList.add('show');
-          navTo(pageIntent);
-        } else {
-          navTo(pageName);
-        }
+        // §2.2 — the name comes from the signed-in account, so N.zero never asks
+        // for it; go straight into the questions.
+        searchWrap.classList.add('show');
+        navTo(pageIntent);
       },90);
     };
   });
@@ -818,11 +845,10 @@ function hi(){return state.name?`, ${state.name.split(' ')[0]}`:'';}
    through this. If the name is missing we divert to pageName() and abort. The
    backend's real account/auth layer will sit behind this same single choke point. */
 function requireName(){
-  if(state.name) return true;
-  classesBox.classList.remove('show');
-  searchWrap.classList.remove('show');
-  pageName();
-  return false;
+  // §2.2 — the name now comes from the signed-in account (captured at sign-in),
+  // so N.zero no longer interrupts the flow to ask for it. Kept as the single
+  // choke point that the real server-side auth gate will sit behind.
+  return true;
 }
 
 /* ---- ADMIN ACCESS GATE ----
