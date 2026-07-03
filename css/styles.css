@@ -1424,3 +1424,26 @@ input:focus-visible,textarea:focus-visible,select:focus-visible{
   .welcome h1 .accent{-webkit-text-fill-color:var(--gold);color:var(--gold);background:none;animation:none}
   .welcome-cta .cta-arrow{animation:none}
 }
+
+/* ============================================================
+   PERFORMANCE PASS — keep the premium look, cut the GPU bill.
+   The film grain (full-screen overlay blend) and the beam are
+   the costliest layers; phones get calmer versions. Pages get
+   paint containment so swapping screens never repaints the
+   whole scene behind them.
+   ============================================================ */
+/* each page already clips (overflow auto) — let the browser skip
+   layout/paint work outside it entirely */
+.page{contain:layout paint}
+/* the fixed scene never resizes — isolate its layout & paint too */
+#scene{contain:strict}
+@media (max-width:720px){
+  /* static grain on phones: texture stays, per-frame repaint goes */
+  .scene-grain{animation:none;opacity:.035}
+  /* slower beam = fewer composited frames on weak GPUs */
+  .beam{animation-duration:30s}
+}
+/* very small / short screens: drop the blend-mode layers entirely */
+@media (max-width:400px), (max-height:480px){
+  .scene-grain,.beam{display:none}
+}

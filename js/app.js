@@ -30,6 +30,18 @@ const LIVE_DATA=false;
 const CITIES=["Nairobi"];
 /* Cities currently open to consultation (Nairobi only for now). */
 const OPEN_CITIES=["Nairobi"];
+/* ---- STAFF (assigned sellers) ----
+   NO fake employees. This stays EMPTY until the owner provides the real staff
+   data / admin-panel code; then each entry is {id, name} and listings carry
+   uploaded_by / active_seller_id pointing at a real staff id. The consultant
+   line in checkout and the sale-complete screen only render when a real staff
+   member resolves — never a made-up name. */
+const STAFF=[];
+function assignedSellerFor(item){
+  if(!item||!STAFF.length)return null;
+  const id=item.active_seller_id!=null?item.active_seller_id:item.uploaded_by;
+  return STAFF.find(s=>s.id===id)||null;
+}
 const GMIN=25000,GMAX=80000000;
 
 let state={};
@@ -51,6 +63,9 @@ const progress=document.getElementById('progress');
 
 /* ============================ HELPERS ============================ */
 const ksh=n=>(n==null||isNaN(n))?"KSh —":"KSh "+Number(n).toLocaleString('en-KE');
+/* escape user-supplied text before it goes into innerHTML — names arrive from
+   sign-up (and localStorage) and must never be interpreted as markup */
+const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const fmtBudget=()=>isRenting()?ksh(state.budget)+" /mo":ksh(state.budget);
 function tierFromValue(v){for(const k of TIER_ORDER){const [lo,hi]=tierRange(k);if(v>=lo&&v<=hi)return k;}
   let best="S",bd=Infinity;for(const k of TIER_ORDER){const [lo,hi]=tierRange(k);const d=Math.min(Math.abs(v-lo),Math.abs(v-hi));if(d<bd){bd=d;best=k;}}return best;}
@@ -427,7 +442,7 @@ function pageLogin(mode){
 
 /* PAGE 0 — welcome */
 function pageWelcome(){window.__parallaxOff=false;
-  const first=(state.name||'').split(' ').filter(Boolean)[0]||'';
+  const first=esc((state.name||'').split(' ').filter(Boolean)[0]||'');
   showPage(p=>{
     p.innerHTML=`
       <div class="welcome">
@@ -838,7 +853,7 @@ function pageIntent(){
     });
   });
 }
-function hi(){return state.name?`, ${state.name.split(' ')[0]}`:'';}
+function hi(){return state.name?`, ${esc(state.name.split(' ')[0])}`:'';}
 
 /* ---- single hard gate: NO route may reach the flow/checkout without a name ----
    Every entry point (class click, search, express acquire, future routes) funnels
@@ -1549,6 +1564,7 @@ function pageCheckout(item){window.__parallaxOff=true;
   classesBox.classList.remove('show');   // hide the class bar while paying — no distraction
   showPage(p=>{
     const t=TIERS[state.tier];const deposit=Math.round(item.price*0.1);
+    const seller=assignedSellerFor(item);   // real staff only — null until admin data lands
     const prof=PAY_PROFILES[state.tier]||PAY_PROFILES.B;
     // D class serves both renters and budget buyers. The D profile copy is written
     // for renters, so when a BUYER lands in D, swap to purchase-appropriate wording.
@@ -1569,7 +1585,7 @@ function pageCheckout(item){window.__parallaxOff=true;
           <div class="pay-fields" data-pf="mpesa">
             <div class="pay-method"><label>M-Pesa Number</label><input id="mpesaNo" placeholder="07XX XXX XXX" inputmode="numeric"></div>
             <p class="bank-line">An STK push for <b>${ksh(deposit)}</b> will be sent to your phone. Enter your PIN on the prompt to authorise.</p>
-            <div class="ssl-row"><span class="lock">🔒</span> Secured by Safaricom Daraja · 256-bit encrypted</div>
+            <div class="ssl-row"><span class="lock">🔒</span> The M-Pesa prompt comes only from our office · never share your PIN</div>
           </div>`;
     const fieldBank=`
           <div class="pay-fields" data-pf="bank">
@@ -1582,7 +1598,7 @@ function pageCheckout(item){window.__parallaxOff=true;
               <div class="srow"><span>Amount</span><b>${ksh(deposit)}</b></div>
               <div class="srow"><span>Ref</span><b id="bRef">${randRef()}</b><button class="copy-btn" data-copy="bRef">Copy</button></div>
             </div>
-            <div class="ssl-row"><span class="lock">🔒</span> Regulated escrow · released on handover · never share your PIN/OTP</div>
+            <div class="ssl-row"><span class="lock">🔒</span> Confirm account details with our office before transferring · never share your PIN/OTP</div>
           </div>`;
     const fieldCard=`
           <div class="pay-fields" data-pf="card">
@@ -1599,7 +1615,7 @@ function pageCheckout(item){window.__parallaxOff=true;
             <div class="pay-method"><label>Cardholder Name</label><input placeholder="As shown on card"></div>
             <div class="pay-method"><label>Card Number</label><input placeholder="Card number" inputmode="numeric"></div>
             <div class="pay-method"><label>Expiry / CVC</label><input placeholder="MM/YY · 123" inputmode="numeric"></div>
-            <div class="ssl-row"><span class="lock">🔒</span> 3-D Secure · Visa / Mastercard / PesaLink verified · PCI-DSS compliant</div>
+            <div class="ssl-row"><span class="lock">🔒</span> Card payments are completed with a consultant on a verified line</div>
           </div>`;
     const fieldFinance=`
           <div class="pay-fields" data-pf="finance">
@@ -1631,7 +1647,7 @@ function pageCheckout(item){window.__parallaxOff=true;
             </div>
             <div class="pay-method"><label>M-Pesa Number</label><input placeholder="07XX XXX XXX" inputmode="numeric"></div>
             <p class="llp-reassure">You'll get an STK push for the deposit now. Each installment is collected automatically on M-Pesa — pay ahead or clear early any time, free of charge.</p>
-            <div class="ssl-row"><span class="lock">🔒</span> Flexible · interest-free · cancel-friendly · secured by M-Pesa</div>
+            <div class="ssl-row"><span class="lock">🔒</span> Flexible · interest-free · cancel-friendly · collected via M-Pesa</div>
           </div>`;})();
     const FIELDS={mpesa:fieldMpesa,bank:fieldBank,card:fieldCard,finance:fieldFinance,lipalp:fieldLipa};
     const chooserLabels={mpesa:['Mobile money',LOGOS.mpesa],bank:['Bank transfer',`<span class="ci">${LOGOS.bankIcon}</span>`],
@@ -1646,6 +1662,7 @@ function pageCheckout(item){window.__parallaxOff=true;
           <h3>Contract Notice</h3>
           <div class="contract-row"><span>Property</span><span>${listingLabel()}</span></div>
           <div class="contract-row"><span>Location</span><span>${state.city}, Kenya</span></div>
+          ${seller?`<div class="contract-row"><span>Your consultant</span><span>${esc(seller.name)}</span></div>`:''}
           <div class="contract-row"><span>Type</span><span>${TIERS[state.tier].name.split(' ')[0]} Class</span></div>
           <div class="contract-row"><span>Bedrooms</span><span>${item.bedCount!=null?item.bedCount:'—'}</span></div>
           <div class="contract-row"><span>Approx. size</span><span>${item.sizeSqm!=null?item.sizeSqm+" m²":"—"}</span></div>
@@ -1660,7 +1677,7 @@ function pageCheckout(item){window.__parallaxOff=true;
           ${prof.welcomeNote?`<div class="pay-welcome">${prof.welcomeNote}</div>`:''}
           ${useChooser?`
           <div id="payChooser" class="pay-chooser">
-            <p class="chooser-q">${state.name?state.name+', how':'How'} would you like to pay?</p>
+            <p class="chooser-q">${state.name?esc(state.name)+', how':'How'} would you like to pay?</p>
             <div class="chooser-grid">
               ${prof.methods.map(pm=>`<button class="chooser-btn" data-go="${pm}">${chooserLabels[pm][1]}<span>${chooserLabels[pm][0]}</span></button>`).join('')}
             </div>
@@ -1673,7 +1690,7 @@ function pageCheckout(item){window.__parallaxOff=true;
           </div>
           <button class="change-method" id="changeMethod" style="display:none">‹ Change payment method</button>
           ${prof.methods.map(pm=>FIELDS[pm]).join('')}
-          <label class="confirm-row"><input type="checkbox" id="confirmChk"><span>I confirm the property details and authorise the secure deposit of <b>${ksh(deposit)}</b>.</span></label>
+          <label class="confirm-row"><input type="checkbox" id="confirmChk"><span>I confirm the property details and authorise the deposit request of <b>${ksh(deposit)}</b>.</span></label>
           <div class="co-actions">
             <button class="place" id="placeBtn" disabled>${isRenting()?'RESERVE &amp; PAY':'PLACE ORDER'}</button>
             <button class="cancel" id="coBack">← Back</button>
@@ -1752,8 +1769,9 @@ function pageCheckout(item){window.__parallaxOff=true;
 function pageDone(success,item){
   progress.classList.remove('show');
   showPage(p=>{
+    const seller=success?assignedSellerFor(item):null;
     const msg=success
-      ? `Thank you for choosing <b>NKM NicMitah Consultant &amp; Real Estate</b>${hi()}. Your transaction has been completed successfully.<br><br>Your <b>${listingLabel()}</b> in <b>${state.city}</b> is now marked <b>Sold</b>. The session will restart shortly.`
+      ? `Thank you for choosing <b>NKM NicMitah Consultant &amp; Real Estate</b>${hi()}. Your transaction has been completed successfully.<br><br>Your <b>${listingLabel()}</b> in <b>${state.city}</b> is now marked <b>Sold</b>.${seller?` Your sale is handled by <b>${esc(seller.name)}</b>, who will contact you shortly.`:''} The session will restart shortly.`
       : `Your payment could not be completed. No charges were made to your account. The session will restart shortly.`;
     p.innerHTML=`<div class="welcome">${zeroBlock(msg)}</div>`;
   });
@@ -2147,6 +2165,19 @@ function restartCinema(){
   },{passive:true});
   window.addEventListener('pointerleave',()=>el.classList.remove('lit'));
 })();
+
+/* ---- resilience: never leave the user staring at a dead screen ----
+   Any uncaught error is logged; if it killed the app before a page painted,
+   recover once by restarting the flow instead of freezing. */
+let __recovered=false;
+window.addEventListener('error',e=>{
+  console.error('[NKM]',e.error||e.message);
+  if(!__recovered && deck && !deck.querySelector('.page')){
+    __recovered=true;
+    try{freshState();startFlow();}catch(_){}
+  }
+});
+window.addEventListener('unhandledrejection',e=>{console.error('[NKM]',e.reason);});
 
 /* first load: run the intro animation then boot */
 (function(){const dur=animateIntro();setTimeout(bootApp,dur+250);})();
