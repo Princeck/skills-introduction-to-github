@@ -1447,3 +1447,22 @@ input:focus-visible,textarea:focus-visible,select:focus-visible{
 @media (max-width:400px), (max-height:480px){
   .scene-grain,.beam{display:none}
 }
+
+/* ============================================================
+   CONTACT STEP (§2.4) — Buy → company line → payment method
+   ============================================================ */
+.contact-card{width:100%;max-width:460px;margin:0 auto;text-align:center;
+  background:var(--surface);border:1px solid var(--hairline);border-radius:var(--r-lg);
+  padding:28px 26px;box-shadow:var(--shadow),inset 0 1px 0 rgba(255,255,255,.65)}
+.contact-card .cc-k{font-size:10px;letter-spacing:2.6px;text-transform:uppercase;
+  color:var(--gold-deep);font-weight:700;margin-bottom:14px}
+.contact-card .cc-phone{display:block;font-family:var(--serif);font-weight:700;
+  font-size:clamp(24px,5.4vw,34px);color:var(--on-surface);letter-spacing:.5px;
+  text-decoration:none;margin-bottom:8px;transition:color var(--t-base) var(--ease)}
+.contact-card a.cc-phone:hover{color:var(--gold-deep)}
+.contact-card .cc-phone.cc-soon{color:var(--on-surface-soft);font-size:clamp(18px,4vw,24px)}
+.contact-card .cc-note{font-size:12.5px;color:var(--on-surface-soft);line-height:1.6;margin-bottom:4px}
+.contact-card .cc-actions{display:flex;flex-direction:column;align-items:center;gap:10px;margin-top:18px}
+.contact-card .back-link{border:none;background:transparent;color:var(--on-surface-soft);
+  font-family:var(--sans);font-size:12.5px;font-weight:600;cursor:pointer;padding:6px 10px;border-radius:8px}
+.contact-card .back-link:hover{color:var(--gold-deep)}

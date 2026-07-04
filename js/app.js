@@ -42,6 +42,14 @@ function assignedSellerFor(item){
   const id=item.active_seller_id!=null?item.active_seller_id:item.uploaded_by;
   return STAFF.find(s=>s.id===id)||null;
 }
+/* ---- COMPANY SETTINGS ----
+   The ONE place the owner edits company-wide details. The real version reads
+   these from the `company_settings` table so admin can change them without
+   touching code. phone:null shows an honest "line coming soon" state — never
+   a made-up number. */
+const COMPANY_SETTINGS={
+  phone:null,          // e.g. "+254 7XX XXX XXX" — set by the owner
+};
 const GMIN=25000,GMAX=80000000;
 
 let state={};
@@ -317,6 +325,50 @@ const DEMO_USER_KEY='nkm_demo_user';
 function demoSaveUser(u){try{localStorage.setItem(DEMO_USER_KEY,JSON.stringify(u));}catch(e){}}
 function demoGetUser(){try{return JSON.parse(localStorage.getItem(DEMO_USER_KEY)||'null');}catch(e){return null;}}
 function demoClearUser(){try{localStorage.removeItem(DEMO_USER_KEY);}catch(e){}}
+
+/* ---- DEMO-ONLY "company database" ----
+   Simulates the future MySQL tables (sales, standby) in localStorage so the
+   whole View→standby→Buy→record flow is clickable with no server. DEMO ONLY —
+   nothing here is private or persistent beyond this browser.
+   PRIVACY RULE (enforced for real in PHP): buyer credentials live only in the
+   full sale record ("company DB"); anything staff-facing must go through
+   staffViewOfSale(), which exposes ONLY the payment method — never the buyer. */
+const DEMO_DB_KEY='nkm_demo_db';
+function dbRead(){try{const d=JSON.parse(localStorage.getItem(DEMO_DB_KEY)||'null');return (d&&d.sales&&d.standby)?d:{sales:[],standby:[]};}catch(e){return {sales:[],standby:[]};}}
+function dbWrite(db){try{localStorage.setItem(DEMO_DB_KEY,JSON.stringify(db));}catch(e){}}
+/* §2.3 — viewing a house puts its uploader ON STANDBY for this potential sale.
+   staff_id stays null until real staff/listing data arrives from the admin panel. */
+function recordStandby(item){
+  const db=dbRead();
+  const ref=item&&item.ref?item.ref:(listingLabel()+' · '+(state.city||''));
+  if(!db.standby.some(s=>s.listing_ref===ref)){
+    const seller=assignedSellerFor(item);
+    db.standby.push({listing_ref:ref,staff_id:seller?seller.id:null,ts:Date.now()});
+    dbWrite(db);
+  }
+}
+/* §2.4 — Buy: the chosen payment method + buyer credentials go to the company DB. */
+function recordSale(item,method){
+  const db=dbRead();
+  const u=demoGetUser()||{};
+  const seller=assignedSellerFor(item);
+  const sale={
+    id:'S'+Date.now().toString(36).toUpperCase(),
+    listing_ref:item&&item.ref?item.ref:(listingLabel()+' · '+(state.city||'')),
+    price:item?item.price:null,
+    payment_method:method||'unspecified',
+    // buyer credentials — company-DB only; staff never see these (see staffViewOfSale)
+    buyer:{name:state.name||u.name||'',email:u.email||'',phone:u.phone||''},
+    // §4.3 — room for one or two credited staff (primary / replacement)
+    staff_credits:seller?[{staff_id:seller.id,role:'primary'}]:[],
+    status:'awaiting_application',   // §2.6 — the owner's application step slots in here
+    created_at:new Date().toISOString(),
+  };
+  db.sales.push(sale);dbWrite(db);
+  return sale;
+}
+/* the ONLY shape staff-facing code may read — payment method, never the buyer */
+function staffViewOfSale(s){return {id:s.id,listing_ref:s.listing_ref,payment_method:s.payment_method,status:s.status,created_at:s.created_at,staff_credits:s.staff_credits};}
 
 async function authSubmit(mode, data){
   // BACKEND: POST to /api/login or /api/signup, verify server-side, hash the
@@ -1444,13 +1496,14 @@ function pageResults(){window.__parallaxOff=true;
       const openDetail=()=>pageDetail(cardsData[i]);
       const img=card.querySelector('.gcard-img'); if(img)img.onclick=openDetail;
       const vd=card.querySelector('.view-d'); if(vd)vd.onclick=(e)=>{e.stopPropagation();openDetail();};
-      const buy=card.querySelector('.buy'); if(buy)buy.onclick=(e)=>{e.stopPropagation();pageCheckout(cardsData[i]);};
+      const buy=card.querySelector('.buy'); if(buy)buy.onclick=(e)=>{e.stopPropagation();pageContact(cardsData[i]);};
     });
   });
 }
 
 /* PAGE 5.5 — full property detail view (gallery + bedrooms + pros/cons) */
 function pageDetail(item){window.__parallaxOff=true;
+  recordStandby(item);   // §2.3 — viewing puts the uploader on standby for this sale
   searchWrap.classList.remove('show');
   showPage(p=>{
     p.classList.add('results-page');
@@ -1513,7 +1566,7 @@ function pageDetail(item){window.__parallaxOff=true;
     p.querySelector('#dNext').onclick=()=>show(g+1);
     thumbs.forEach((tb,i)=>tb.onclick=()=>{if(i<ng)show(i);});
     p.querySelector('#dBack').onclick=()=>pageResults();
-    p.querySelector('#dBuy').onclick=()=>pageCheckout(item);
+    p.querySelector('#dBuy').onclick=()=>pageContact(item);
   });
 }
 
@@ -1558,6 +1611,35 @@ const PAY_PROFILES={
      promise:'A warm welcome · move in with ease · we’ve got you',
      depositLabel:'Move-in deposit (1 month)'},
 };
+
+/* PAGE 6.5 — §2.4 contact step: Buy first shows the company line, then the
+   buyer continues to pick a payment method. The phone comes from
+   COMPANY_SETTINGS (owner-editable, never hardcoded around the app). */
+function pageContact(item){window.__parallaxOff=true;
+  searchWrap.classList.remove('show');
+  classesBox.classList.remove('show');
+  showPage(p=>{
+    const seller=assignedSellerFor(item);
+    const tel=COMPANY_SETTINGS.phone;
+    p.innerHTML=`
+      ${zeroBlock(`Wonderful choice${hi()}. To proceed with this home, you can <b>call our office</b> directly — or continue below to choose how you'd like to pay, and our team will reach out to you.`)}
+      <div class="contact-card">
+        <div class="cc-k">NicMitah Consultant &amp; Real Estate</div>
+        ${tel
+          ? `<a class="cc-phone" href="tel:${tel.replace(/\s+/g,'')}">${esc(tel)}</a>
+             <div class="cc-note">Mon–Sat · 8:00–18:00 EAT · mention your ${esc(listingLabel())}</div>`
+          : `<div class="cc-phone cc-soon">Office line published at launch</div>
+             <div class="cc-note">Continue below — our team will call you on the number from your account.</div>`}
+        ${seller?`<div class="cc-note">Your consultant: <b>${esc(seller.name)}</b></div>`:''}
+        <div class="cc-actions">
+          <button class="next" id="ccPay">Choose payment method →</button>
+          <button class="back-link" id="ccBack">‹ Back to the home</button>
+        </div>
+      </div>`;
+    p.querySelector('#ccPay').onclick=()=>pageCheckout(item);
+    p.querySelector('#ccBack').onclick=()=>pageDetail(item);
+  });
+}
 
 function pageCheckout(item){window.__parallaxOff=true;
   searchWrap.classList.remove('show');
@@ -1760,7 +1842,17 @@ function pageCheckout(item){window.__parallaxOff=true;
     // confirm checkbox gates the order
     const chk=p.querySelector('#confirmChk'),placeBtn=p.querySelector('#placeBtn');
     chk.onchange=()=>{placeBtn.disabled=!chk.checked;};
-    placeBtn.onclick=()=>{if(!chk.checked)return;pageDone(true,item);};
+    placeBtn.onclick=()=>{
+      if(!chk.checked)return;
+      // §2.4 — record method + buyer to the (demo) company DB. Staff-facing
+      // reads go through staffViewOfSale() and never include the buyer.
+      const activeField=p.querySelector('.pay-fields.active');
+      recordSale(item,activeField?activeField.dataset.pf:null);
+      /* §2.6 APPLICATION STEP HOOK — the owner's application page will slot in
+         here (sale.status is 'awaiting_application'); until then we go straight
+         to the done screen. */
+      pageDone(true,item);
+    };
     const coBack=p.querySelector('#coBack'); if(coBack)coBack.onclick=()=>pageDetail(item);
   });
 }
