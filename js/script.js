@@ -209,13 +209,9 @@ const LOGOS={
   financeIcon:`<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21 h18"/><path d="M5 21 V9 M19 21 V9 M9 21 V9 M15 21 V9"/><path d="M12 3 L21 8 H3 Z"/></svg>`,
   poleIcon:`<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12 h3 M10.5 12 h3 M18 12 h3"/><circle cx="7.5" cy="12" r="1.4" fill="currentColor" stroke="none"/><circle cx="15" cy="12" r="1.4" fill="currentColor" stroke="none"/><path d="M5 6 q7 -3 14 0 M5 18 q7 3 14 0" opacity=".55"/></svg>`
 };
-const BANKS=[
-  {id:"equity",name:"Equity Bank Kenya",acct:"—",swift:"—",paybill:"—"},
-  {id:"kcb",name:"KCB Bank Kenya",acct:"—",swift:"—",paybill:"—"},
-  {id:"coop",name:"Co-operative Bank",acct:"—",swift:"—",paybill:"—"},
-  {id:"absa",name:"Absa Bank Kenya",acct:"—",swift:"—",paybill:"—"},
-];
-function randRef(){return 'NKM-'+Math.random().toString(36).slice(2,7).toUpperCase()+'-'+Math.floor(1000+Math.random()*9000);}
+/* (Named-bank list and generated payment references removed — no fake payment
+   destinations or refs. Real account details are given by the office; real
+   references come from the backend when a sale is recorded.) */
 
 /* ---- Lipa Pole Pole plan maths (B/C/D buyers) ----
    A small, honest installment plan. A 10% booking deposit secures the home now,
@@ -374,7 +370,7 @@ async function authSubmit(mode, data){
   // BACKEND: POST to /api/login or /api/signup, verify server-side, hash the
   // password, set a session cookie. Returns {ok:true} on success.
   // DEMO ONLY: remember the buyer locally so N.zero can greet them next time.
-  if(mode==='signup' || mode==='google'){
+  if(mode==='signup'){
     demoSaveUser({name:data.name||'',email:data.email||'',phone:data.phone||'',ts:Date.now()});
   } else if(mode==='signin'){
     const prev=demoGetUser()||{};
@@ -436,15 +432,6 @@ function pageLogin(mode){
             : `New to NKM? <button class="auth-link" id="auToSignup">Create an account</button>`}
         </div>
         <div class="auth-divider"><span>or</span></div>
-        <button class="auth-google" id="auGoogle">
-          <svg viewBox="0 0 48 48" width="18" height="18" aria-hidden="true">
-            <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
-            <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
-            <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
-            <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
-          </svg>
-          <span>Continue with Google</span>
-        </button>
         <button class="auth-guest" id="auGuest">Continue as guest</button>
         <p class="auth-fineprint">⚙️ Demo mode — details are saved only on this device. Secure accounts &amp; private storage arrive with the live system.</p>
       </div>`;
@@ -481,10 +468,6 @@ function pageLogin(mode){
     const si=p.querySelector('#auToSignin'); if(si)si.onclick=()=>pageLogin('signin');
     const fg=p.querySelector('#auForgot'); if(fg)fg.onclick=()=>{hint.textContent='Password reset will be available once accounts are live.';};
     p.querySelector('#auGuest').onclick=()=>proceed();
-    const gg=p.querySelector('#auGoogle'); if(gg)gg.onclick=async ()=>{
-      // BACKEND: launch Google OAuth (redirect / popup) and verify server-side.
-      const r=await authSubmit('google',{}); if(r.ok)proceed(); else hint.textContent=r.message||'Google sign-in unavailable right now.';
-    };
 
     // Enter key submits
     p.querySelectorAll('input').forEach(inp=>inp.addEventListener('keydown',e=>{if(e.key==='Enter')p.querySelector('#auSubmit').click();}));
@@ -1666,47 +1649,25 @@ function pageCheckout(item){window.__parallaxOff=true;
     const fieldMpesa=`
           <div class="pay-fields" data-pf="mpesa">
             <div class="pay-method"><label>M-Pesa Number</label><input id="mpesaNo" placeholder="07XX XXX XXX" inputmode="numeric"></div>
-            <p class="bank-line">An STK push for <b>${ksh(deposit)}</b> will be sent to your phone. Enter your PIN on the prompt to authorise.</p>
+            <p class="bank-line">Our office sends the M-Pesa request for <b>${ksh(deposit)}</b> to this number once your order is confirmed.</p>
             <div class="ssl-row"><span class="lock">🔒</span> The M-Pesa prompt comes only from our office · never share your PIN</div>
           </div>`;
     const fieldBank=`
           <div class="pay-fields" data-pf="bank">
-            <div class="bank-chips">
-              ${BANKS.map((b,i)=>`<div class="bank-chip${i===0?' sel':''}" data-bank="${b.id}" title="${b.name}">${LOGOS[b.id]}</div>`).join('')}
-            </div>
             <div class="secure-box" id="bankBox">
-              <div class="srow"><span>Pay to</span><b id="bName">${BANKS[0].name}</b></div>
-              <div class="srow"><span>Account</span><b id="bAcct">${BANKS[0].acct}</b><button class="copy-btn" data-copy="bAcct">Copy</button></div>
               <div class="srow"><span>Amount</span><b>${ksh(deposit)}</b></div>
-              <div class="srow"><span>Ref</span><b id="bRef">${randRef()}</b><button class="copy-btn" data-copy="bRef">Copy</button></div>
             </div>
+            <p class="bank-line">Bank account details are provided directly by our office when your order is confirmed — we never post account numbers online.</p>
             <div class="ssl-row"><span class="lock">🔒</span> Confirm account details with our office before transferring · never share your PIN/OTP</div>
           </div>`;
     const fieldCard=`
           <div class="pay-fields" data-pf="card">
-            <div class="brand-label">International</div>
-            <div class="card-brands">
-              <div class="cb on">${LOGOS.visa}</div><div class="cb on">${LOGOS.mc}</div>
-              <div class="cb on">${LOGOS.amex}</div><div class="cb on">${LOGOS.unionpay}</div>
-            </div>
-            <div class="brand-label">Kenyan &amp; local</div>
-            <div class="card-brands">
-              <div class="cb on" style="width:62px">${LOGOS.pesalink}</div><div class="cb on" style="width:58px">${LOGOS.saccolink}</div>
-              <div class="cb on" style="width:56px">${LOGOS.pesapal}</div><div class="cb on" style="width:60px">${LOGOS.airtel}</div>
-            </div>
-            <div class="pay-method"><label>Cardholder Name</label><input placeholder="As shown on card"></div>
-            <div class="pay-method"><label>Card Number</label><input placeholder="Card number" inputmode="numeric"></div>
-            <div class="pay-method"><label>Expiry / CVC</label><input placeholder="MM/YY · 123" inputmode="numeric"></div>
-            <div class="ssl-row"><span class="lock">🔒</span> Card payments are completed with a consultant on a verified line</div>
+            <p class="bank-line">Card payments are arranged directly with our office — a consultant completes the payment with you on a verified line. No card details are entered here.</p>
+            <div class="ssl-row"><span class="lock">🔒</span> Never share your card number or CVC in chat or email</div>
           </div>`;
     const fieldFinance=`
           <div class="pay-fields" data-pf="finance">
-            <p class="bank-line" style="margin-bottom:8px">For premium properties, flexible financing is available. Choose an option that suits you:</p>
-            <div class="finance-opts">
-              <label class="fin-opt sel"><input type="radio" name="fin" checked><div><div class="fin-t">Mortgage pre-approval</div><div class="fin-d">Partner banks · from 30% deposit · up to 25 years</div></div></label>
-              <label class="fin-opt"><input type="radio" name="fin"><div><div class="fin-t">Installment plan</div><div class="fin-d">Pay over 12–36 months, interest-free first 6 months</div></div></label>
-              <label class="fin-opt"><input type="radio" name="fin"><div><div class="fin-t">International wire transfer</div><div class="fin-d">SWIFT · for diaspora &amp; corporate buyers</div></div></label>
-            </div>
+            <p class="bank-line">Flexible financing can be arranged for this home. A dedicated consultant will walk you through the options available and tailor an arrangement with you.</p>
             <div class="ssl-row"><span class="lock">🔒</span> A dedicated consultant will contact you to complete the arrangement</div>
           </div>`;
     const fieldLipa=(()=>{
@@ -1728,7 +1689,7 @@ function pageCheckout(item){window.__parallaxOff=true;
               <div class="lb-row lb-now"><span>Pay now via M-Pesa</span><b>${ksh(f.deposit)}</b></div>
             </div>
             <div class="pay-method"><label>M-Pesa Number</label><input placeholder="07XX XXX XXX" inputmode="numeric"></div>
-            <p class="llp-reassure">You'll get an STK push for the deposit now. Each installment is collected automatically on M-Pesa — pay ahead or clear early any time, free of charge.</p>
+            <p class="llp-reassure">Our office confirms your plan, then sends each M-Pesa request on schedule — pay ahead or clear early any time, free of charge.</p>
             <div class="ssl-row"><span class="lock">🔒</span> Flexible · interest-free · cancel-friendly · collected via M-Pesa</div>
           </div>`;})();
     const FIELDS={mpesa:fieldMpesa,bank:fieldBank,card:fieldCard,finance:fieldFinance,lipalp:fieldLipa};
@@ -1812,19 +1773,6 @@ function pageCheckout(item){window.__parallaxOff=true;
       const back=p.querySelector('#backMethods');
       if(back)back.onclick=()=>{body.style.display='none';chooser.style.display='block';};
     }
-    // bank selection updates the secure box
-    p.querySelectorAll('.bank-chip').forEach(opt=>opt.onclick=()=>{
-      p.querySelectorAll('.bank-chip').forEach(x=>x.classList.remove('sel'));
-      opt.classList.add('sel');
-      const b=BANKS.find(x=>x.id===opt.dataset.bank);
-      p.querySelector('#bAcct').textContent=b.acct;
-      p.querySelector('#bName').textContent=b.name;
-    });
-    // finance option highlighting (premium tiers)
-    p.querySelectorAll('.fin-opt').forEach(opt=>opt.onclick=()=>{
-      p.querySelectorAll('.fin-opt').forEach(x=>x.classList.remove('sel'));
-      opt.classList.add('sel');
-    });
     // Lipa Pole Pole plan selection (B/C/D) — recompute the breakdown live
     p.querySelectorAll('.llp-plan').forEach(opt=>opt.onclick=()=>{
       p.querySelectorAll('.llp-plan').forEach(x=>x.classList.remove('sel'));
@@ -1863,8 +1811,8 @@ function pageDone(success,item){
   showPage(p=>{
     const seller=success?assignedSellerFor(item):null;
     const msg=success
-      ? `Thank you for choosing <b>NKM NicMitah Consultant &amp; Real Estate</b>${hi()}. Your transaction has been completed successfully.<br><br>Your <b>${listingLabel()}</b> in <b>${state.city}</b> is now marked <b>Sold</b>.${seller?` Your sale is handled by <b>${esc(seller.name)}</b>, who will contact you shortly.`:''} The session will restart shortly.`
-      : `Your payment could not be completed. No charges were made to your account. The session will restart shortly.`;
+      ? `Your order has been recorded${hi()} — thank you for choosing <b>NKM NicMitah Consultant &amp; Real Estate</b>.<br><br>Our team will contact you to complete your <b>${listingLabel()}</b> in <b>${state.city}</b>.${seller?` Your sale is handled by <b>${esc(seller.name)}</b>, who will reach out shortly.`:''} The session will restart shortly.`
+      : `Your order could not be recorded. No charges were made. The session will restart shortly.`;
     p.innerHTML=`<div class="welcome">${zeroBlock(msg)}</div>`;
   });
   setTimeout(restartCinema,3000);
