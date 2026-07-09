@@ -192,18 +192,8 @@ function zeroBlock(text){
    Original stylised representations (not the trademarked logos). ============================ */
 const LOGOS={
   mpesa:`<svg class="brand-svg" viewBox="0 0 132 34" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="mpg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#54c038"/><stop offset="1" stop-color="#3a9e24"/></linearGradient></defs><rect width="132" height="34" rx="7" fill="url(#mpg)"/><circle cx="19" cy="17" r="11" fill="#fff"/><text x="19" y="22.5" font-family="Sora,Arial" font-weight="800" font-size="15" fill="#3a9e24" text-anchor="middle">M</text><text x="40" y="22.5" font-family="Sora,Arial" font-weight="800" font-size="15" fill="#fff" letter-spacing="1.5">PESA</text></svg>`,
-  equity:`<svg class="brand-svg" viewBox="0 0 88 26"><rect width="88" height="26" rx="3" fill="#e2231a"/><text x="44" y="18" font-family="Sora,Arial" font-weight="800" font-size="13" fill="#fff" text-anchor="middle">EQUITY</text></svg>`,
-  kcb:`<svg class="brand-svg" viewBox="0 0 60 26"><rect width="60" height="26" rx="3" fill="#0a7d3e"/><text x="30" y="18" font-family="Sora,Arial" font-weight="800" font-size="13" fill="#fff" text-anchor="middle">KCB</text></svg>`,
-  coop:`<svg class="brand-svg" viewBox="0 0 96 26"><rect width="96" height="26" rx="3" fill="#00529c"/><text x="48" y="18" font-family="Sora,Arial" font-weight="800" font-size="12" fill="#fff" text-anchor="middle">CO-OP</text></svg>`,
-  absa:`<svg class="brand-svg" viewBox="0 0 72 26"><rect width="72" height="26" rx="3" fill="#cc0000"/><text x="36" y="18" font-family="Sora,Arial" font-weight="800" font-size="13" fill="#fff" text-anchor="middle">ABSA</text></svg>`,
-  visa:`<svg class="brand-svg" viewBox="0 0 64 22"><rect width="64" height="22" rx="3" fill="#1a1f71"/><text x="32" y="16" font-family="Georgia,serif" font-style="italic" font-weight="700" font-size="13" fill="#fff" text-anchor="middle">VISA</text></svg>`,
-  mc:`<svg class="brand-svg" viewBox="0 0 52 32"><circle cx="20" cy="16" r="11" fill="#eb001b"/><circle cx="32" cy="16" r="11" fill="#f79e1b" opacity="0.9"/></svg>`,
-  amex:`<svg class="brand-svg" viewBox="0 0 64 22"><rect width="64" height="22" rx="3" fill="#2e77bb"/><text x="32" y="15" font-family="Sora,Arial" font-weight="800" font-size="9" fill="#fff" text-anchor="middle">AMEX</text></svg>`,
-  unionpay:`<svg class="brand-svg" viewBox="0 0 64 22"><rect width="32" height="22" rx="3" fill="#e21836"/><rect x="16" width="32" height="22" rx="3" fill="#00447c" opacity="0.92"/><rect x="32" width="32" height="22" rx="3" fill="#007b84" opacity="0.85"/></svg>`,
-  pesalink:`<svg class="brand-svg" viewBox="0 0 84 22"><rect width="84" height="22" rx="3" fill="#0b6e4f"/><circle cx="13" cy="11" r="5" fill="#7fd6a0"/><text x="50" y="15" font-family="Sora,Arial" font-weight="800" font-size="9" fill="#fff" text-anchor="middle">PesaLink</text></svg>`,
-  pesapal:`<svg class="brand-svg" viewBox="0 0 76 22"><rect width="76" height="22" rx="3" fill="#f47b20"/><text x="38" y="15" font-family="Sora,Arial" font-weight="800" font-size="9" fill="#fff" text-anchor="middle">Pesapal</text></svg>`,
-  airtel:`<svg class="brand-svg" viewBox="0 0 76 22"><rect width="76" height="22" rx="3" fill="#e40000"/><text x="38" y="15" font-family="Sora,Arial" font-weight="800" font-size="8.5" fill="#fff" text-anchor="middle">Airtel Money</text></svg>`,
-  saccolink:`<svg class="brand-svg" viewBox="0 0 84 22"><rect width="84" height="22" rx="3" fill="#1d4e89"/><text x="42" y="15" font-family="Sora,Arial" font-weight="800" font-size="8.5" fill="#fff" text-anchor="middle">Sacco Link</text></svg>`,
+  /* (bank/card brand badges removed — they implied partnerships that aren't
+     confirmed. Only the M-Pesa mark and neutral icons remain.) */
   bankIcon:`<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9 L12 4 L21 9 Z"/><path d="M4 9 v9 M9 9 v9 M15 9 v9 M20 9 v9"/><path d="M3 18 h18"/><path d="M2 21 h20"/></svg>`,
   cardIcon:`<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2.5"/><path d="M2 9.5 h20"/><path d="M6 15 h4"/></svg>`,
   financeIcon:`<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21 h18"/><path d="M5 21 V9 M19 21 V9 M9 21 V9 M15 21 V9"/><path d="M12 3 L21 8 H3 Z"/></svg>`,
@@ -1856,7 +1846,7 @@ function pagePremiumGate(k){
          ['◆','Dedicated private consultant','One point of contact, available around the clock for you alone.'],
          ['◆','Absolute discretion','Confidential, private viewings handled with full discretion.'],
          ['◆','White-glove acquisition','Legal, financing and handover managed end to end on your behalf.'],
-         ['◆','Bespoke financing','Private banking introductions and tailored payment structures.'],
+         ['◆','Bespoke arrangements','Payment structures tailored with your private consultant.'],
        ],
        cta:'Enter private viewing →',
        express:'⚡ Express acquisition — our signature S residence'},
@@ -1867,7 +1857,7 @@ function pagePremiumGate(k){
        perks:[
          ['◆','Personal consultant','A named advisor guides every step of your search.'],
          ['◆','Flexible private viewings','Book around your calendar, including evenings and weekends.'],
-         ['◆','Premium financing','Mortgage pre-approval and installment options arranged for you.'],
+         ['◆','Flexible financing','Financing and installment options discussed with your consultant.'],
          ['◆','Priority handover','Streamlined paperwork and a smooth, quick move-in.'],
        ],
        cta:'Begin premium viewing →',
@@ -1887,7 +1877,7 @@ function pagePremiumGate(k){
   }[k];
   showPage(p=>{
     p.innerHTML=`
-      ${zeroBlock(`${state.name?state.name+', ':''}${k==='B'?`let's find your family a home. This is `:`welcome to `}${GATE.blurb}`)}
+      ${zeroBlock(`${state.name?esc(state.name)+', ':''}${k==='B'?`let's find your family a home. This is `:`welcome to `}${GATE.blurb}`)}
       <div class="controls">
         <div class="gate-card ${GATE.cls}">
           <div class="gate-kicker">${GATE.kicker}</div>
