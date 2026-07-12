@@ -61,7 +61,7 @@ body{
 ::selection{background:rgba(47,111,106,.22);color:var(--ink)}
 ::-moz-selection{background:rgba(47,111,106,.22);color:var(--ink)}
 
-/* ---------- premium navy scene: soft aurora + drifting gold orbs ---------- */
+/* ---------- premium navy scene: aurora, skyline horizon & comet streaks ---------- */
 #scene{
   position:fixed;inset:0;z-index:0;opacity:0;transition:opacity 1.2s ease;overflow:hidden;
   background:
@@ -81,17 +81,29 @@ body{
 @keyframes auroraDrift{
   0%{transform:translate3d(0,0,0)}
   100%{transform:translate3d(-3%,3%,0)}}
-/* drifting golden orbs — a few soft glowing points (no blur filter) */
-.orbs{position:absolute;inset:0;z-index:0;pointer-events:none;overflow:hidden}
-.orb{position:absolute;border-radius:50%;
-  background:radial-gradient(circle at 38% 38%, rgba(247,221,165,.85), rgba(201,154,85,.4) 45%, transparent 72%);
-  will-change:transform,opacity;opacity:0;animation:orbFloat linear infinite}
-@keyframes orbFloat{
-  0%{opacity:0;transform:translate3d(0,18px,0) scale(.7)}
-  15%{opacity:.8}
-  50%{transform:translate3d(0,-10px,0) scale(1)}
-  85%{opacity:.6}
-  100%{opacity:0;transform:translate3d(0,-26px,0) scale(.85)}}
+/* ---- city skyline at the horizon (replaces the drifting orbs) ----
+   A quiet Nairobi-style silhouette with a few warm lit windows anchors the
+   scene in real estate. Static image = zero per-frame cost. */
+.skyline{position:absolute;left:0;right:0;bottom:0;z-index:0;pointer-events:none;
+  height:clamp(110px,20vh,200px);opacity:.85;
+  background-image:url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1200 240'><g fill='%23172c4e'><rect x='30' y='95' width='68' height='145'/><rect x='120' y='52' width='50' height='188'/><rect x='118' y='44' width='54' height='8'/><rect x='143' y='24' width='4' height='24'/><rect x='250' y='78' width='56' height='162' rx='26'/><rect x='276' y='50' width='4' height='34'/><rect x='340' y='120' width='82' height='120'/><rect x='460' y='40' width='46' height='200'/><rect x='455' y='60' width='56' height='6'/><rect x='540' y='140' width='92' height='100'/><rect x='670' y='70' width='60' height='170'/><rect x='698' y='46' width='4' height='26'/><rect x='760' y='104' width='42' height='136'/><rect x='830' y='58' width='74' height='182'/><rect x='940' y='122' width='56' height='118'/><rect x='1020' y='82' width='70' height='158'/><rect x='1120' y='138' width='58' height='102'/></g><g fill='%23e9c48a' opacity='.8'><rect x='44' y='120' width='5' height='7'/><rect x='70' y='150' width='5' height='7'/><rect x='132' y='80' width='5' height='7'/><rect x='150' y='120' width='5' height='7'/><rect x='266' y='110' width='5' height='7'/><rect x='284' y='150' width='5' height='7'/><rect x='360' y='140' width='5' height='7'/><rect x='396' y='170' width='5' height='7'/><rect x='472' y='70' width='5' height='7'/><rect x='488' y='120' width='5' height='7'/><rect x='560' y='160' width='5' height='7'/><rect x='600' y='185' width='5' height='7'/><rect x='685' y='100' width='5' height='7'/><rect x='706' y='150' width='5' height='7'/><rect x='845' y='90' width='5' height='7'/><rect x='874' y='140' width='5' height='7'/><rect x='952' y='150' width='5' height='7'/><rect x='1036' y='110' width='5' height='7'/><rect x='1060' y='160' width='5' height='7'/><rect x='1136' y='160' width='5' height='7'/></g></svg>");
+  background-repeat:repeat-x;background-position:bottom center;background-size:auto 100%}
+/* soft warm haze rising behind the skyline */
+.skyline::before{content:"";position:absolute;left:0;right:0;bottom:0;height:140%;z-index:-1;
+  background:linear-gradient(180deg,transparent,rgba(214,170,110,.05) 55%,rgba(94,120,160,.09))}
+
+/* ---- gold comet streaks — a rare shooting star across the upper sky ---- */
+.comets{position:absolute;inset:0;z-index:0;pointer-events:none;overflow:hidden}
+.comet{position:absolute;top:14%;left:-12%;width:150px;height:2px;border-radius:999px;
+  background:linear-gradient(90deg,transparent,rgba(240,212,154,.9));
+  filter:drop-shadow(0 0 6px rgba(240,212,154,.75));
+  transform:rotate(13deg);opacity:0;will-change:transform,opacity;
+  animation:cometFly 12s linear infinite}
+.comet.c2{top:32%;width:110px;animation-duration:15s;animation-delay:6.5s}
+@keyframes cometFly{
+  0%,88%{opacity:0;transform:translate3d(0,0,0) rotate(13deg)}
+  90%{opacity:1}
+  100%{opacity:0;transform:translate3d(115vw,26vh,0) rotate(13deg)}}
 .scene-overlay{position:absolute;inset:0;z-index:1;pointer-events:none;
   background:
     radial-gradient(120% 120% at 50% 40%, transparent 48%, rgba(8,16,32,.5) 82%, rgba(6,11,24,.9) 100%),
@@ -1460,6 +1472,28 @@ input:focus-visible,textarea:focus-visible,select:focus-visible{
 @media (max-width:480px){
   .auth-card{padding:26px 20px}
   .contact-card{padding:24px 20px}
+}
+
+/* ---- button-row alignment ----
+   Order rows: PLACE ORDER and Back sit on one perfectly-level line (equal
+   heights, centred labels); on narrow phones they stack full-width instead
+   of squeezing. The contact card's CTA gets a consistent width. */
+.co-actions{align-items:stretch}
+.co-actions .place,.co-actions .cancel{display:inline-flex;align-items:center;justify-content:center}
+@media (max-width:480px){
+  .co-actions{flex-direction:column}
+  .co-actions .cancel{width:100%}
+}
+.cc-actions .next{width:100%;max-width:320px}
+
+/* ---- progress bar shimmer — a slow light sweep along the gold fill ---- */
+#progress .bar{background:linear-gradient(90deg,var(--gold-deep),var(--gold) 40%,#f0d49a 50%,var(--gold) 60%,var(--gold-deep));
+  background-size:220% 100%;animation:progShine 2.8s linear infinite}
+@keyframes progShine{0%{background-position:0% 0}100%{background-position:220% 0}}
+
+@media (prefers-reduced-motion:reduce){
+  .comet{display:none}
+  #progress .bar{animation:none}
 }
 
 /* ============================================================

@@ -2111,23 +2111,8 @@ function animateIntro(){
   by.style.animation=`flowUp .7s ease ${dropEnd+450}ms forwards`;
   return dropEnd+450+700; // total intro duration until last element settled
 }
-function spawnOrbs(){
-  const box=document.getElementById('orbs');
-  if(!box||box.childElementCount)return;   // once only
-  const N=6;
-  let html='';
-  for(let i=0;i<N;i++){
-    const size=(Math.random()*4+2).toFixed(1);          // 2–6px core (glow makes them larger)
-    const left=(Math.random()*100).toFixed(1);
-    const top=(Math.random()*100).toFixed(1);
-    const dur=(Math.random()*14+12).toFixed(1);         // 12–26s drift
-    const delay=(-Math.random()*dur).toFixed(1);        // desync start
-    const scale=(Math.random()*2.2+1).toFixed(2);       // halo spread
-    html+=`<span class="orb" style="left:${left}%;top:${top}%;width:${size*scale*4}px;height:${size*scale*4}px;`+
-          `animation-duration:${dur}s;animation-delay:${delay}s"></span>`;
-  }
-  box.innerHTML=html;
-}
+/* (Floating orbs removed — the scene now uses the skyline horizon and comet
+   streaks, both pure CSS with no per-boot generation needed.) */
 /* twinkling starfield — scatters tiny gold-white points across the scene.
    Each gets its own duration/delay/brightness so the field shimmers
    organically rather than pulsing in unison. Injected once. */
@@ -2151,7 +2136,6 @@ function spawnStars(){
 function bootApp(){
   document.getElementById('intro').classList.add('fade');
   document.getElementById('scene').classList.add('on');
-  spawnOrbs();
   spawnStars();
   document.getElementById('app').classList.add('on');
   document.getElementById('headerScrim').classList.add('show');
