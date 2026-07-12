@@ -1448,6 +1448,20 @@ input:focus-visible,textarea:focus-visible,select:focus-visible{
   .scene-grain,.beam{display:none}
 }
 
+/* ---- fit pass: the sign-in card is the front door ----
+   .page reserves 118px top / 150px bottom for the fixed header & class bar,
+   which squeezes the (now taller) auth card on short phones. Neither the
+   search pill nor the class bar is shown on the auth screen, so reclaim
+   that space there; tighten card padding on narrow screens. */
+@media (max-height:700px){
+  .page.auth-page{padding-top:84px;padding-bottom:96px}
+  .auth-card{padding:24px 22px}
+}
+@media (max-width:480px){
+  .auth-card{padding:26px 20px}
+  .contact-card{padding:24px 20px}
+}
+
 /* ============================================================
    CONTACT STEP (§2.4) — Buy → company line → payment method
    ============================================================ */
