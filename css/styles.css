@@ -1497,6 +1497,36 @@ input:focus-visible,textarea:focus-visible,select:focus-visible{
 }
 
 /* ============================================================
+   ADAPTIVE CURSOR — a ring + dot that recolours to match what
+   it's over: white on the navy scene, navy on gold buttons,
+   gold on white cards. Grows over clickables, squeezes on
+   press. Desktop fine-pointer only; if JS never runs, the
+   .custom-cursor class is never added and the native cursor
+   stays untouched.
+   ============================================================ */
+#cursor{position:fixed;left:0;top:0;z-index:9999;pointer-events:none;opacity:0;transition:opacity .3s ease}
+body.custom-cursor #cursor.on{opacity:1}
+#cursor .cur-ring{position:absolute;left:-14px;top:-14px;width:28px;height:28px;border-radius:50%;
+  border:1.5px solid currentColor;opacity:.75;
+  transition:transform .22s var(--ease),color .25s ease,opacity .25s ease}
+#cursor .cur-dot{position:absolute;left:-3px;top:-3px;width:6px;height:6px;border-radius:50%;background:currentColor;
+  transition:transform .18s var(--ease),color .25s ease}
+/* theme states — set by js from the hovered element */
+#cursor.cur-light{color:#f7f9fb}          /* over the navy scene → white */
+#cursor.cur-ink{color:#16273d}            /* over gold elements → deep navy */
+#cursor.cur-gold{color:var(--gold-deep)}  /* over white surfaces → gold */
+/* affordance: swell over anything clickable, squeeze while pressing */
+#cursor.cur-hover .cur-ring{transform:scale(1.45);opacity:1}
+#cursor.cur-down .cur-ring{transform:scale(.8)}
+#cursor.cur-down .cur-dot{transform:scale(1.6)}
+/* the themed cursor replaces the native arrow; text fields keep their
+   native caret cursor so typing still feels right */
+body.custom-cursor,body.custom-cursor *{cursor:none!important}
+body.custom-cursor input,body.custom-cursor textarea,body.custom-cursor select{cursor:auto!important}
+@media (hover:none){#cursor{display:none}}
+@media (prefers-reduced-motion:reduce){#cursor{display:none}}
+
+/* ============================================================
    CONTACT STEP (§2.4) — Buy → company line → payment method
    ============================================================ */
 .contact-card{width:100%;max-width:460px;margin:0 auto;text-align:center;

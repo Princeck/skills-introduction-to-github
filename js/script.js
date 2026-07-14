@@ -2180,6 +2180,45 @@ function restartCinema(){
   window.addEventListener('pointerleave',()=>el.classList.remove('lit'));
 })();
 
+/* ---- adaptive cursor ----
+   A ring + dot that follows the pointer and recolours to match whatever is
+   underneath: white over the navy scene, deep navy over gold buttons, gold
+   over white cards. Swells over clickables, squeezes on press. Desktop
+   fine-pointer only; skipped for touch and reduced-motion users, and if JS
+   fails the native cursor is untouched. */
+(function initCursor(){
+  const el=document.getElementById('cursor');
+  if(!el)return;
+  const fine=window.matchMedia('(hover:hover) and (pointer:fine)').matches;
+  const calm=window.matchMedia('(prefers-reduced-motion:reduce)').matches;
+  if(!fine||calm)return;
+  document.body.classList.add('custom-cursor');
+  el.classList.add('cur-light');
+  // gold-filled elements → navy cursor
+  const GOLD_SEL='.next,.welcome-cta,.s-btn,.back-btn,.buy,.place,.auth-submit,.chooser-btn,.cls.active,.welcome h1 .accent,.emp-news';
+  // white/ivory surfaces → gold cursor
+  const LIGHT_SEL='.bubble,.auth-card,.name-card,.slider-card,.budget-card,.contact-card,.coming-soon,.panel,.gcard,.lcard,.detail,#classes,.search-pill,.gate-card';
+  // anything clickable → ring swells
+  const HOT_SEL='button,a,input,select,textarea,label,.opt,.cls,.gcard-img,.dthumb,.pay-tab,.llp-plan,.band,.qdrag';
+  let x=0,y=0,raf=0;
+  const apply=()=>{raf=0;el.style.transform=`translate3d(${x}px,${y}px,0)`;};
+  window.addEventListener('pointermove',e=>{
+    x=e.clientX;y=e.clientY;
+    if(!raf)raf=requestAnimationFrame(apply);
+    const t=e.target;
+    const theme=(t.closest&&t.closest(GOLD_SEL))?'cur-ink'
+              :(t.closest&&t.closest(LIGHT_SEL))?'cur-gold':'cur-light';
+    if(!el.classList.contains(theme)){
+      el.classList.remove('cur-ink','cur-gold','cur-light');el.classList.add(theme);
+    }
+    el.classList.toggle('cur-hover',!!(t.closest&&t.closest(HOT_SEL)));
+    el.classList.add('on');
+  },{passive:true});
+  document.addEventListener('pointerdown',()=>el.classList.add('cur-down'),{passive:true});
+  document.addEventListener('pointerup',()=>el.classList.remove('cur-down'),{passive:true});
+  document.documentElement.addEventListener('pointerleave',()=>el.classList.remove('on'));
+})();
+
 /* ---- resilience: never leave the user staring at a dead screen ----
    Any uncaught error is logged; if it killed the app before a page painted,
    recover once by restarting the flow instead of freezing. */
