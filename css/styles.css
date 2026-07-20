@@ -253,14 +253,20 @@ body{
 .page.prefs-page #prefNext{margin-bottom:14px}
 .page::-webkit-scrollbar{width:8px}
 .page::-webkit-scrollbar-thumb{background:rgba(160,200,240,.25);border-radius:8px}
-.page.active{opacity:1;pointer-events:auto;animation:pageIn .2s var(--ease) both}
-.page.leaving{animation:pageOut .15s var(--ease-soft) both}
+.page.active{opacity:1;pointer-events:auto;animation:pageIn .36s var(--ease) both}
+.page.leaving{animation:pageOut .16s var(--ease-soft) both}
 @keyframes pageIn{
-  0%{opacity:0;transform:translateY(12px) scale(.992)}
-  100%{opacity:1;transform:translateY(0) scale(1)}}
+  0%{opacity:0;transform:translateY(16px) scale(.988);filter:blur(4px)}
+  55%{filter:blur(0)}
+  100%{opacity:1;transform:translateY(0) scale(1);filter:blur(0)}}
 @keyframes pageOut{
   0%{opacity:1;transform:translateY(0) scale(1)}
-  100%{opacity:0;transform:translateY(-8px) scale(.994)}}
+  100%{opacity:0;transform:translateY(-10px) scale(.992)}}
+@media (prefers-reduced-motion:reduce){
+  .page.active{animation:fadeInOnly .2s ease both}
+  .page.leaving{animation:none}
+  @keyframes fadeInOnly{from{opacity:0}to{opacity:1}}
+}
 
 /* progress bar (under header) */
 #progress{position:fixed;top:0;left:0;transform:none;z-index:80;
@@ -454,8 +460,8 @@ input[type=range]::-moz-range-thumb{width:18px;height:18px;border-radius:50%;cur
 .next{margin-top:6px;padding:14px 32px;border-radius:999px;border:1.5px solid var(--gold);cursor:pointer;
   background:rgba(18,35,57,.35);color:var(--gold);
   font-weight:700;font-size:14px;font-family:var(--sans);letter-spacing:.3px;transition:transform .2s ease,box-shadow .25s ease,background .25s ease,color .3s ease,border-color .25s ease,opacity .2s ease}
-.next:hover:not(:disabled){transform:translateY(-2px);background:var(--gold);border-color:var(--gold);color:#fff;box-shadow:0 6px 16px rgba(0,0,0,.34)}
-.next:active:not(:disabled){transform:translateY(0) scale(.98)}
+.next:hover:not(:disabled){transform:translateY(-2px);background:linear-gradient(135deg,#f3d9a4,var(--gold) 55%,var(--gold-deep));border-color:var(--gold);color:#16273d;box-shadow:0 12px 28px -10px rgba(217,168,95,.7),0 2px 8px rgba(0,0,0,.28)}
+.next:active:not(:disabled){transform:translateY(0) scale(.975)}
 .next:disabled{opacity:.4;cursor:not-allowed;transform:none;box-shadow:none}
 /* back button — fixed at the bottom-left, same level as Class pill; styled like Begin consultation */
 .back-btn{position:fixed;left:24px;bottom:58px;z-index:55;padding:0 20px;height:44px;border-radius:999px;cursor:pointer;
@@ -1544,3 +1550,33 @@ body.custom-cursor input,body.custom-cursor textarea,body.custom-cursor select{c
 .contact-card .back-link{border:none;background:transparent;color:var(--on-surface-soft);
   font-family:var(--sans);font-size:12.5px;font-weight:600;cursor:pointer;padding:6px 10px;border-radius:8px}
 .contact-card .back-link:hover{color:var(--gold-deep)}
+
+/* small "(optional)" tag next to a field label */
+.lbl-opt{font-weight:500;font-size:11px;color:var(--on-surface-soft);letter-spacing:.2px;text-transform:none;margin-left:4px}
+
+/* ============================================================
+   DELIGHT LAYER — small, useful micro-interactions that make
+   the app feel alive and worth returning to.
+   ============================================================ */
+/* click burst — a quick gold ring blooms wherever the user taps a control */
+.burst{position:fixed;z-index:9998;pointer-events:none;width:16px;height:16px;margin:-8px 0 0 -8px;
+  border-radius:50%;border:2px solid var(--gold);opacity:.85;will-change:transform,opacity;
+  animation:burstPop .52s cubic-bezier(.22,.61,.36,1) forwards}
+@keyframes burstPop{to{transform:scale(4.2);opacity:0;border-width:.5px}}
+
+/* listing cards catch a soft light sweep on hover — draws the eye to browse */
+.gcard{position:relative;overflow:hidden}
+.gcard::after{content:"";position:absolute;inset:0;pointer-events:none;z-index:3;
+  background:linear-gradient(115deg,transparent 30%,rgba(255,244,214,.14) 48%,transparent 66%);
+  transform:translateX(-120%);transition:transform .8s var(--ease);opacity:0}
+.gcard:hover::after{transform:translateX(120%);opacity:1}
+
+/* the class-bar current letter pulses gently so returning users notice the selector */
+#classToggle .ct-cur{animation:ctBreathe 3.2s ease-in-out infinite}
+@keyframes ctBreathe{0%,100%{text-shadow:0 0 0 rgba(217,168,95,0)}50%{text-shadow:0 0 10px rgba(217,168,95,.55)}}
+
+@media (prefers-reduced-motion:reduce){
+  .burst{display:none}
+  .gcard::after{display:none}
+  #classToggle .ct-cur{animation:none}
+}

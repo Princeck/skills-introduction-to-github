@@ -369,6 +369,15 @@ async function authSubmit(mode, data){
   return {ok:true};
 }
 function validEmail(e){return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e||'');}
+/* derive a friendly display name from an email's local part, so a user who
+   signs up with their gmail never has to type a name:
+   "john.doe24@gmail.com" → "John Doe". Returns '' if nothing readable remains. */
+function nameFromEmail(email){
+  const local=String(email||'').split('@')[0]||'';
+  const parts=local.replace(/\+.*$/,'').split(/[._\-\d]+/).filter(w=>w.length>1);
+  if(!parts.length)return '';
+  return parts.slice(0,2).map(w=>w[0].toUpperCase()+w.slice(1).toLowerCase()).join(' ');
+}
 
 function pageLogin(mode){
   mode=mode||'signin';
@@ -390,8 +399,8 @@ function pageLogin(mode){
         <div class="auth-fields">
           ${isSignup?`
           <div class="auth-field">
-            <label>Full name</label>
-            <input id="auName" placeholder="e.g. Ethan Rich" autocomplete="name">
+            <label>Full name <span class="lbl-opt">(optional)</span></label>
+            <input id="auName" placeholder="Leave blank to use your email name" autocomplete="name">
           </div>
           <div class="auth-field">
             <label>Phone</label>
@@ -433,23 +442,29 @@ function pageLogin(mode){
       const email=p.querySelector('#auEmail').value.trim();
       const pass=p.querySelector('#auPass').value;
       if(isSignup){
-        const nm=p.querySelector('#auName').value.trim();
+        let nm=p.querySelector('#auName').value.trim();
         const phone=(p.querySelector('#auPhone').value||'').trim();
         const p2=p.querySelector('#auPass2').value;
-        if(!nm || nm.split(' ').filter(Boolean).length<2){hint.textContent='Please enter your first and last name.';return;}
-        if(phone.replace(/\D/g,'').length<9){hint.textContent='Please enter a valid phone number.';return;}
         if(!validEmail(email)){hint.textContent='Please enter a valid email address.';return;}
+        if(!nm)nm=nameFromEmail(email);   // email is enough — no name typing needed
+        if(!nm){hint.textContent='Please add your name — we could not read one from your email.';return;}
+        if(phone.replace(/\D/g,'').length<9){hint.textContent='Please enter a valid phone number.';return;}
         if(pass.length<6){hint.textContent='Password should be at least 6 characters.';return;}
         if(pass!==p2){hint.textContent='Passwords do not match.';return;}
         // capture name so Zero can greet them and skip re-asking
-        state.name=parseName(nm)||'';
+        state.name=parseName(nm)||nm;
         const r=await authSubmit('signup',{name:nm,email,phone,pass});
         if(r.ok)proceed(); else hint.textContent=r.message||'Could not create account. Please try again.';
       }else{
         if(!validEmail(email)){hint.textContent='Please enter a valid email address.';return;}
         if(!pass){hint.textContent='Please enter your password.';return;}
         const r=await authSubmit('signin',{email,pass});
-        if(r.ok){ const su=demoGetUser(); if(su&&su.name)state.name=parseName(su.name)||su.name; proceed(); }
+        if(r.ok){
+          const su=demoGetUser();
+          state.name=(su&&su.name)?(parseName(su.name)||su.name):nameFromEmail(email);
+          if(su&&!su.name&&state.name){su.name=state.name;demoSaveUser(su);}
+          proceed();
+        }
         else hint.textContent=r.message||'Incorrect email or password.';
       }
     };
@@ -2178,6 +2193,24 @@ function restartCinema(){
     if(!raf)raf=requestAnimationFrame(apply);
   },{passive:true});
   window.addEventListener('pointerleave',()=>el.classList.remove('lit'));
+})();
+
+/* ---- click burst ----
+   A small gold ring blooms wherever the user taps an interactive control —
+   a tactile flourish that makes the app feel responsive and alive. Works on
+   touch and mouse; skipped under reduced-motion. */
+(function initBurst(){
+  if(window.matchMedia('(prefers-reduced-motion:reduce)').matches)return;
+  const HOT='button,a,.opt,.cls,.gcard-img,.dthumb,.pay-tab,.llp-plan,.chooser-btn,.bank-chip,.band';
+  document.addEventListener('pointerdown',e=>{
+    const t=e.target;
+    if(!(t.closest&&t.closest(HOT)))return;
+    const b=document.createElement('span');
+    b.className='burst';
+    b.style.left=e.clientX+'px';b.style.top=e.clientY+'px';
+    document.body.appendChild(b);
+    setTimeout(()=>b.remove(),540);
+  },{passive:true});
 })();
 
 /* ---- adaptive cursor ----
