@@ -182,7 +182,54 @@ function setProgress(i){
 /* NKM logo — real brand mark embedded as an image */
 const NKM_LOGO_SRC="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIiByb2xlPSJpbWciIGFyaWEtbGFiZWw9Ik4uemVybyI+PGRlZnM+PGxpbmVhckdyYWRpZW50IGlkPSJuemJnIiB4MT0iMCIgeTE9IjAiIHgyPSIwIiB5Mj0iMSI+PHN0b3Agb2Zmc2V0PSIwIiBzdG9wLWNvbG9yPSIjMWQzNTU2Ii8+PHN0b3Agb2Zmc2V0PSIxIiBzdG9wLWNvbG9yPSIjMGIxODJlIi8+PC9saW5lYXJHcmFkaWVudD48bGluZWFyR3JhZGllbnQgaWQ9Im56ZyIgeDE9IjAiIHkxPSIwIiB4Mj0iMSIgeTI9IjEiPjxzdG9wIG9mZnNldD0iMCIgc3RvcC1jb2xvcj0iI2YwZDQ5YSIvPjxzdG9wIG9mZnNldD0iLjUiIHN0b3AtY29sb3I9IiNkOWE4NWYiLz48c3RvcCBvZmZzZXQ9IjEiIHN0b3AtY29sb3I9IiNiOTg2M2YiLz48L2xpbmVhckdyYWRpZW50PjwvZGVmcz48cmVjdCB4PSIzIiB5PSIzIiB3aWR0aD0iOTQiIGhlaWdodD0iOTQiIHJ4PSIyNCIgZmlsbD0idXJsKCNuemJnKSIvPjxyZWN0IHg9IjMuNzUiIHk9IjMuNzUiIHdpZHRoPSI5Mi41IiBoZWlnaHQ9IjkyLjUiIHJ4PSIyMy4yNSIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjZDlhODVmIiBzdHJva2Utb3BhY2l0eT0iLjQ1IiBzdHJva2Utd2lkdGg9IjEuNSIvPjxyZWN0IHg9IjkiIHk9IjYiIHdpZHRoPSI4MiIgaGVpZ2h0PSI0MCIgcng9IjIwIiBmaWxsPSIjZmZmZmZmIiBvcGFjaXR5PSIuMDUiLz48cGF0aCBkPSJNMzEgNzUgTDMxIDI5IEw1MCA1NyBMNjkgMjkgTDY5IDc1IiBmaWxsPSJub25lIiBzdHJva2U9InVybCgjbnpnKSIgc3Ryb2tlLXdpZHRoPSI1LjUiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIvPjxwYXRoIGQ9Ik01MCA1OCBMNTguNSA3NCBMNDEuNSA3NCBaIiBmaWxsPSJ1cmwoI256ZykiLz48Y2lyY2xlIGN4PSI1MCIgY3k9IjY5IiByPSIyLjciIGZpbGw9IiMxMTIzM2QiLz48L3N2Zz4=";
 function nkmBadge(){return `<img class="nkm-img" src="${NKM_LOGO_SRC}" alt="N.zero" draggable="false">`;}
-(function(){const m=document.getElementById("logoMark"); if(m)m.innerHTML=nkmBadge();})();
+
+/* ---- NKM company shield — faithful vector of the brand logo ----
+   Navy crest with a double gold border, a silver Ionic column, the gold NKM
+   monogram, the NOVARIXCORE wordmark and a gold compass star. Pure vector, so
+   it stays razor-sharp at every size. `idp` namespaces the gradient ids so
+   multiple copies (header + intro) never collide. Individual parts carry
+   classes (sh-outer, sh-inner, sh-col, sh-mono, sh-word, sh-star, sh-fill)
+   the intro animation draws on. */
+function nkmLogoSVG(idp){
+  idp=idp||'lg';
+  const shield='M33 46 L120 32 L207 46 L207 139 L120 243 L33 139 Z';
+  const inner='M47 58 L120 45 L193 58 L193 133 L120 225 L47 133 Z';
+  return `<svg class="nkm-shield" viewBox="0 0 240 268" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="NKM NicMitah Consultant and Real Estate — Novarixcore">
+  <defs>
+    <linearGradient id="${idp}Gold" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#f8e7b3"/><stop offset=".34" stop-color="#e7c176"/>
+      <stop offset=".62" stop-color="#d9a85f"/><stop offset="1" stop-color="#b07d38"/>
+    </linearGradient>
+    <linearGradient id="${idp}Nav" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#1c3252"/><stop offset="1" stop-color="#0d1a2b"/>
+    </linearGradient>
+    <linearGradient id="${idp}Sil" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#ffffff"/><stop offset=".5" stop-color="#cfd7df"/>
+      <stop offset="1" stop-color="#8f9ca9"/>
+    </linearGradient>
+  </defs>
+  <path class="sh-fill" d="${shield}" fill="url(#${idp}Nav)"/>
+  <g class="sh-col" fill="url(#${idp}Sil)" stroke="#7f8b98" stroke-width=".8">
+    <rect x="101" y="74" width="38" height="7" rx="1.5"/>
+    <rect x="103" y="81" width="34" height="8"/>
+    <circle cx="107" cy="86" r="7"/><circle cx="133" cy="86" r="7"/>
+    <circle cx="107" cy="86" r="2.1" fill="#8f9aa6" stroke="none"/><circle cx="133" cy="86" r="2.1" fill="#8f9aa6" stroke="none"/>
+    <rect x="110" y="89" width="20" height="66"/>
+    <g stroke="#93a0ac" stroke-width="1"><line x1="116" y1="91" x2="116" y2="153"/><line x1="120" y1="91" x2="120" y2="153"/><line x1="124" y1="91" x2="124" y2="153"/></g>
+    <rect x="100" y="155" width="40" height="9" rx="1.5"/>
+  </g>
+  <text class="sh-mono" x="120" y="150" text-anchor="middle" font-family="Georgia,'Times New Roman',serif" font-weight="700" font-size="74" letter-spacing="-3" fill="url(#${idp}Gold)">NKM</text>
+  <text class="sh-word" x="120" y="182" text-anchor="middle" font-family="'Helvetica Neue',Arial,sans-serif" font-weight="700" font-size="14.5" letter-spacing="4.2" fill="url(#${idp}Gold)">NOVARIXCORE</text>
+  <g class="sh-star" fill="url(#${idp}Gold)" transform="translate(120 208)">
+    <path d="M0 -20 L4 -4 L20 0 L4 4 L0 20 L-4 4 L-20 0 L-4 -4 Z"/>
+    <path d="M0 -12 L3.4 -3.4 L12 0 L3.4 3.4 L0 12 L-3.4 3.4 L-12 0 L-3.4 -3.4 Z" transform="rotate(45)" opacity=".9"/>
+    <circle cx="0" cy="0" r="2.3" fill="#16273d"/>
+  </g>
+  <path class="sh-inner" d="${inner}" fill="none" stroke="url(#${idp}Gold)" stroke-width="2" opacity=".92" stroke-linejoin="round"/>
+  <path class="sh-outer" d="${shield}" fill="none" stroke="url(#${idp}Gold)" stroke-width="6.5" stroke-linejoin="round"/>
+</svg>`;
+}
+(function(){const m=document.getElementById("logoMark"); if(m)m.innerHTML=nkmLogoSVG('hdr');})();
 
 function zeroBlock(text){
   return `<div class="zero"><div class="ava">${nkmBadge()}</div><div class="bubble"><div class="who">N.zero</div>${text}</div></div>`;
@@ -2109,22 +2156,11 @@ document.getElementById('searchBar').addEventListener('keydown',e=>{if(e.key==='
 /* split a line into per-letter .drop spans with a clean stagger.
    `nkmHighlight` tints the trailing "NKM" sky-blue. startDelay in ms. */
 function animateIntro(){
-  const lead=document.querySelector('.intro-welcome .lead');
-  const letters=[...document.querySelectorAll('.nkm-drop .drop')];
-  const t=document.querySelector('.intro-tag');
-  const by=document.querySelector('.intro-by');
-  // reset
-  [lead,t,by,...letters].forEach(el=>{el.style.animation='none';void el.offsetWidth;});
-  // "Welcome to" fades up first
-  lead.style.animation='flowUp .6s ease .15s forwards';
-  // NKM letters fade + scale in with a gold shimmer, staggered ~150ms apart
-  const dropStart=480;
-  letters.forEach((s,i)=>{s.style.animation=`letterRise .8s cubic-bezier(.16,.84,.32,1) ${dropStart+i*150}ms forwards`;});
-  const dropEnd=dropStart+letters.length*150+800; // letters fully settled
-  // tagline + powered-by fade up, one after the other
-  t.style.animation=`flowUp .7s ease ${dropEnd+150}ms forwards`;
-  by.style.animation=`flowUp .7s ease ${dropEnd+450}ms forwards`;
-  return dropEnd+450+700; // total intro duration until last element settled
+  // Smart-car-style brand reveal: inject the shield, then CSS draws the gold
+  // frame and fades the interior in sequence; the welcome + motto follow.
+  const box=document.getElementById('introLogo');
+  if(box && !box.childElementCount){ box.innerHTML=nkmLogoSVG('intro'); }
+  return 3050; // total until the last line settles (matches the CSS timeline)
 }
 /* (Floating orbs removed — the scene now uses the skyline horizon and comet
    streaks, both pure CSS with no per-boot generation needed.) */
