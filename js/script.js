@@ -2156,11 +2156,23 @@ document.getElementById('searchBar').addEventListener('keydown',e=>{if(e.key==='
 /* split a line into per-letter .drop spans with a clean stagger.
    `nkmHighlight` tints the trailing "NKM" sky-blue. startDelay in ms. */
 function animateIntro(){
-  // Smart-car-style brand reveal: inject the shield, then CSS draws the gold
-  // frame and fades the interior in sequence; the welcome + motto follow.
+  // Smart-car-style brand reveal: the shield etches in, N.zero greets the
+  // visitor, then a Continue button appears. No auto-advance — Continue is the
+  // single hook that boots the app. Animations are (re)triggered by toggling
+  // #intro.playing so the sequence replays cleanly on every visit/restart.
+  const intro=document.getElementById('intro');
   const box=document.getElementById('introLogo');
   if(box && !box.childElementCount){ box.innerHTML=nkmLogoSVG('intro'); }
-  return 3050; // total until the last line settles (matches the CSS timeline)
+  const zbox=document.getElementById('introZero');
+  if(zbox && !zbox.childElementCount){ zbox.innerHTML=zeroBlock('Welcome. We strive to serve everyone equally.'); }
+  const cont=document.getElementById('introContinue');
+  if(cont && !cont.__wired){
+    cont.__wired=true;
+    cont.addEventListener('click',()=>{ if(intro && !intro.classList.contains('fade')) bootApp(); });
+  }
+  // restart the reveal animations
+  if(intro){ intro.classList.remove('playing'); void intro.offsetWidth; intro.classList.add('playing'); }
+  return 0; // Continue drives boot; nothing auto-advances
 }
 /* (Floating orbs removed — the scene now uses the skyline horizon and comet
    streaks, both pure CSS with no per-boot generation needed.) */
@@ -2196,8 +2208,7 @@ function runIntro(){
   const intro=document.getElementById('intro');intro.classList.remove('fade');
   document.getElementById('scene').classList.remove('on');
   document.getElementById('app').classList.remove('on');
-  const dur=animateIntro();
-  setTimeout(bootApp,dur+250); // brief beat after everything lands, then straight in
+  animateIntro();   // Continue button drives boot — no auto-advance
 }
 function restartCinema(){
   wipe.classList.add('on');
@@ -2302,4 +2313,4 @@ window.addEventListener('error',e=>{
 window.addEventListener('unhandledrejection',e=>{console.error('[NKM]',e.reason);});
 
 /* first load: run the intro animation then boot */
-(function(){const dur=animateIntro();setTimeout(bootApp,dur+250);})();
+(function(){animateIntro();})();   // Continue button drives boot — no auto-advance
