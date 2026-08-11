@@ -1,0 +1,1219 @@
+<title>Zero — Source</title>
+<style>
+  :root {
+    --ground:  #0a0b0f;
+    --panel:   #12141c;
+    --panel-2: #171a24;
+    --line:    #232838;
+    --ink:     #f4f6fb;
+    --muted:   #9aa3bd;
+    --red:     #ff3b47;
+    --blue:    #2f7bff;
+    --green:   #21d07a;
+    --mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+    --sans: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  /* Single committed visual world — Zero's own. Every color is painted
+     explicitly so the page holds on any host ground, light or dark. */
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background:
+      radial-gradient(900px 480px at 12% -8%, rgba(47,123,255,.12), transparent 60%),
+      radial-gradient(760px 400px at 100% 0%, rgba(255,59,71,.10), transparent 55%),
+      var(--ground);
+    color: var(--ink);
+    font-family: var(--sans);
+    line-height: 1.6;
+    min-height: 100vh;
+  }
+  .wrap { max-width: 940px; margin: 0 auto; padding: 48px 24px 80px; }
+
+  header { display: flex; align-items: center; gap: 14px; margin-bottom: 8px; }
+  .mark {
+    width: 44px; height: 44px; border-radius: 11px; display: grid; place-items: center;
+    font-family: var(--mono); font-weight: 800; font-size: 21px; color: #fff;
+    background: linear-gradient(135deg, var(--red), var(--blue));
+    box-shadow: 0 0 26px rgba(47,123,255,.35);
+  }
+  h1 { font-size: 27px; margin: 0; font-weight: 800; letter-spacing: .5px; }
+  h1 b { color: var(--red); }
+  .meta {
+    font-family: var(--mono); font-size: 12.5px; color: var(--muted);
+    margin: 0 0 30px 58px; font-variant-numeric: tabular-nums;
+  }
+
+  .actions { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
+  button {
+    font-family: var(--sans); font-size: 15px; font-weight: 700;
+    border: none; border-radius: 11px; padding: 15px 26px; cursor: pointer;
+    color: #fff; background: linear-gradient(135deg, var(--red), #b31f28);
+    transition: filter .15s, transform .08s;
+  }
+  button:hover { filter: brightness(1.12); }
+  button:active { transform: scale(.97); }
+  button:focus-visible { outline: 3px solid var(--blue); outline-offset: 3px; }
+  button.alt { background: transparent; border: 1px solid var(--line); color: var(--muted); }
+  button.alt:hover { color: var(--ink); border-color: var(--blue); }
+  button.done { background: linear-gradient(135deg, var(--green), #14663a); }
+
+  .note {
+    font-size: 13.5px; color: var(--muted); margin: 0 0 30px;
+  }
+  .note b { color: var(--ink); font-weight: 600; }
+
+  .steps {
+    background: var(--panel); border: 1px solid var(--line); border-radius: 13px;
+    padding: 20px 24px; margin-bottom: 26px;
+  }
+  .steps h2 {
+    font-size: 11.5px; text-transform: uppercase; letter-spacing: 1.6px;
+    color: var(--blue); margin: 0 0 12px; font-family: var(--mono);
+  }
+  .steps ol { margin: 0; padding-left: 20px; font-size: 14.5px; }
+  .steps li { margin-bottom: 7px; }
+  .steps li:last-child { margin: 0; }
+  .steps code {
+    font-family: var(--mono); font-size: 12.5px; background: var(--ground);
+    border: 1px solid var(--line); border-radius: 5px; padding: 2px 7px; color: var(--red);
+  }
+
+  .warn {
+    border-left: 3px solid var(--red); background: rgba(255,59,71,.07);
+    border-radius: 0 10px 10px 0; padding: 15px 20px; margin-bottom: 32px; font-size: 14px;
+  }
+  .warn b { color: var(--red); }
+  .warn ul { margin: 9px 0 0; padding-left: 20px; color: var(--muted); }
+  .warn code { font-family: var(--mono); font-size: 12.5px; color: var(--ink); }
+
+  .codehead {
+    display: flex; justify-content: space-between; align-items: center;
+    background: var(--panel-2); border: 1px solid var(--line); border-bottom: none;
+    border-radius: 12px 12px 0 0; padding: 11px 18px;
+    font-family: var(--mono); font-size: 12px; color: var(--muted);
+  }
+  pre {
+    margin: 0; background: var(--panel); border: 1px solid var(--line);
+    border-radius: 0 0 12px 12px; padding: 20px;
+    overflow: auto; max-height: 460px;
+    font-family: var(--mono); font-size: 12px; line-height: 1.65;
+    color: #c9d3ea; tab-size: 2;
+  }
+  textarea.src { position: absolute; left: -9999px; top: 0; opacity: 0; }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; animation: none !important; }
+  }
+  @media (max-width: 560px) {
+    .meta { margin-left: 0; }
+    button { width: 100%; }
+  }
+</style>
+
+<div class="wrap">
+  <header>
+    <div class="mark">0</div>
+    <h1>ZER<b>0</b> — source</h1>
+  </header>
+  <p class="meta">zero-standalone.html · 42.2 KB · 1036 lines · self-contained</p>
+
+  <div class="actions">
+    <button id="copy">Copy all code</button>
+    <button class="alt" id="dl">Download .html</button>
+  </div>
+  <p class="note">One file, everything inlined — no external CSS, JS, or fonts. Paste it anywhere, or save it and double-click to run.</p>
+
+  <div class="steps">
+    <h2>Using it with Claude</h2>
+    <ol>
+      <li>Hit <b>Copy all code</b> above.</li>
+      <li>Paste into a new Claude conversation.</li>
+      <li>Tell it what to change — <code>restyle this, keep every id and function name</code>.</li>
+      <li>Save what comes back as <code>zero.html</code> and open it.</li>
+    </ol>
+  </div>
+
+  <div class="warn">
+    <b>Keep these intact through a redesign</b> — they're what makes the stop button work:
+    <ul>
+      <li><code>#killSwitch</code> and <code>#haltBanner</code> — the stop control and its overlay</li>
+      <li><code>guardedFetch()</code> — every network call routes through it; swap it for plain <code>fetch</code> and STOP stops working</li>
+      <li>All <code>id</code> attributes — the script targets 26 of them</li>
+    </ul>
+  </div>
+
+  <div class="codehead"><span>zero-standalone.html</span><span>scroll to read</span></div>
+  <pre id="view"></pre>
+
+  <textarea class="src" id="src" readonly>&lt;!DOCTYPE html>
+&lt;html lang="en">
+&lt;head>
+  &lt;meta charset="UTF-8" />
+  &lt;meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  &lt;meta name="robots" content="noindex, nofollow" />
+  &lt;title>ZERO&lt;/title>
+  &lt;style>
+/* ============================================================
+   ZERO — personal assistant
+   Theme: red / blue / black / white
+   Private by design. No tracking, no accounts, no telemetry.
+   ============================================================ */
+
+:root {
+  --black:      #0a0b0f;
+  --panel:      #12141c;
+  --panel-2:    #171a24;
+  --line:       #232838;
+  --white:      #f4f6fb;
+  --muted:      #9aa3bd;
+  --red:        #ff3b47;
+  --red-dim:    #b31f28;
+  --blue:       #2f7bff;
+  --blue-dim:   #1a4fb3;
+  --green:      #21d07a;
+  --radius:     14px;
+  --shadow:     0 10px 40px rgba(0,0,0,.45);
+  --mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+  --sans: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background:
+    radial-gradient(1200px 600px at 15% -10%, rgba(47,123,255,.10), transparent 60%),
+    radial-gradient(1000px 500px at 100% 0%, rgba(255,59,71,.09), transparent 55%),
+    var(--black);
+  color: var(--white);
+  font-family: var(--sans);
+  min-height: 100vh;
+}
+
+a { color: var(--blue); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+/* ---------- Layout ---------- */
+.app {
+  display: grid;
+  grid-template-columns: 240px 1fr;
+  min-height: 100vh;
+}
+
+.sidebar {
+  border-right: 1px solid var(--line);
+  background: linear-gradient(180deg, var(--panel), var(--black));
+  padding: 22px 16px;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 28px;
+}
+.brand .logo {
+  width: 40px; height: 40px;
+  border-radius: 10px;
+  display: grid; place-items: center;
+  font-family: var(--mono);
+  font-weight: 800;
+  font-size: 20px;
+  color: var(--white);
+  background: linear-gradient(135deg, var(--red), var(--blue));
+  box-shadow: 0 0 22px rgba(47,123,255,.35);
+}
+.brand .name { font-size: 22px; font-weight: 800; letter-spacing: 1px; }
+.brand .name b { color: var(--red); }
+
+.nav { list-style: none; margin: 0; padding: 0; }
+.nav li {
+  display: flex; align-items: center; gap: 12px;
+  padding: 11px 12px;
+  border-radius: 10px;
+  color: var(--muted);
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 14px;
+  transition: background .15s, color .15s;
+}
+.nav li:hover { background: var(--panel-2); color: var(--white); }
+.nav li.active {
+  background: linear-gradient(90deg, rgba(255,59,71,.15), rgba(47,123,255,.15));
+  color: var(--white);
+  box-shadow: inset 3px 0 0 var(--red);
+}
+.nav .ic { width: 18px; text-align: center; }
+
+.sidebar .foot {
+  position: absolute;
+  bottom: 18px; left: 16px; right: 16px;
+  font-size: 11px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+.dot { display:inline-block; width:8px;height:8px;border-radius:50%;background:var(--green);box-shadow:0 0 8px var(--green); }
+
+/* ---------- Main ---------- */
+.main { padding: 26px 30px; overflow-y: auto; height: 100vh; }
+
+.topbar {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 22px;
+}
+.topbar h1 { font-size: 24px; margin: 0; font-weight: 800; }
+.topbar .sub { color: var(--muted); font-size: 13px; margin-top: 3px; }
+.clock { font-family: var(--mono); font-size: 13px; color: var(--muted); text-align:right; }
+.clock b { color: var(--white); font-size: 15px; }
+
+.view { display: none; animation: fade .25s ease; }
+.view.active { display: block; }
+@keyframes fade { from { opacity: 0; transform: translateY(6px);} to {opacity:1; transform:none;} }
+
+/* ---------- Cards / grid ---------- */
+.grid { display: grid; gap: 16px; }
+.grid.cols-2 { grid-template-columns: 1fr 1fr; }
+.grid.cols-3 { grid-template-columns: repeat(3, 1fr); }
+
+.card {
+  background: linear-gradient(180deg, var(--panel), var(--panel-2));
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 18px;
+  box-shadow: var(--shadow);
+}
+.card h2, .card h3 { margin: 0 0 12px; font-size: 15px; letter-spacing: .3px; }
+.card .hint { color: var(--muted); font-size: 12px; }
+
+.pill {
+  font-size: 11px; font-weight: 700; padding: 3px 9px; border-radius: 999px;
+  background: rgba(47,123,255,.14); color: var(--blue);
+  border: 1px solid rgba(47,123,255,.3);
+}
+.pill.red { background: rgba(255,59,71,.14); color: var(--red); border-color: rgba(255,59,71,.3);}
+
+/* ---------- Market ---------- */
+.mkt-row {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr 1fr;
+  align-items: center;
+  padding: 12px 6px;
+  border-bottom: 1px solid var(--line);
+  font-family: var(--mono);
+  font-size: 14px;
+}
+.mkt-row:last-child { border-bottom: none; }
+.mkt-row .sym { font-weight: 700; }
+.mkt-row .sym small { color: var(--muted); font-weight: 400; margin-left:6px;}
+.up { color: var(--green); }
+.down { color: var(--red); }
+.mkt-head { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 1px; }
+
+/* ---------- Chat ---------- */
+.chat-wrap { display: flex; flex-direction: column; height: calc(100vh - 150px); }
+.chat-log { flex: 1; overflow-y: auto; padding: 6px; display: flex; flex-direction: column; gap: 12px; }
+.msg { max-width: 78%; padding: 12px 14px; border-radius: 12px; font-size: 14px; line-height: 1.5; white-space: pre-wrap; }
+.msg.user { align-self: flex-end; background: linear-gradient(135deg, var(--blue-dim), var(--blue)); }
+.msg.zero { align-self: flex-start; background: var(--panel-2); border: 1px solid var(--line); }
+.msg.sys  { align-self: center; background: transparent; color: var(--muted); font-size: 12px; text-align:center; }
+.chat-input { display: flex; gap: 10px; margin-top: 12px; }
+
+/* ---------- Forms / buttons ---------- */
+input, textarea, select {
+  background: var(--black);
+  border: 1px solid var(--line);
+  color: var(--white);
+  border-radius: 10px;
+  padding: 11px 13px;
+  font-family: var(--sans);
+  font-size: 14px;
+  width: 100%;
+}
+input:focus, textarea:focus { outline: none; border-color: var(--blue); box-shadow: 0 0 0 3px rgba(47,123,255,.18); }
+.btn {
+  background: linear-gradient(135deg, var(--red), var(--red-dim));
+  color: var(--white); border: none; border-radius: 10px;
+  padding: 11px 18px; font-weight: 700; cursor: pointer; font-size: 14px;
+  white-space: nowrap; transition: transform .1s, filter .15s;
+}
+.btn:hover { filter: brightness(1.1); }
+.btn:active { transform: scale(.97); }
+.btn.blue { background: linear-gradient(135deg, var(--blue), var(--blue-dim)); }
+.btn.ghost { background: transparent; border: 1px solid var(--line); color: var(--muted); }
+.btn.ghost:hover { color: var(--white); border-color: var(--blue); }
+
+/* ---------- Tasks ---------- */
+.task { display: flex; align-items: center; gap: 12px; padding: 11px 6px; border-bottom: 1px solid var(--line); }
+.task:last-child { border: none; }
+.task input[type=checkbox] { width: 18px; height: 18px; accent-color: var(--red); }
+.task.done span { text-decoration: line-through; color: var(--muted); }
+.task .del { margin-left: auto; color: var(--muted); cursor: pointer; background:none;border:none;font-size:16px;width:auto; }
+.task .del:hover { color: var(--red); }
+
+.stat { text-align: center; }
+.stat .n { font-size: 30px; font-weight: 800; font-family: var(--mono); }
+.stat .l { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: 1px; }
+
+.notice {
+  font-size: 12px; color: var(--muted);
+  border: 1px dashed var(--line); border-radius: 10px; padding: 10px 12px; margin-top: 12px;
+}
+.notice b { color: var(--white); }
+
+.spinner { color: var(--muted); font-size: 13px; padding: 20px 0; text-align:center; }
+
+/* ============================================================
+   KILL SWITCH — always on top, always reachable.
+   Deliberately not dependent on app state or navigation.
+   ============================================================ */
+#killSwitch {
+  position: fixed;
+  top: 18px; right: 22px;
+  z-index: 99999;
+  background: linear-gradient(135deg, var(--red), var(--red-dim));
+  color: #fff;
+  border: 2px solid #fff;
+  border-radius: 12px;
+  padding: 13px 22px;
+  font-weight: 900;
+  font-size: 15px;
+  letter-spacing: 2px;
+  cursor: pointer;
+  font-family: var(--mono);
+  box-shadow: 0 0 0 4px rgba(255,59,71,.25), 0 8px 30px rgba(0,0,0,.6);
+  animation: pulseKill 2.4s ease-in-out infinite;
+  transition: transform .08s;
+}
+#killSwitch:hover { filter: brightness(1.15); }
+#killSwitch:active { transform: scale(.94); }
+#killSwitch.halted {
+  background: linear-gradient(135deg, #1c8b4b, #14663a);
+  animation: none;
+  box-shadow: 0 0 0 4px rgba(33,208,122,.25), 0 8px 30px rgba(0,0,0,.6);
+}
+@keyframes pulseKill {
+  0%,100% { box-shadow: 0 0 0 4px rgba(255,59,71,.25), 0 8px 30px rgba(0,0,0,.6); }
+  50%     { box-shadow: 0 0 0 10px rgba(255,59,71,.05), 0 8px 30px rgba(0,0,0,.6); }
+}
+
+/* Full-screen halt overlay */
+#haltBanner {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 99998;
+  background: rgba(10,11,15,.86);
+  backdrop-filter: blur(3px);
+  place-items: center;
+  text-align: center;
+}
+#haltBanner.on { display: grid; }
+#haltBanner .box {
+  border: 2px solid var(--red);
+  background: var(--panel);
+  border-radius: var(--radius);
+  padding: 34px 44px;
+  max-width: 460px;
+  box-shadow: 0 0 60px rgba(255,59,71,.3);
+}
+#haltBanner h2 { color: var(--red); font-size: 26px; margin: 0 0 10px; letter-spacing: 3px; font-family: var(--mono); }
+#haltBanner p { color: var(--muted); font-size: 14px; line-height: 1.6; }
+
+/* Control panel */
+.ctrl-row {
+  display: flex; align-items: center; gap: 12px;
+  padding: 13px 6px; border-bottom: 1px solid var(--line);
+}
+.ctrl-row:last-child { border-bottom: none; }
+.ctrl-row .label { flex: 1; }
+.ctrl-row .label b { display: block; font-size: 14px; }
+.ctrl-row .label span { color: var(--muted); font-size: 12px; }
+.led { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+.led.on  { background: var(--green); box-shadow: 0 0 10px var(--green); }
+.led.off { background: var(--muted); opacity: .4; }
+.led.hot { background: var(--red); box-shadow: 0 0 10px var(--red); }
+
+.toggle { position: relative; width: 46px; height: 26px; flex-shrink: 0; }
+.toggle input { opacity: 0; width: 0; height: 0; position: absolute; }
+.toggle .track {
+  position: absolute; inset: 0; background: var(--line);
+  border-radius: 999px; cursor: pointer; transition: background .2s;
+}
+.toggle .track::before {
+  content: ''; position: absolute; height: 20px; width: 20px; left: 3px; top: 3px;
+  background: var(--white); border-radius: 50%; transition: transform .2s;
+}
+.toggle input:checked + .track { background: var(--blue); }
+.toggle input:checked + .track::before { transform: translateX(20px); }
+
+.log-feed {
+  font-family: var(--mono); font-size: 12px; max-height: 260px; overflow-y: auto;
+  background: var(--black); border: 1px solid var(--line); border-radius: 10px; padding: 12px;
+}
+.log-feed div { padding: 3px 0; color: var(--muted); border-bottom: 1px solid rgba(35,40,56,.5); }
+.log-feed div:last-child { border: none; }
+.log-feed .t { color: var(--blue); }
+.log-feed .warn { color: var(--red); }
+
+@media (max-width: 820px) {
+  .app { grid-template-columns: 1fr; }
+  .sidebar { position: static; height: auto; }
+  .grid.cols-2, .grid.cols-3 { grid-template-columns: 1fr; }
+}
+
+  &lt;/style>
+&lt;/head>
+&lt;body>
+  &lt;!-- ============ KILL SWITCH — always visible, always first ============ -->
+  &lt;button id="killSwitch" onclick="Zero.toggleHalt()" title="Immediately stop all Zero activity">■ STOP&lt;/button>
+
+  &lt;div id="haltBanner">
+    &lt;div class="box">
+      &lt;h2>ZERO HALTED&lt;/h2>
+      &lt;p>All automatic activity is stopped. No network calls, no market polling, no AI requests. Your data is untouched and safe.&lt;/p>
+      &lt;p style="margin-top:18px">
+        &lt;button class="btn blue" onclick="Zero.toggleHalt()">Resume Zero&lt;/button>
+      &lt;/p>
+    &lt;/div>
+  &lt;/div>
+
+  &lt;div class="app">
+    &lt;!-- ============ SIDEBAR ============ -->
+    &lt;aside class="sidebar">
+      &lt;div class="brand">
+        &lt;div class="logo">0&lt;/div>
+        &lt;div class="name">ZER&lt;b>0&lt;/b>&lt;/div>
+      &lt;/div>
+      &lt;ul class="nav" id="nav">
+        &lt;li data-view="control">&lt;span class="ic">⏻&lt;/span> Control Panel&lt;/li>
+        &lt;li data-view="dashboard" class="active">&lt;span class="ic">▦&lt;/span> Dashboard&lt;/li>
+        &lt;li data-view="markets">&lt;span class="ic">▲&lt;/span> Markets&lt;/li>
+        &lt;li data-view="assistant">&lt;span class="ic">◈&lt;/span> Assistant&lt;/li>
+        &lt;li data-view="tasks">&lt;span class="ic">✓&lt;/span> Tasks&lt;/li>
+        &lt;li data-view="notes">&lt;span class="ic">✎&lt;/span> Notes&lt;/li>
+        &lt;li data-view="settings">&lt;span class="ic">⚙&lt;/span> Settings&lt;/li>
+      &lt;/ul>
+      &lt;div class="foot">
+        &lt;span class="dot">&lt;/span> Private mode &amp;middot; local only&lt;br />
+        No accounts &amp;middot; no tracking &amp;middot; no telemetry.
+      &lt;/div>
+    &lt;/aside>
+
+    &lt;!-- ============ MAIN ============ -->
+    &lt;main class="main">
+      &lt;div class="topbar">
+        &lt;div>
+          &lt;h1 id="viewTitle">Dashboard&lt;/h1>
+          &lt;div class="sub" id="viewSub">Your day at a glance.&lt;/div>
+        &lt;/div>
+        &lt;div class="clock">&lt;b id="clock">--:--:--&lt;/b>&lt;br />&lt;span id="date">&lt;/span>&lt;/div>
+      &lt;/div>
+
+      &lt;!-- CONTROL PANEL -->
+      &lt;section class="view" id="view-control">
+        &lt;div class="card" style="border-color:var(--red)">
+          &lt;h2>Master Control &lt;span class="pill red">safety&lt;/span>&lt;/h2>
+          &lt;p class="hint">One button stops everything Zero does. It works even if the rest of the app is broken or misbehaving — nothing Zero runs can disable it.&lt;/p>
+          &lt;div style="display:flex;gap:12px;margin-top:14px;flex-wrap:wrap">
+            &lt;button class="btn" style="font-size:16px;padding:15px 30px" onclick="Zero.toggleHalt()">■ EMERGENCY STOP&lt;/button>
+            &lt;button class="btn ghost" onclick="Zero.killNetwork()">⛔ Cut all network access&lt;/button>
+            &lt;button class="btn ghost" onclick="Zero.panic()">☢ Panic: stop + wipe keys&lt;/button>
+          &lt;/div>
+        &lt;/div>
+
+        &lt;div class="grid cols-2" style="margin-top:16px">
+          &lt;div class="card">
+            &lt;h2>Capability Switches&lt;/h2>
+            &lt;p class="hint">Turn any capability off individually. Off means Zero cannot use it at all.&lt;/p>
+            &lt;div style="margin-top:10px">
+              &lt;div class="ctrl-row">
+                &lt;span class="led on" id="ledNet">&lt;/span>
+                &lt;div class="label">&lt;b>Network access&lt;/b>&lt;span>Lets Zero reach the internet&lt;/span>&lt;/div>
+                &lt;label class="toggle">&lt;input type="checkbox" id="capNetwork" checked onchange="Zero.setCap('network',this.checked)" />&lt;span class="track">&lt;/span>&lt;/label>
+              &lt;/div>
+              &lt;div class="ctrl-row">
+                &lt;span class="led on" id="ledMkt">&lt;/span>
+                &lt;div class="label">&lt;b>Auto market polling&lt;/b>&lt;span>Refreshes prices every 60s&lt;/span>&lt;/div>
+                &lt;label class="toggle">&lt;input type="checkbox" id="capMarket" checked onchange="Zero.setCap('market',this.checked)" />&lt;span class="track">&lt;/span>&lt;/label>
+              &lt;/div>
+              &lt;div class="ctrl-row">
+                &lt;span class="led off" id="ledAi">&lt;/span>
+                &lt;div class="label">&lt;b>AI requests&lt;/b>&lt;span>Sends your prompts to the AI provider&lt;/span>&lt;/div>
+                &lt;label class="toggle">&lt;input type="checkbox" id="capAi" checked onchange="Zero.setCap('ai',this.checked)" />&lt;span class="track">&lt;/span>&lt;/label>
+              &lt;/div>
+              &lt;div class="ctrl-row">
+                &lt;span class="led on" id="ledStore">&lt;/span>
+                &lt;div class="label">&lt;b>Local storage writes&lt;/b>&lt;span>Lets Zero save tasks &amp; notes&lt;/span>&lt;/div>
+                &lt;label class="toggle">&lt;input type="checkbox" id="capStorage" checked onchange="Zero.setCap('storage',this.checked)" />&lt;span class="track">&lt;/span>&lt;/label>
+              &lt;/div>
+            &lt;/div>
+          &lt;/div>
+
+          &lt;div class="card">
+            &lt;h2>Activity Log &lt;span class="pill">transparency&lt;/span>&lt;/h2>
+            &lt;p class="hint">Every action Zero takes is logged here so nothing happens without you seeing it.&lt;/p>
+            &lt;div class="log-feed" id="logFeed">&lt;/div>
+            &lt;button class="btn ghost" style="margin-top:10px" onclick="Zero.clearLog()">Clear log&lt;/button>
+          &lt;/div>
+        &lt;/div>
+
+        &lt;div class="card" style="margin-top:16px">
+          &lt;h2>System Status&lt;/h2>
+          &lt;div class="grid cols-3">
+            &lt;div class="stat">&lt;div class="n" id="sysState" style="color:var(--green);font-size:20px">RUNNING&lt;/div>&lt;div class="l">State&lt;/div>&lt;/div>
+            &lt;div class="stat">&lt;div class="n" id="sysCalls" style="color:var(--blue);font-size:20px">0&lt;/div>&lt;div class="l">Network calls&lt;/div>&lt;/div>
+            &lt;div class="stat">&lt;div class="n" id="sysCaps" style="color:var(--white);font-size:20px">4/4&lt;/div>&lt;div class="l">Capabilities on&lt;/div>&lt;/div>
+          &lt;/div>
+        &lt;/div>
+      &lt;/section>
+
+      &lt;!-- DASHBOARD -->
+      &lt;section class="view active" id="view-dashboard">
+        &lt;div class="grid cols-3" style="margin-bottom:16px">
+          &lt;div class="card stat">&lt;div class="n" id="statTasks" style="color:var(--red)">0&lt;/div>&lt;div class="l">Open Tasks&lt;/div>&lt;/div>
+          &lt;div class="card stat">&lt;div class="n" id="statBtc" style="color:var(--blue)">—&lt;/div>&lt;div class="l">BTC / USD&lt;/div>&lt;/div>
+          &lt;div class="card stat">&lt;div class="n" id="statNotes" style="color:var(--white)">0&lt;/div>&lt;div class="l">Notes&lt;/div>&lt;/div>
+        &lt;/div>
+        &lt;div class="grid cols-2">
+          &lt;div class="card">
+            &lt;h2>Daily Market Brief &lt;span class="pill">live&lt;/span>&lt;/h2>
+            &lt;div id="miniMarket">&lt;div class="spinner">Loading live prices…&lt;/div>&lt;/div>
+            &lt;div class="notice">📊 &lt;b>Information only, not financial advice.&lt;/b> Prices are delayed/aggregated from public sources. Do your own research before trading.&lt;/div>
+          &lt;/div>
+          &lt;div class="card">
+            &lt;h2>Quick Capture&lt;/h2>
+            &lt;p class="hint">Drop a thought, task, or idea — Zero routes it.&lt;/p>
+            &lt;textarea id="quickCapture" rows="4" placeholder="e.g. 'Ship landing page for the racing game'…">&lt;/textarea>
+            &lt;div style="display:flex;gap:10px;margin-top:10px">
+              &lt;button class="btn" onclick="Zero.captureAsTask()">+ Add as Task&lt;/button>
+              &lt;button class="btn blue" onclick="Zero.captureAsNote()">+ Save as Note&lt;/button>
+            &lt;/div>
+          &lt;/div>
+        &lt;/div>
+      &lt;/section>
+
+      &lt;!-- MARKETS -->
+      &lt;section class="view" id="view-markets">
+        &lt;div class="card">
+          &lt;h2>Live Markets &lt;span class="pill">crypto · live&lt;/span> &lt;span class="pill red">stocks · needs key&lt;/span>&lt;/h2>
+          &lt;div class="mkt-row mkt-head">&lt;div>Asset&lt;/div>&lt;div>Price&lt;/div>&lt;div>24h&lt;/div>&lt;/div>
+          &lt;div id="marketTable">&lt;div class="spinner">Loading live prices…&lt;/div>&lt;/div>
+          &lt;div style="margin-top:14px;display:flex;gap:10px;align-items:center">
+            &lt;button class="btn blue" onclick="Zero.loadMarkets()">↻ Refresh&lt;/button>
+            &lt;span class="hint" id="marketUpdated">&lt;/span>
+          &lt;/div>
+          &lt;div class="notice">Crypto is live from CoinGecko's free public API (no key needed). To add &lt;b>stocks &amp; indices&lt;/b>, drop a free API key (Finnhub / Alpha Vantage) in &lt;b>Settings&lt;/b>. Nothing here is financial advice.&lt;/div>
+        &lt;/div>
+      &lt;/section>
+
+      &lt;!-- ASSISTANT -->
+      &lt;section class="view" id="view-assistant">
+        &lt;div class="card">
+          &lt;h2>Zero Assistant &lt;span class="pill" id="aiStatus">offline&lt;/span>&lt;/h2>
+          &lt;div class="chat-wrap">
+            &lt;div class="chat-log" id="chatLog">&lt;/div>
+            &lt;div class="chat-input">
+              &lt;input id="chatInput" placeholder="Ask Zero anything…" onkeydown="if(event.key==='Enter')Zero.send()" />
+              &lt;button class="btn" onclick="Zero.send()">Send&lt;/button>
+            &lt;/div>
+          &lt;/div>
+          &lt;div class="notice">Zero runs a built-in offline command engine (try &lt;b>help&lt;/b>, &lt;b>task ...&lt;/b>, &lt;b>note ...&lt;/b>, &lt;b>price btc&lt;/b>, &lt;b>time&lt;/b>). To unlock full conversational AI, add an API key in &lt;b>Settings&lt;/b> — your key stays in your browser and is sent only to the AI provider you choose.&lt;/div>
+        &lt;/div>
+      &lt;/section>
+
+      &lt;!-- TASKS -->
+      &lt;section class="view" id="view-tasks">
+        &lt;div class="card">
+          &lt;h2>Tasks&lt;/h2>
+          &lt;div class="chat-input" style="margin-bottom:8px">
+            &lt;input id="taskInput" placeholder="What needs doing?" onkeydown="if(event.key==='Enter')Zero.addTask()" />
+            &lt;button class="btn" onclick="Zero.addTask()">Add&lt;/button>
+          &lt;/div>
+          &lt;div id="taskList">&lt;/div>
+        &lt;/div>
+      &lt;/section>
+
+      &lt;!-- NOTES -->
+      &lt;section class="view" id="view-notes">
+        &lt;div class="card">
+          &lt;h2>Notes&lt;/h2>
+          &lt;textarea id="noteInput" rows="3" placeholder="New note…">&lt;/textarea>
+          &lt;div style="margin-top:10px">&lt;button class="btn blue" onclick="Zero.addNote()">Save Note&lt;/button>&lt;/div>
+          &lt;div id="noteList" style="margin-top:16px">&lt;/div>
+        &lt;/div>
+      &lt;/section>
+
+      &lt;!-- SETTINGS -->
+      &lt;section class="view" id="view-settings">
+        &lt;div class="grid cols-2">
+          &lt;div class="card">
+            &lt;h2>AI Provider&lt;/h2>
+            &lt;p class="hint">Paste a key to enable full conversational AI. Stored only in this browser (localStorage) — never sent anywhere except the provider you pick.&lt;/p>
+            &lt;label class="hint">Provider&lt;/label>
+            &lt;select id="aiProvider">
+              &lt;option value="anthropic">Anthropic (Claude)&lt;/option>
+              &lt;option value="openai">OpenAI&lt;/option>
+            &lt;/select>
+            &lt;label class="hint" style="margin-top:10px;display:block">API Key&lt;/label>
+            &lt;input id="aiKey" type="password" placeholder="sk-…" />
+            &lt;div style="margin-top:12px">&lt;button class="btn" onclick="Zero.saveAiKey()">Save Key&lt;/button>
+            &lt;button class="btn ghost" onclick="Zero.clearAiKey()">Clear&lt;/button>&lt;/div>
+          &lt;/div>
+          &lt;div class="card">
+            &lt;h2>Market Data Key &lt;span class="pill">optional&lt;/span>&lt;/h2>
+            &lt;p class="hint">Add a free Finnhub key to enable live stocks &amp; indices.&lt;/p>
+            &lt;input id="stockKey" type="password" placeholder="Finnhub API key…" />
+            &lt;div style="margin-top:12px">&lt;button class="btn blue" onclick="Zero.saveStockKey()">Save&lt;/button>&lt;/div>
+          &lt;/div>
+          &lt;div class="card">
+            &lt;h2>Privacy&lt;/h2>
+            &lt;p class="hint">Zero has no server, no analytics, and no accounts. All your data lives in this browser only.&lt;/p>
+            &lt;button class="btn ghost" onclick="Zero.exportData()">⤓ Export my data (JSON)&lt;/button>
+            &lt;button class="btn ghost" onclick="Zero.wipeData()" style="margin-top:8px">⌫ Wipe everything&lt;/button>
+          &lt;/div>
+        &lt;/div>
+      &lt;/section>
+    &lt;/main>
+  &lt;/div>
+
+  &lt;script>
+/* ============================================================
+   ZERO — app logic
+   Private by design: all state lives in localStorage on THIS
+   device. No server, no analytics, no accounts. Your keys are
+   only ever sent to the AI/market provider you explicitly pick.
+   ============================================================ */
+
+const Zero = (() => {
+  const LS = {
+    tasks: 'zero.tasks',
+    notes: 'zero.notes',
+    aiKey: 'zero.aiKey',
+    aiProvider: 'zero.aiProvider',
+    stockKey: 'zero.stockKey',
+  };
+
+  const store = {
+    get(k, d) { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch { return d; } },
+    set(k, v) {
+      // Storage writes respect the Control Panel switch.
+      if (typeof Control !== 'undefined' &amp;&amp; !Control.caps.storage) return;
+      localStorage.setItem(k, JSON.stringify(v));
+    },
+    raw(k) { return localStorage.getItem(k) || ''; },
+    rawSet(k, v) { localStorage.setItem(k, v); },
+  };
+
+  let tasks = store.get(LS.tasks, []);
+  let notes = store.get(LS.notes, []);
+
+  /* ============================================================
+     CONTROL LAYER — the user's kill switch.
+
+     Design rule: this layer is the ONLY path to the network, and
+     nothing in Zero's own logic is allowed to flip these flags.
+     Only a direct user click changes them. If HALTED is true,
+     every capability is denied regardless of individual switches.
+     ============================================================ */
+  const Control = {
+    halted: false,
+    caps: { network: true, market: true, ai: true, storage: true },
+    calls: 0,
+    inflight: new Set(),   // AbortControllers for live requests
+    timers: new Set(),     // interval IDs we can cancel
+  };
+
+  function log(msg, warn) {
+    const feed = document.getElementById('logFeed');
+    if (!feed) return;
+    const d = document.createElement('div');
+    d.innerHTML = `&lt;span class="t">${new Date().toLocaleTimeString()}&lt;/span> ` +
+                  `&lt;span class="${warn ? 'warn' : ''}">${esc(msg)}&lt;/span>`;
+    feed.prepend(d);
+    while (feed.children.length > 200) feed.lastChild.remove();
+  }
+
+  /* Every network request in Zero goes through here. No exceptions. */
+  async function guardedFetch(url, opts = {}, capability = 'network') {
+    if (Control.halted) { log('BLOCKED (halted): ' + shortUrl(url), true); throw new Error('Zero is halted — press Resume to allow activity.'); }
+    if (!Control.caps.network) { log('BLOCKED (network off): ' + shortUrl(url), true); throw new Error('Network access is switched off in the Control Panel.'); }
+    if (!Control.caps[capability]) { log(`BLOCKED (${capability} off): ` + shortUrl(url), true); throw new Error(`${capability} is switched off in the Control Panel.`); }
+
+    const ac = new AbortController();
+    Control.inflight.add(ac);
+    Control.calls++;
+    updateStatus();
+    log('→ ' + shortUrl(url));
+    try {
+      return await fetch(url, { ...opts, signal: ac.signal });
+    } finally {
+      Control.inflight.delete(ac);
+    }
+  }
+
+  const shortUrl = u => { try { return new URL(u).hostname; } catch { return String(u).slice(0, 40); } };
+
+  /* Hard stop: abort in-flight requests, cancel timers, freeze UI. */
+  function toggleHalt() {
+    Control.halted = !Control.halted;
+    const btn = document.getElementById('killSwitch');
+    const banner = document.getElementById('haltBanner');
+
+    if (Control.halted) {
+      Control.inflight.forEach(ac => ac.abort());
+      Control.inflight.clear();
+      Control.timers.forEach(id => clearInterval(id));
+      Control.timers.clear();
+      btn.textContent = '▶ RESUME';
+      btn.classList.add('halted');
+      banner.classList.add('on');
+      log('EMERGENCY STOP — all activity halted by user.', true);
+    } else {
+      btn.textContent = '■ STOP';
+      btn.classList.remove('halted');
+      banner.classList.remove('on');
+      log('Resumed by user.');
+      startTimers();
+      loadMarkets();
+    }
+    updateStatus();
+  }
+
+  function killNetwork() {
+    Control.caps.network = false;
+    document.getElementById('capNetwork').checked = false;
+    Control.inflight.forEach(ac => ac.abort());
+    Control.inflight.clear();
+    log('Network access cut by user.', true);
+    updateStatus();
+  }
+
+  function panic() {
+    if (!confirm('PANIC: stop everything and delete all stored API keys?\n\nYour tasks and notes are kept.')) return;
+    if (!Control.halted) toggleHalt();
+    [LS.aiKey, LS.stockKey].forEach(k => localStorage.removeItem(k));
+    const ak = document.getElementById('aiKey'); if (ak) ak.value = '';
+    const sk = document.getElementById('stockKey'); if (sk) sk.value = '';
+    refreshAiStatus();
+    log('PANIC — halted and all API keys wiped.', true);
+    alert('Zero halted. All API keys deleted from this device.');
+  }
+
+  function setCap(name, on) {
+    Control.caps[name] = on;
+    log(`Capability "${name}" turned ${on ? 'ON' : 'OFF'} by user.`, !on);
+    if (!on) { Control.inflight.forEach(ac => ac.abort()); Control.inflight.clear(); }
+    if (name === 'market') {
+      if (on) { startTimers(); loadMarkets(); } else { stopMarketTimer(); }
+    }
+    // Re-enabling the network clears any stale "blocked" message on screen.
+    if (name === 'network' &amp;&amp; on &amp;&amp; Control.caps.market) loadMarkets();
+    updateStatus();
+  }
+
+  function updateStatus() {
+    const set = (id, txt, color) => {
+      const el = document.getElementById(id);
+      if (el) { el.textContent = txt; if (color) el.style.color = color; }
+    };
+    set('sysState', Control.halted ? 'HALTED' : 'RUNNING', Control.halted ? 'var(--red)' : 'var(--green)');
+    set('sysCalls', Control.calls);
+    const on = Object.values(Control.caps).filter(Boolean).length;
+    set('sysCaps', `${on}/4`);
+
+    const led = (id, state) => { const e = document.getElementById(id); if (e) e.className = 'led ' + state; };
+    const live = k => (!Control.halted &amp;&amp; Control.caps[k]) ? 'on' : 'off';
+    led('ledNet', Control.halted ? 'hot' : live('network'));
+    led('ledMkt', live('market'));
+    led('ledAi', (!Control.halted &amp;&amp; Control.caps.ai &amp;&amp; store.raw(LS.aiKey)) ? 'on' : 'off');
+    led('ledStore', Control.caps.storage ? 'on' : 'off');
+  }
+
+  function clearLog() { document.getElementById('logFeed').innerHTML = ''; }
+
+  let marketTimer = null;
+  function startTimers() {
+    stopMarketTimer();
+    if (Control.caps.market &amp;&amp; !Control.halted) {
+      marketTimer = setInterval(loadMarkets, 60000);
+      Control.timers.add(marketTimer);
+    }
+  }
+  function stopMarketTimer() {
+    if (marketTimer) { clearInterval(marketTimer); Control.timers.delete(marketTimer); marketTimer = null; }
+  }
+
+  /* ---------------- Navigation ---------------- */
+  const titles = {
+    control:   ['Control Panel', 'You are in charge. Stop anything, anytime.'],
+    dashboard: ['Dashboard', 'Your day at a glance.'],
+    markets:   ['Markets', 'Live readings — information, not advice.'],
+    assistant: ['Assistant', 'Ask Zero anything.'],
+    tasks:     ['Tasks', 'What needs doing.'],
+    notes:     ['Notes', 'Your second brain.'],
+    settings:  ['Settings', 'Keys &amp; privacy — all local.'],
+  };
+
+  function nav(view) {
+    document.querySelectorAll('.nav li').forEach(li =>
+      li.classList.toggle('active', li.dataset.view === view));
+    document.querySelectorAll('.view').forEach(v =>
+      v.classList.toggle('active', v.id === 'view-' + view));
+    const [t, s] = titles[view] || ['', ''];
+    document.getElementById('viewTitle').textContent = t;
+    document.getElementById('viewSub').textContent = s;
+    if (view === 'markets') loadMarkets();
+  }
+
+  /* ---------------- Clock ---------------- */
+  function tick() {
+    const d = new Date();
+    document.getElementById('clock').textContent = d.toLocaleTimeString();
+    document.getElementById('date').textContent = d.toLocaleDateString(undefined,
+      { weekday: 'short', month: 'short', day: 'numeric' });
+  }
+
+  /* ---------------- Markets (live crypto) ---------------- */
+  const COINS = [
+    ['bitcoin', 'BTC', 'Bitcoin'],
+    ['ethereum', 'ETH', 'Ethereum'],
+    ['solana', 'SOL', 'Solana'],
+    ['binancecoin', 'BNB', 'BNB'],
+    ['ripple', 'XRP', 'XRP'],
+    ['dogecoin', 'DOGE', 'Dogecoin'],
+  ];
+
+  async function loadMarkets() {
+    const table = document.getElementById('marketTable');
+    const mini = document.getElementById('miniMarket');
+    const ids = COINS.map(c => c[0]).join(',');
+    const url = `https://api.coingecko.com/api/v3/simple/price?ids=${ids}` +
+                `&amp;vs_currencies=usd&amp;include_24hr_change=true`;
+    try {
+      const res = await guardedFetch(url, {}, 'market');
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const data = await res.json();
+      const rows = COINS.map(([id, sym, name]) => {
+        const p = data[id];
+        if (!p) return '';
+        const chg = p.usd_24h_change ?? 0;
+        const cls = chg >= 0 ? 'up' : 'down';
+        const arrow = chg >= 0 ? '▲' : '▼';
+        return `&lt;div class="mkt-row">
+          &lt;div class="sym">${sym}&lt;small>${name}&lt;/small>&lt;/div>
+          &lt;div>$${fmt(p.usd)}&lt;/div>
+          &lt;div class="${cls}">${arrow} ${Math.abs(chg).toFixed(2)}%&lt;/div>
+        &lt;/div>`;
+      }).join('');
+      if (table) table.innerHTML = rows;
+      if (mini) mini.innerHTML = `&lt;div class="mkt-row mkt-head">&lt;div>Asset&lt;/div>&lt;div>Price&lt;/div>&lt;div>24h&lt;/div>&lt;/div>` + rows;
+      document.getElementById('marketUpdated').textContent =
+        'Updated ' + new Date().toLocaleTimeString();
+      const btc = data.bitcoin?.usd;
+      if (btc) document.getElementById('statBtc').textContent = '$' + fmt(btc);
+    } catch (e) {
+      const msg = `&lt;div class="spinner">⚠ Couldn't reach live market feed (${e.message}). Check your connection and hit refresh.&lt;/div>`;
+      if (table) table.innerHTML = msg;
+      if (mini) mini.innerHTML = msg;
+    }
+  }
+
+  const fmt = n => n >= 1
+    ? n.toLocaleString(undefined, { maximumFractionDigits: 2 })
+    : n.toPrecision(4);
+
+  /* ---------------- Tasks ---------------- */
+  function renderTasks() {
+    const list = document.getElementById('taskList');
+    if (!tasks.length) { list.innerHTML = '&lt;p class="hint">No tasks yet. Add one above.&lt;/p>'; }
+    else {
+      list.innerHTML = tasks.map((t, i) => `
+        &lt;div class="task ${t.done ? 'done' : ''}">
+          &lt;input type="checkbox" ${t.done ? 'checked' : ''} onchange="Zero.toggleTask(${i})" />
+          &lt;span>${esc(t.text)}&lt;/span>
+          &lt;button class="del" onclick="Zero.delTask(${i})">×&lt;/button>
+        &lt;/div>`).join('');
+    }
+    document.getElementById('statTasks').textContent = tasks.filter(t => !t.done).length;
+    store.set(LS.tasks, tasks);
+  }
+  function addTask(text) {
+    const inp = document.getElementById('taskInput');
+    const val = (text ?? inp.value).trim();
+    if (!val) return;
+    tasks.unshift({ text: val, done: false, ts: Date.now() });
+    if (!text) inp.value = '';
+    renderTasks();
+  }
+  function toggleTask(i) { tasks[i].done = !tasks[i].done; renderTasks(); }
+  function delTask(i) { tasks.splice(i, 1); renderTasks(); }
+
+  /* ---------------- Notes ---------------- */
+  function renderNotes() {
+    const list = document.getElementById('noteList');
+    if (!notes.length) { list.innerHTML = '&lt;p class="hint">No notes yet.&lt;/p>'; }
+    else {
+      list.innerHTML = notes.map((n, i) => `
+        &lt;div class="card" style="margin-bottom:10px">
+          &lt;div style="display:flex;justify-content:space-between;align-items:start">
+            &lt;div style="white-space:pre-wrap">${esc(n.text)}&lt;/div>
+            &lt;button class="del" style="color:var(--muted);background:none;border:none;cursor:pointer;font-size:16px" onclick="Zero.delNote(${i})">×&lt;/button>
+          &lt;/div>
+          &lt;div class="hint" style="margin-top:8px">${new Date(n.ts).toLocaleString()}&lt;/div>
+        &lt;/div>`).join('');
+    }
+    document.getElementById('statNotes').textContent = notes.length;
+    store.set(LS.notes, notes);
+  }
+  function addNote(text) {
+    const inp = document.getElementById('noteInput');
+    const val = (text ?? inp.value).trim();
+    if (!val) return;
+    notes.unshift({ text: val, ts: Date.now() });
+    if (!text) inp.value = '';
+    renderNotes();
+  }
+  function delNote(i) { notes.splice(i, 1); renderNotes(); }
+
+  /* ---------------- Quick capture ---------------- */
+  function captureAsTask() {
+    const el = document.getElementById('quickCapture');
+    if (el.value.trim()) { addTask(el.value.trim()); el.value = ''; nav('tasks'); }
+  }
+  function captureAsNote() {
+    const el = document.getElementById('quickCapture');
+    if (el.value.trim()) { addNote(el.value.trim()); el.value = ''; nav('notes'); }
+  }
+
+  /* ---------------- Assistant ---------------- */
+  function bubble(text, who) {
+    const log = document.getElementById('chatLog');
+    const d = document.createElement('div');
+    d.className = 'msg ' + who;
+    d.textContent = text;
+    log.appendChild(d);
+    log.scrollTop = log.scrollHeight;
+    return d;
+  }
+
+  async function send() {
+    const inp = document.getElementById('chatInput');
+    const q = inp.value.trim();
+    if (!q) return;
+    inp.value = '';
+    bubble(q, 'user');
+
+    // Try built-in offline commands first — always works, no key, no network.
+    const handled = offlineCommand(q);
+    if (handled !== null) { bubble(handled, 'zero'); return; }
+
+    // Otherwise, use the AI provider if a key is configured.
+    const key = store.raw(LS.aiKey);
+    if (!key) {
+      bubble("I don't have an AI key yet, so I'm running in offline mode. " +
+             "Type `help` to see what I can do right now, or add a key in Settings to unlock full conversation.", 'zero');
+      return;
+    }
+    const thinking = bubble('…', 'zero');
+    try {
+      const reply = await callAI(q);
+      thinking.textContent = reply;
+    } catch (e) {
+      thinking.textContent = '⚠ AI request failed: ' + e.message;
+    }
+  }
+
+  function offlineCommand(q) {
+    const s = q.trim();
+    const low = s.toLowerCase();
+    if (low === 'help') {
+      return [
+        'Zero offline commands:',
+        '• help            — this list',
+        '• task &lt;text>     — add a task',
+        '• note &lt;text>     — save a note',
+        '• tasks           — list open tasks',
+        '• price btc|eth|sol — live crypto price',
+        '• time            — current time',
+        '',
+        'Add an AI key in Settings for full conversation.'
+      ].join('\n');
+    }
+    if (low === 'time') return new Date().toLocaleString();
+    if (low === 'tasks') {
+      const open = tasks.filter(t => !t.done);
+      return open.length ? open.map((t, i) => `${i + 1}. ${t.text}`).join('\n') : 'No open tasks. 🎉';
+    }
+    if (low.startsWith('task ')) { addTask(s.slice(5)); renderTasks(); return '✓ Task added.'; }
+    if (low.startsWith('note ')) { addNote(s.slice(5)); renderNotes(); return '✓ Note saved.'; }
+    if (low.startsWith('price ')) {
+      const sym = low.slice(6).trim();
+      const map = { btc: 'bitcoin', eth: 'ethereum', sol: 'solana', bnb: 'binancecoin', xrp: 'ripple', doge: 'dogecoin' };
+      const id = map[sym];
+      if (!id) return `I can price: ${Object.keys(map).join(', ')}.`;
+      livePrice(id, sym.toUpperCase());
+      return `Fetching live ${sym.toUpperCase()} price…`;
+    }
+    return null; // not an offline command
+  }
+
+  async function livePrice(id, sym) {
+    try {
+      const r = await guardedFetch(`https://api.coingecko.com/api/v3/simple/price?ids=${id}&amp;vs_currencies=usd&amp;include_24hr_change=true`, {}, 'market');
+      const d = await r.json();
+      const chg = d[id].usd_24h_change;
+      bubble(`${sym}: $${fmt(d[id].usd)}  (${chg >= 0 ? '+' : ''}${chg.toFixed(2)}% 24h)`, 'zero');
+    } catch (e) { bubble('Could not fetch price: ' + e.message, 'zero'); }
+  }
+
+  async function callAI(q) {
+    const provider = store.raw(LS.aiProvider) || 'anthropic';
+    const key = store.raw(LS.aiKey);
+    const sys = "You are Zero, a concise, capable personal assistant. The user builds websites and games. Be direct and useful. When asked about trading, give information and analysis but always note it is not financial advice.";
+    if (provider === 'anthropic') {
+      const r = await guardedFetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'x-api-key': key,
+          'anthropic-version': '2023-06-01',
+          'anthropic-dangerous-direct-browser-access': 'true',
+        },
+        body: JSON.stringify({
+          model: 'claude-sonnet-5',
+          max_tokens: 1024,
+          system: sys,
+          messages: [{ role: 'user', content: q }],
+        }),
+      }, 'ai');
+      const d = await r.json();
+      if (d.error) throw new Error(d.error.message);
+      return d.content?.map(c => c.text).join('') || '(no reply)';
+    } else {
+      const r = await guardedFetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'authorization': 'Bearer ' + key },
+        body: JSON.stringify({
+          model: 'gpt-4o-mini',
+          messages: [{ role: 'system', content: sys }, { role: 'user', content: q }],
+        }),
+      }, 'ai');
+      const d = await r.json();
+      if (d.error) throw new Error(d.error.message);
+      return d.choices?.[0]?.message?.content || '(no reply)';
+    }
+  }
+
+  /* ---------------- Settings ---------------- */
+  function saveAiKey() {
+    store.rawSet(LS.aiKey, document.getElementById('aiKey').value.trim());
+    store.rawSet(LS.aiProvider, document.getElementById('aiProvider').value);
+    refreshAiStatus();
+    alert('AI key saved locally.');
+  }
+  function clearAiKey() { localStorage.removeItem(LS.aiKey); document.getElementById('aiKey').value = ''; refreshAiStatus(); }
+  function saveStockKey() { store.rawSet(LS.stockKey, document.getElementById('stockKey').value.trim()); alert('Market key saved locally.'); }
+
+  function refreshAiStatus() {
+    const on = !!store.raw(LS.aiKey);
+    const el = document.getElementById('aiStatus');
+    el.textContent = on ? 'online' : 'offline';
+    el.className = 'pill' + (on ? '' : ' red');
+  }
+
+  function exportData() {
+    const blob = new Blob([JSON.stringify({ tasks, notes }, null, 2)], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'zero-data.json';
+    a.click();
+  }
+  function wipeData() {
+    if (!confirm('Wipe ALL Zero data on this device? This cannot be undone.')) return;
+    Object.values(LS).forEach(k => localStorage.removeItem(k));
+    tasks = []; notes = [];
+    renderTasks(); renderNotes(); refreshAiStatus();
+    alert('All local data wiped.');
+  }
+
+  /* ---------------- Helpers ---------------- */
+  function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+  /* ---------------- Init ---------------- */
+  function init() {
+    document.getElementById('nav').addEventListener('click', e => {
+      const li = e.target.closest('li'); if (li) nav(li.dataset.view);
+    });
+    document.getElementById('aiProvider').value = store.raw(LS.aiProvider) || 'anthropic';
+
+    // Keyboard kill switch: Esc twice, or Ctrl/Cmd + . — works from anywhere.
+    let lastEsc = 0;
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape') {
+        const now = Date.now();
+        if (now - lastEsc &lt; 600) { toggleHalt(); lastEsc = 0; } else { lastEsc = now; }
+      }
+      if ((e.ctrlKey || e.metaKey) &amp;&amp; e.key === '.') { e.preventDefault(); toggleHalt(); }
+    });
+
+    tick(); setInterval(tick, 1000);
+    renderTasks(); renderNotes(); refreshAiStatus(); updateStatus();
+    log('Zero started. All capabilities on. Press STOP anytime.');
+    loadMarkets(); startTimers();
+    bubble("I'm Zero. Type `help` to see what I can do offline, or add an AI key in Settings for full conversation.", 'zero');
+  }
+
+  return {
+    nav, loadMarkets, addTask, toggleTask, delTask, addNote, delNote,
+    captureAsTask, captureAsNote, send, saveAiKey, clearAiKey, saveStockKey,
+    exportData, wipeData, init,
+    toggleHalt, killNetwork, panic, setCap, clearLog,
+  };
+})();
+
+document.addEventListener('DOMContentLoaded', Zero.init);
+
+  &lt;/script>
+&lt;/body>
+&lt;/html>
+</textarea>
+</div>
+
+<script>
+  var src = document.getElementById('src');
+  var code = src.value;                 // entities decoded back to the exact original
+  document.getElementById('view').textContent = code;
+
+  var btn = document.getElementById('copy');
+  btn.addEventListener('click', function () {
+    function ok() {
+      btn.textContent = 'Copied \u2713';
+      btn.classList.add('done');
+      setTimeout(function () { btn.textContent = 'Copy all code'; btn.classList.remove('done'); }, 2200);
+    }
+    // execCommand fallback matters: the async clipboard API is blocked in
+    // some sandboxed frames, and this page is likely to run inside one.
+    function legacy() {
+      src.style.cssText = 'position:fixed;left:0;top:0;opacity:0';
+      src.select();
+      try { document.execCommand('copy'); ok(); }
+      catch (e) { btn.textContent = 'Press Ctrl/Cmd+C'; }
+      src.style.cssText = 'position:absolute;left:-9999px;top:0;opacity:0';
+    }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(code).then(ok, legacy);
+    } else { legacy(); }
+  });
+
+  document.getElementById('dl').addEventListener('click', function () {
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([code], { type: 'text/html' }));
+    a.download = 'zero.html';
+    a.click();
+    URL.revokeObjectURL(a.href);
+  });
+</script>
