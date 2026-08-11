@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="robots" content="noindex, nofollow" />
+  <title>ZERO</title>
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+  <!-- ============ KILL SWITCH — always visible, always first ============ -->
+  <button id="killSwitch" onclick="Zero.toggleHalt()" title="Immediately stop all Zero activity">■ STOP</button>
+
+  <div id="haltBanner">
+    <div class="box">
+      <h2>ZERO HALTED</h2>
+      <p>All automatic activity is stopped. No network calls, no market polling, no AI requests. Your data is untouched and safe.</p>
+      <p style="margin-top:18px">
+        <button class="btn blue" onclick="Zero.toggleHalt()">Resume Zero</button>
+      </p>
+    </div>
+  </div>
+
+  <div class="app">
+    <!-- ============ SIDEBAR ============ -->
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="logo">0</div>
+        <div class="name">ZER<b>0</b></div>
+      </div>
+      <ul class="nav" id="nav">
+        <li data-view="control"><span class="ic">⏻</span> Control Panel</li>
+        <li data-view="dashboard" class="active"><span class="ic">▦</span> Dashboard</li>
+        <li data-view="markets"><span class="ic">▲</span> Markets</li>
+        <li data-view="assistant"><span class="ic">◈</span> Assistant</li>
+        <li data-view="tasks"><span class="ic">✓</span> Tasks</li>
+        <li data-view="notes"><span class="ic">✎</span> Notes</li>
+        <li data-view="settings"><span class="ic">⚙</span> Settings</li>
+      </ul>
+      <div class="foot">
+        <span class="dot"></span> Private mode &middot; local only<br />
+        No accounts &middot; no tracking &middot; no telemetry.
+      </div>
+    </aside>
+
+    <!-- ============ MAIN ============ -->
+    <main class="main">
+      <div class="topbar">
+        <div>
+          <h1 id="viewTitle">Dashboard</h1>
+          <div class="sub" id="viewSub">Your day at a glance.</div>
+        </div>
+        <div class="clock"><b id="clock">--:--:--</b><br /><span id="date"></span></div>
+      </div>
+
+      <!-- CONTROL PANEL -->
+      <section class="view" id="view-control">
+        <div class="card" style="border-color:var(--red)">
+          <h2>Master Control <span class="pill red">safety</span></h2>
+          <p class="hint">One button stops everything Zero does. It works even if the rest of the app is broken or misbehaving — nothing Zero runs can disable it.</p>
+          <div style="display:flex;gap:12px;margin-top:14px;flex-wrap:wrap">
+            <button class="btn" style="font-size:16px;padding:15px 30px" onclick="Zero.toggleHalt()">■ EMERGENCY STOP</button>
+            <button class="btn ghost" onclick="Zero.killNetwork()">⛔ Cut all network access</button>
+            <button class="btn ghost" onclick="Zero.panic()">☢ Panic: stop + wipe keys</button>
+          </div>
+        </div>
+
+        <div class="grid cols-2" style="margin-top:16px">
+          <div class="card">
+            <h2>Capability Switches</h2>
+            <p class="hint">Turn any capability off individually. Off means Zero cannot use it at all.</p>
+            <div style="margin-top:10px">
+              <div class="ctrl-row">
+                <span class="led on" id="ledNet"></span>
+                <div class="label"><b>Network access</b><span>Lets Zero reach the internet</span></div>
+                <label class="toggle"><input type="checkbox" id="capNetwork" checked onchange="Zero.setCap('network',this.checked)" /><span class="track"></span></label>
+              </div>
+              <div class="ctrl-row">
+                <span class="led on" id="ledMkt"></span>
+                <div class="label"><b>Auto market polling</b><span>Refreshes prices every 60s</span></div>
+                <label class="toggle"><input type="checkbox" id="capMarket" checked onchange="Zero.setCap('market',this.checked)" /><span class="track"></span></label>
+              </div>
+              <div class="ctrl-row">
+                <span class="led off" id="ledAi"></span>
+                <div class="label"><b>AI requests</b><span>Sends your prompts to the AI provider</span></div>
+                <label class="toggle"><input type="checkbox" id="capAi" checked onchange="Zero.setCap('ai',this.checked)" /><span class="track"></span></label>
+              </div>
+              <div class="ctrl-row">
+                <span class="led on" id="ledStore"></span>
+                <div class="label"><b>Local storage writes</b><span>Lets Zero save tasks & notes</span></div>
+                <label class="toggle"><input type="checkbox" id="capStorage" checked onchange="Zero.setCap('storage',this.checked)" /><span class="track"></span></label>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <h2>Activity Log <span class="pill">transparency</span></h2>
+            <p class="hint">Every action Zero takes is logged here so nothing happens without you seeing it.</p>
+            <div class="log-feed" id="logFeed"></div>
+            <button class="btn ghost" style="margin-top:10px" onclick="Zero.clearLog()">Clear log</button>
+          </div>
+        </div>
+
+        <div class="card" style="margin-top:16px">
+          <h2>System Status</h2>
+          <div class="grid cols-3">
+            <div class="stat"><div class="n" id="sysState" style="color:var(--green);font-size:20px">RUNNING</div><div class="l">State</div></div>
+            <div class="stat"><div class="n" id="sysCalls" style="color:var(--blue);font-size:20px">0</div><div class="l">Network calls</div></div>
+            <div class="stat"><div class="n" id="sysCaps" style="color:var(--white);font-size:20px">4/4</div><div class="l">Capabilities on</div></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- DASHBOARD -->
+      <section class="view active" id="view-dashboard">
+        <div class="grid cols-3" style="margin-bottom:16px">
+          <div class="card stat"><div class="n" id="statTasks" style="color:var(--red)">0</div><div class="l">Open Tasks</div></div>
+          <div class="card stat"><div class="n" id="statBtc" style="color:var(--blue)">—</div><div class="l">BTC / USD</div></div>
+          <div class="card stat"><div class="n" id="statNotes" style="color:var(--white)">0</div><div class="l">Notes</div></div>
+        </div>
+        <div class="grid cols-2">
+          <div class="card">
+            <h2>Daily Market Brief <span class="pill">live</span></h2>
+            <div id="miniMarket"><div class="spinner">Loading live prices…</div></div>
+            <div class="notice">📊 <b>Information only, not financial advice.</b> Prices are delayed/aggregated from public sources. Do your own research before trading.</div>
+          </div>
+          <div class="card">
+            <h2>Quick Capture</h2>
+            <p class="hint">Drop a thought, task, or idea — Zero routes it.</p>
+            <textarea id="quickCapture" rows="4" placeholder="e.g. 'Ship landing page for the racing game'…"></textarea>
+            <div style="display:flex;gap:10px;margin-top:10px">
+              <button class="btn" onclick="Zero.captureAsTask()">+ Add as Task</button>
+              <button class="btn blue" onclick="Zero.captureAsNote()">+ Save as Note</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- MARKETS -->
+      <section class="view" id="view-markets">
+        <div class="card">
+          <h2>Live Markets <span class="pill">crypto · live</span> <span class="pill red">stocks · needs key</span></h2>
+          <div class="mkt-row mkt-head"><div>Asset</div><div>Price</div><div>24h</div></div>
+          <div id="marketTable"><div class="spinner">Loading live prices…</div></div>
+          <div style="margin-top:14px;display:flex;gap:10px;align-items:center">
+            <button class="btn blue" onclick="Zero.loadMarkets()">↻ Refresh</button>
+            <span class="hint" id="marketUpdated"></span>
+          </div>
+          <div class="notice">Crypto is live from CoinGecko's free public API (no key needed). To add <b>stocks & indices</b>, drop a free API key (Finnhub / Alpha Vantage) in <b>Settings</b>. Nothing here is financial advice.</div>
+        </div>
+      </section>
+
+      <!-- ASSISTANT -->
+      <section class="view" id="view-assistant">
+        <div class="card">
+          <h2>Zero Assistant <span class="pill" id="aiStatus">offline</span></h2>
+          <div class="chat-wrap">
+            <div class="chat-log" id="chatLog"></div>
+            <div class="chat-input">
+              <input id="chatInput" placeholder="Ask Zero anything…" onkeydown="if(event.key==='Enter')Zero.send()" />
+              <button class="btn" onclick="Zero.send()">Send</button>
+            </div>
+          </div>
+          <div class="notice">Zero runs a built-in offline command engine (try <b>help</b>, <b>task ...</b>, <b>note ...</b>, <b>price btc</b>, <b>time</b>). To unlock full conversational AI, add an API key in <b>Settings</b> — your key stays in your browser and is sent only to the AI provider you choose.</div>
+        </div>
+      </section>
+
+      <!-- TASKS -->
+      <section class="view" id="view-tasks">
+        <div class="card">
+          <h2>Tasks</h2>
+          <div class="chat-input" style="margin-bottom:8px">
+            <input id="taskInput" placeholder="What needs doing?" onkeydown="if(event.key==='Enter')Zero.addTask()" />
+            <button class="btn" onclick="Zero.addTask()">Add</button>
+          </div>
+          <div id="taskList"></div>
+        </div>
+      </section>
+
+      <!-- NOTES -->
+      <section class="view" id="view-notes">
+        <div class="card">
+          <h2>Notes</h2>
+          <textarea id="noteInput" rows="3" placeholder="New note…"></textarea>
+          <div style="margin-top:10px"><button class="btn blue" onclick="Zero.addNote()">Save Note</button></div>
+          <div id="noteList" style="margin-top:16px"></div>
+        </div>
+      </section>
+
+      <!-- SETTINGS -->
+      <section class="view" id="view-settings">
+        <div class="grid cols-2">
+          <div class="card">
+            <h2>AI Provider</h2>
+            <p class="hint">Paste a key to enable full conversational AI. Stored only in this browser (localStorage) — never sent anywhere except the provider you pick.</p>
+            <label class="hint">Provider</label>
+            <select id="aiProvider">
+              <option value="anthropic">Anthropic (Claude)</option>
+              <option value="openai">OpenAI</option>
+            </select>
+            <label class="hint" style="margin-top:10px;display:block">API Key</label>
+            <input id="aiKey" type="password" placeholder="sk-…" />
+            <div style="margin-top:12px"><button class="btn" onclick="Zero.saveAiKey()">Save Key</button>
+            <button class="btn ghost" onclick="Zero.clearAiKey()">Clear</button></div>
+          </div>
+          <div class="card">
+            <h2>Market Data Key <span class="pill">optional</span></h2>
+            <p class="hint">Add a free Finnhub key to enable live stocks & indices.</p>
+            <input id="stockKey" type="password" placeholder="Finnhub API key…" />
+            <div style="margin-top:12px"><button class="btn blue" onclick="Zero.saveStockKey()">Save</button></div>
+          </div>
+          <div class="card">
+            <h2>Privacy</h2>
+            <p class="hint">Zero has no server, no analytics, and no accounts. All your data lives in this browser only.</p>
+            <button class="btn ghost" onclick="Zero.exportData()">⤓ Export my data (JSON)</button>
+            <button class="btn ghost" onclick="Zero.wipeData()" style="margin-top:8px">⌫ Wipe everything</button>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script src="js/app.js"></script>
+</body>
+</html>
