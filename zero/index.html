@@ -11,10 +11,21 @@
   <!-- ============ KILL SWITCH — always visible, always first ============ -->
   <button id="killSwitch" onclick="Zero.toggleHalt()" title="Immediately stop all Zero activity">■ STOP</button>
 
+  <!-- ============ VAULT LOCK SCREEN ============ -->
+  <div id="lockScreen">
+    <div class="box">
+      <h2>ZERO LOCKED</h2>
+      <p>Your data is encrypted on this device. Enter the passphrase to open it.</p>
+      <input id="lockPass" type="password" placeholder="Passphrase" autocomplete="current-password" style="margin-top:16px" />
+      <div id="lockErr" class="lock-err"></div>
+      <p style="margin-top:14px"><button class="btn" onclick="Zero.unlockVault()">Unlock</button></p>
+    </div>
+  </div>
+
   <div id="haltBanner">
     <div class="box">
       <h2>ZERO HALTED</h2>
-      <p>All automatic activity is stopped. No network calls, no market polling, no AI requests. Your data is untouched and safe.</p>
+      <p>All automatic activity is stopped. No network calls, no market polling, no engine requests. Your data is untouched and safe.</p>
       <p style="margin-top:18px">
         <button class="btn blue" onclick="Zero.toggleHalt()">Resume Zero</button>
       </p>
@@ -61,7 +72,7 @@
           <div style="display:flex;gap:12px;margin-top:14px;flex-wrap:wrap">
             <button class="btn" style="font-size:16px;padding:15px 30px" onclick="Zero.toggleHalt()">■ EMERGENCY STOP</button>
             <button class="btn ghost" onclick="Zero.killNetwork()">⛔ Cut all network access</button>
-            <button class="btn ghost" onclick="Zero.panic()">☢ Panic: stop + wipe keys</button>
+            <button class="btn ghost" onclick="Zero.panic()">☢ Panic: stop + lock vault</button>
           </div>
         </div>
 
@@ -82,7 +93,7 @@
               </div>
               <div class="ctrl-row">
                 <span class="led off" id="ledAi"></span>
-                <div class="label"><b>AI requests</b><span>Sends your prompts to the AI provider</span></div>
+                <div class="label"><b>Engine requests</b><span>Sends prompts to your local engine</span></div>
                 <label class="toggle"><input type="checkbox" id="capAi" checked onchange="Zero.setCap('ai',this.checked)" /><span class="track"></span></label>
               </div>
               <div class="ctrl-row">
@@ -153,7 +164,7 @@
       <!-- ASSISTANT -->
       <section class="view" id="view-assistant">
         <div class="card">
-          <h2>Zero Assistant <span class="pill" id="aiStatus">offline</span></h2>
+          <h2>Zero Assistant <span class="pill" id="aiStatus">local</span></h2>
           <div class="chat-wrap">
             <div class="chat-log" id="chatLog"></div>
             <div class="chat-input">
@@ -161,7 +172,7 @@
               <button class="btn" onclick="Zero.send()">Send</button>
             </div>
           </div>
-          <div class="notice">Zero runs a built-in offline command engine (try <b>help</b>, <b>task ...</b>, <b>note ...</b>, <b>price btc</b>, <b>time</b>). To unlock full conversational AI, add an API key in <b>Settings</b> — your key stays in your browser and is sent only to the AI provider you choose.</div>
+          <div class="notice">Zero answers <b>help</b>, <b>task …</b>, <b>note …</b>, <b>price btc</b> and <b>time</b> with no model at all. For open conversation, point it at a local engine in <b>Settings</b> — the prompt goes to your own machine and never leaves it.</div>
         </div>
       </section>
 
@@ -191,17 +202,49 @@
       <section class="view" id="view-settings">
         <div class="grid cols-2">
           <div class="card">
-            <h2>AI Provider</h2>
-            <p class="hint">Paste a key to enable full conversational AI. Stored only in this browser (localStorage) — never sent anywhere except the provider you pick.</p>
-            <label class="hint">Provider</label>
-            <select id="aiProvider">
-              <option value="anthropic">Anthropic (Claude)</option>
-              <option value="openai">OpenAI</option>
+            <h2>Local Engine <span class="pill">no account</span></h2>
+            <p class="hint">Zero's brain runs on this machine. No provider, no API key, no sign-in — your prompts go to <code>localhost</code> and stop there.</p>
+            <label class="hint" style="margin-top:12px;display:block">Address</label>
+            <input id="engineUrl" placeholder="http://localhost:11434" />
+            <label class="hint" style="margin-top:10px;display:block">Model</label>
+            <input id="engineModel" placeholder="llama3.2" />
+            <label class="hint" style="margin-top:10px;display:block">Request format</label>
+            <select id="engineMode">
+              <option value="ollama">Ollama</option>
+              <option value="openai">Local server (llama.cpp, LM Studio, Jan)</option>
             </select>
-            <label class="hint" style="margin-top:10px;display:block">API Key</label>
-            <input id="aiKey" type="password" placeholder="sk-…" />
-            <div style="margin-top:12px"><button class="btn" onclick="Zero.saveAiKey()">Save Key</button>
-            <button class="btn ghost" onclick="Zero.clearAiKey()">Clear</button></div>
+            <div style="margin-top:12px">
+              <button class="btn" onclick="Zero.saveEngine()">Save &amp; test</button>
+              <button class="btn ghost" onclick="Zero.testEngine()">Test connection</button>
+            </div>
+            <div id="engineStatus" class="hint" style="margin-top:12px"></div>
+            <div class="notice">
+              <b>Getting an engine running:</b> install <a href="https://ollama.com" target="_blank" rel="noopener noreferrer">Ollama</a>, then
+              <code>ollama pull llama3.2</code>. Because Zero runs from a file, Ollama must be told to accept it —
+              start it with <code>OLLAMA_ORIGINS=* ollama serve</code>, otherwise the browser blocks the request.
+            </div>
+          </div>
+
+          <div class="card">
+            <h2>Vault <span class="pill" id="vaultState">off</span></h2>
+            <p class="hint">Encrypts your tasks and notes on this device with a passphrase. Without it, anything Zero saves can be read by anyone who reaches this browser profile or a backup of it.</p>
+
+            <div id="vaultSetup">
+              <label class="hint" style="margin-top:12px;display:block">Passphrase</label>
+              <input id="vaultPass" type="password" placeholder="at least 8 characters" />
+              <label class="hint" style="margin-top:10px;display:block">Confirm</label>
+              <input id="vaultPass2" type="password" placeholder="type it again" />
+              <div style="margin-top:12px"><button class="btn" onclick="Zero.enableVault()">Turn encryption on</button></div>
+              <div class="notice"><b>There is no reset.</b> The passphrase is never stored, so nobody — including Zero — can recover your data without it. Write it down somewhere safe before you continue.</div>
+            </div>
+
+            <div id="vaultManage" style="display:none">
+              <div style="margin-top:12px;display:flex;gap:10px;flex-wrap:wrap">
+                <button class="btn" onclick="Zero.lockVault()">Lock now</button>
+                <button class="btn ghost" onclick="Zero.disableVault()">Turn encryption off</button>
+              </div>
+              <div class="notice">Locking wipes the key and your data from memory. Zero keeps running; the saved data stays sealed until you unlock it again. <b>Panic</b> on the Control Panel does this instantly.</div>
+            </div>
           </div>
           <div class="card">
             <h2>Market Data Key <span class="pill">optional</span></h2>
@@ -220,6 +263,7 @@
     </main>
   </div>
 
+  <script src="js/vault.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>

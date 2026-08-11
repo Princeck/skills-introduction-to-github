@@ -10,16 +10,18 @@ const path = require('path');
 const dir = __dirname;
 const html = fs.readFileSync(path.join(dir, 'index.html'), 'utf8');
 const css = fs.readFileSync(path.join(dir, 'css/styles.css'), 'utf8');
-const js = fs.readFileSync(path.join(dir, 'js/app.js'), 'utf8');
+// Vault first: app.js reads Vault.isEnabled() while initialising.
+const js = fs.readFileSync(path.join(dir, 'js/vault.js'), 'utf8') + '\n' +
+           fs.readFileSync(path.join(dir, 'js/app.js'), 'utf8');
 
 // NOTE: the replacement MUST be a function, not a string. In a replacement
 // string, `$$` means a literal `$` and `$'` means "the rest of the input" —
 // and our CSS/JS contain both. A function's return value is used verbatim.
 const out = html
   .replace('<link rel="stylesheet" href="css/styles.css" />', () => `<style>\n${css}\n  </style>`)
-  .replace('<script src="js/app.js"></script>', () => `<script>\n${js}\n  </script>`);
+  .replace('<script src="js/vault.js"></script>\n  <script src="js/app.js"></script>', () => `<script>\n${js}\n  </script>`);
 
-if (out.includes('css/styles.css') || out.includes('js/app.js')) {
+if (out.includes('css/styles.css') || out.includes('js/app.js') || out.includes('js/vault.js')) {
   console.error('✗ Inlining failed — a reference was left behind.');
   process.exit(1);
 }

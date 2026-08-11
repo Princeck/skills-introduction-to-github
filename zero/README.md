@@ -41,8 +41,8 @@ Zero is built so **you** are always in charge.
 | **■ STOP** (top-right, always visible) | Instantly halts everything — aborts in-flight requests, cancels timers, freezes activity |
 | **Esc Esc** or **Ctrl/Cmd + .** | Same kill switch, from the keyboard, anywhere |
 | **Cut all network access** | Zero can no longer reach the internet at all |
-| **Panic** | Halts Zero *and* deletes every stored API key |
-| **Capability switches** | Turn network / market polling / AI / storage off individually |
+| **Panic** | Halts Zero, locks the vault, and clears the session from memory |
+| **Capability switches** | Turn network / market polling / engine / storage off individually |
 | **Activity log** | Every action and every blocked action, timestamped |
 
 **Design rule:** every network request in Zero routes through one guarded
@@ -56,9 +56,52 @@ these switches — only a direct click from you.
 
 - **Dashboard** — open tasks, live BTC, quick capture
 - **Markets** — live crypto prices (BTC, ETH, SOL, BNB, XRP, DOGE), auto-refresh every 60s
-- **Assistant** — offline command engine (`help`, `task …`, `note …`, `price btc`, `tasks`, `time`), plus full conversational AI when you add a key
+- **Assistant** — built-in commands (`help`, `task …`, `note …`, `price btc`, `tasks`, `time`) that need no model at all, plus open conversation through a local engine
 - **Tasks / Notes** — saved locally, export to JSON anytime
-- **Settings** — API keys, data export, full wipe
+- **Settings** — local engine, vault passphrase, data export, full wipe
+
+---
+
+## The engine is yours
+
+Zero has no AI provider. No Anthropic, no OpenAI, no account, no API key, no
+hosted service of any kind. It talks to a model running on your own machine:
+
+```bash
+# one-time setup
+brew install ollama          # or download from ollama.com
+ollama pull llama3.2
+
+# start it so Zero (running from a file) is allowed to reach it
+OLLAMA_ORIGINS=* ollama serve
+```
+
+Then point Settings → Local Engine at `http://localhost:11434` and hit
+**Save & test**. LM Studio, llama.cpp's server and Jan work too — switch the
+request format to *Local server*.
+
+`OLLAMA_ORIGINS=*` matters: without it the browser's origin check blocks the
+request and the engine looks dead when it is actually running fine.
+
+Your prompts go to localhost and stop there. Turn off the network entirely from
+the Control Panel and the assistant keeps working, because the model is local.
+
+---
+
+## The vault
+
+Tasks and notes are encrypted at rest with a passphrase:
+
+- **PBKDF2-SHA256**, 310,000 iterations, random 16-byte salt per vault
+- **AES-GCM 256**, random 12-byte IV per record, authenticated so tampering fails loudly
+- The key is derived in memory and marked non-extractable; the passphrase is never stored
+
+Locked, Zero holds nothing: localStorage contains only ciphertext and the
+in-memory copy is dropped. **Panic** locks it instantly.
+
+**There is no reset.** Nobody can recover your data without the passphrase —
+not you, not me, not anyone with the device. That is the property that makes it
+worth having. Write it down somewhere safe.
 
 ---
 
@@ -66,21 +109,24 @@ these switches — only a direct click from you.
 
 **What's genuinely true:**
 - No server, no accounts, no analytics, no telemetry, no cookies, no tracking pixels
-- All your tasks and notes live in *your browser's* localStorage, on your device
-- API keys are stored locally and sent only to the provider you pick
+- No third-party requests at all: no CDNs, no web fonts, no remote scripts
+- Your prompts never leave the machine — the model runs locally
+- Tasks and notes are encrypted at rest; locked, they are unreadable without your passphrase
 - You can export or wipe everything with one click
-- Open source — every line is in this folder, auditable
+- Every line is in this folder, auditable
 
 **What is NOT true, and I won't pretend otherwise:**
-Zero cannot make you invisible to governments or ISPs. When it fetches market
-prices or calls an AI API, that traffic is visible to your network, your ISP, and
-the API provider. No app can change that. If you need stronger network privacy,
-that's a job for tools built for it (a reputable VPN, Tor) — and even those have
-real limits.
+Zero cannot make you untraceable. While the network switch is on it fetches
+crypto prices, and that traffic is visible to your network and your ISP — they
+see *that* you contacted a price API, though not your data or prompts. Beyond
+that: your device itself, your browser profile, your operating system and anyone
+with physical access remain outside what an app can defend. Full-disk encryption
+and a locked OS account are the layer beneath this one, and network-level privacy
+is a job for tools built for it — each with real limits of its own.
 
-What Zero *does* give you is **data minimisation**: it collects nothing, stores
-nothing remotely, and phones home to nobody. That part is real and verifiable in
-the source.
+Switch the network off and Zero goes fully offline: assistant, tasks, notes and
+vault all keep working with zero outbound traffic. That is the strongest honest
+claim available, and it is verifiable in the activity log.
 
 ---
 
@@ -105,6 +151,7 @@ professional.
 
 - [ ] Live stocks & indices via Finnhub
 - [ ] Price alerts and watchlist
+- [ ] Vault-backed encrypted export
 - [ ] Plugin system so new capabilities drop in without touching core
-- [ ] Local-model support (Ollama) so the assistant runs fully offline
+- [x] Local-model support (Ollama) so the assistant runs fully offline
 - [ ] PWA install so Zero works as a desktop/mobile app

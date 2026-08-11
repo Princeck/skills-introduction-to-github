@@ -9,24 +9,47 @@ const Zero = (() => {
   const LS = {
     tasks: 'zero.tasks',
     notes: 'zero.notes',
-    aiKey: 'zero.aiKey',
-    aiProvider: 'zero.aiProvider',
+    engineUrl: 'zero.engineUrl',
+    engineModel: 'zero.engineModel',
+    engineMode: 'zero.engineMode',
     stockKey: 'zero.stockKey',
   };
+
+  // Short rolling context so the assistant remembers the current thread.
+  // Memory only — never written to disk in any form.
+  let chatHistory = [];
 
   const store = {
     get(k, d) { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch { return d; } },
     set(k, v) {
       // Storage writes respect the Control Panel switch.
       if (typeof Control !== 'undefined' && !Control.caps.storage) return;
+      // With the vault on, nothing readable is written: persist() owns
+      // these keys and writes ciphertext instead.
+      if (Vault.isEnabled()) { persist(); return; }
       localStorage.setItem(k, JSON.stringify(v));
     },
     raw(k) { return localStorage.getItem(k) || ''; },
     rawSet(k, v) { localStorage.setItem(k, v); },
   };
 
-  let tasks = store.get(LS.tasks, []);
-  let notes = store.get(LS.notes, []);
+  // Vault-off: read straight from localStorage. Vault-on: these stay
+  // empty until unlock() decrypts them, so a locked Zero holds nothing.
+  let tasks = Vault.isEnabled() ? [] : store.get(LS.tasks, []);
+  let notes = Vault.isEnabled() ? [] : store.get(LS.notes, []);
+
+  /* Encrypt the in-memory model and write it. Fire-and-forget: callers
+     stay synchronous, and a locked vault simply declines to write. */
+  async function persist() {
+    if (!Vault.isEnabled() || !Vault.isUnlocked()) return;
+    if (!Control.caps.storage) return;
+    try {
+      localStorage.setItem(LS.tasks, await Vault.encrypt(JSON.stringify(tasks)));
+      localStorage.setItem(LS.notes, await Vault.encrypt(JSON.stringify(notes)));
+    } catch (e) {
+      log('Could not save: ' + e.message, true);
+    }
+  }
 
   /* ============================================================
      CONTROL LAYER — the user's kill switch.
@@ -110,14 +133,16 @@ const Zero = (() => {
   }
 
   function panic() {
-    if (!confirm('PANIC: stop everything and delete all stored API keys?\n\nYour tasks and notes are kept.')) return;
+    if (!confirm('PANIC: stop everything, lock the vault and clear this session?\n\nEncrypted data stays on disk and needs your passphrase to open again.')) return;
     if (!Control.halted) toggleHalt();
-    [LS.aiKey, LS.stockKey].forEach(k => localStorage.removeItem(k));
-    const ak = document.getElementById('aiKey'); if (ak) ak.value = '';
+    localStorage.removeItem(LS.stockKey);
     const sk = document.getElementById('stockKey'); if (sk) sk.value = '';
-    refreshAiStatus();
-    log('PANIC — halted and all API keys wiped.', true);
-    alert('Zero halted. All API keys deleted from this device.');
+    chatHistory = [];
+    const cl = document.getElementById('chatLog'); if (cl) cl.innerHTML = '';
+    // Locking drops the key and the plaintext model in one move.
+    if (Vault.isEnabled()) lockVault(); else { refreshAiStatus(); }
+    log('PANIC — halted, vault locked, session cleared.', true);
+    alert('Zero halted and locked. Your data is sealed on this device.');
   }
 
   function setCap(name, on) {
@@ -328,19 +353,15 @@ const Zero = (() => {
     const handled = offlineCommand(q);
     if (handled !== null) { bubble(handled, 'zero'); return; }
 
-    // Otherwise, use the AI provider if a key is configured.
-    const key = store.raw(LS.aiKey);
-    if (!key) {
-      bubble("I don't have an AI key yet, so I'm running in offline mode. " +
-             "Type `help` to see what I can do right now, or add a key in Settings to unlock full conversation.", 'zero');
-      return;
-    }
+    // Otherwise hand it to the local engine, streaming the reply in.
     const thinking = bubble('…', 'zero');
     try {
-      const reply = await callAI(q);
+      const reply = await callEngine(q, partial => { thinking.textContent = partial; });
       thinking.textContent = reply;
+      chatHistory.push({ role: 'user', content: q }, { role: 'assistant', content: reply });
+      if (chatHistory.length > 16) chatHistory = chatHistory.slice(-16);
     } catch (e) {
-      thinking.textContent = '⚠ AI request failed: ' + e.message;
+      thinking.textContent = '⚠ ' + e.message;
     }
   }
 
@@ -387,59 +408,209 @@ const Zero = (() => {
     } catch (e) { bubble('Could not fetch price: ' + e.message, 'zero'); }
   }
 
-  async function callAI(q) {
-    const provider = store.raw(LS.aiProvider) || 'anthropic';
-    const key = store.raw(LS.aiKey);
-    const sys = "You are Zero, a concise, capable personal assistant. The user builds websites and games. Be direct and useful. When asked about trading, give information and analysis but always note it is not financial advice.";
-    if (provider === 'anthropic') {
-      const r = await guardedFetch('https://api.anthropic.com/v1/messages', {
+  /* ============================================================
+     LOCAL ENGINE
+
+     Zero talks to a model running on this machine — Ollama,
+     llama.cpp, LM Studio, Jan. There is no hosted provider and no
+     API key: the request goes to localhost and the prompt never
+     leaves the device.
+
+     "OpenAI-compatible" below names a request *format* that local
+     servers implement. Nothing is sent to OpenAI; the URL is
+     whatever local address you point Zero at.
+     ============================================================ */
+  const SYSTEM_PROMPT =
+    "You are Zero, a private personal assistant running locally on the user's own machine. " +
+    "The user builds websites and games. Be direct, concrete and brief. " +
+    "For market or trading questions, give information and analysis, and note that it is not financial advice.";
+
+  const engineCfg = () => ({
+    url: (store.raw(LS.engineUrl) || 'http://localhost:11434').replace(/\/+$/, ''),
+    model: store.raw(LS.engineModel) || 'llama3.2',
+    mode: store.raw(LS.engineMode) || 'ollama',
+  });
+
+  async function callEngine(q, onToken) {
+    const { url, model, mode } = engineCfg();
+    const history = chatHistory.slice(-8);
+
+    const [endpoint, body, pluck] = mode === 'openai'
+      ? [url + '/v1/chat/completions',
+         { model, stream: true, messages: [{ role: 'system', content: SYSTEM_PROMPT }, ...history, { role: 'user', content: q }] },
+         d => d.choices?.[0]?.delta?.content]
+      : [url + '/api/chat',
+         { model, stream: true, messages: [{ role: 'system', content: SYSTEM_PROMPT }, ...history, { role: 'user', content: q }] },
+         d => d.message?.content];
+
+    let r;
+    try {
+      r = await guardedFetch(endpoint, {
         method: 'POST',
-        headers: {
-          'content-type': 'application/json',
-          'x-api-key': key,
-          'anthropic-version': '2023-06-01',
-          'anthropic-dangerous-direct-browser-access': 'true',
-        },
-        body: JSON.stringify({
-          model: 'claude-sonnet-5',
-          max_tokens: 1024,
-          system: sys,
-          messages: [{ role: 'user', content: q }],
-        }),
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(body),
       }, 'ai');
+    } catch (e) {
+      // A blocked request carries its own explanation; a dead socket does not.
+      if (/halted|switched off/i.test(e.message)) throw e;
+      throw new Error(`Can't reach the engine at ${url}. Is it running? (${e.message})`);
+    }
+
+    if (!r.ok) {
+      const detail = await r.text().catch(() => '');
+      if (r.status === 404) throw new Error(`Engine reached, but model "${model}" was not found. Pull it first, or change the model name in Settings.`);
+      throw new Error(`Engine returned ${r.status}. ${detail.slice(0, 180)}`);
+    }
+
+    // Local models are slow enough that streaming is the difference
+    // between "thinking" and "frozen".
+    let full = '';
+    const reader = r.body?.getReader();
+    if (!reader) { full = await r.text(); onToken?.(full); return full; }
+
+    const take = line => {
+      line = line.trim();
+      if (!line) return;
+      if (line.startsWith('data:')) line = line.slice(5).trim();     // SSE framing
+      if (line === '[DONE]') return;
+      try {
+        const piece = pluck(JSON.parse(line));
+        if (piece) { full += piece; onToken?.(full); }
+      } catch { /* keepalives and non-JSON frames are expected */ }
+    };
+
+    const decoder = new TextDecoder();
+    let buf = '';
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += decoder.decode(value, { stream: true });
+      const lines = buf.split('\n');
+      buf = lines.pop() || '';                 // last item may be a partial line
+      lines.forEach(take);
+    }
+    // A stream that ends without a trailing newline leaves its final —
+    // and often longest — chunk sitting in the buffer. Flush it.
+    take(buf);
+    return full || '(the engine returned nothing)';
+  }
+
+  async function testEngine() {
+    const out = document.getElementById('engineStatus');
+    const { url, model, mode } = engineCfg();
+    out.textContent = 'Checking ' + url + ' …';
+    out.className = 'hint';
+    try {
+      const r = await guardedFetch(mode === 'openai' ? url + '/v1/models' : url + '/api/tags', {}, 'ai');
+      if (!r.ok) throw new Error('HTTP ' + r.status);
       const d = await r.json();
-      if (d.error) throw new Error(d.error.message);
-      return d.content?.map(c => c.text).join('') || '(no reply)';
-    } else {
-      const r = await guardedFetch('https://api.openai.com/v1/chat/completions', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json', 'authorization': 'Bearer ' + key },
-        body: JSON.stringify({
-          model: 'gpt-4o-mini',
-          messages: [{ role: 'system', content: sys }, { role: 'user', content: q }],
-        }),
-      }, 'ai');
-      const d = await r.json();
-      if (d.error) throw new Error(d.error.message);
-      return d.choices?.[0]?.message?.content || '(no reply)';
+      const names = (d.models || d.data || []).map(m => m.name || m.id).filter(Boolean);
+      const has = names.some(n => n === model || n.startsWith(model + ':'));
+      out.innerHTML = names.length
+        ? `<b style="color:var(--green)">Connected.</b> ${names.length} model(s) available.` +
+          (has ? ` "${esc(model)}" is ready.` : ` <span style="color:var(--red)">"${esc(model)}" not among them:</span> ${esc(names.slice(0, 6).join(', '))}`)
+        : `<b style="color:var(--green)">Connected</b>, but no models are installed yet.`;
+      refreshAiStatus();
+    } catch (e) {
+      out.innerHTML = `<b style="color:var(--red)">No engine at ${esc(url)}.</b> ${esc(e.message)}<br>` +
+        `Start one, then try again. With Ollama: <code>ollama serve</code>, then <code>ollama pull ${esc(model)}</code>.`;
     }
   }
 
   /* ---------------- Settings ---------------- */
-  function saveAiKey() {
-    store.rawSet(LS.aiKey, document.getElementById('aiKey').value.trim());
-    store.rawSet(LS.aiProvider, document.getElementById('aiProvider').value);
+  function saveEngine() {
+    store.rawSet(LS.engineUrl, document.getElementById('engineUrl').value.trim());
+    store.rawSet(LS.engineModel, document.getElementById('engineModel').value.trim());
+    store.rawSet(LS.engineMode, document.getElementById('engineMode').value);
     refreshAiStatus();
-    alert('AI key saved locally.');
+    testEngine();
   }
-  function clearAiKey() { localStorage.removeItem(LS.aiKey); document.getElementById('aiKey').value = ''; refreshAiStatus(); }
   function saveStockKey() { store.rawSet(LS.stockKey, document.getElementById('stockKey').value.trim()); alert('Market key saved locally.'); }
 
   function refreshAiStatus() {
-    const on = !!store.raw(LS.aiKey);
     const el = document.getElementById('aiStatus');
-    el.textContent = on ? 'online' : 'offline';
-    el.className = 'pill' + (on ? '' : ' red');
+    if (!el) return;
+    const { model } = engineCfg();
+    el.textContent = 'local · ' + model;
+    el.className = 'pill';
+  }
+
+  /* ---------------- Vault ---------------- */
+  function vaultUi() {
+    const enabled = Vault.isEnabled(), unlocked = Vault.isUnlocked();
+    const badge = document.getElementById('vaultState');
+    const setup = document.getElementById('vaultSetup');
+    const manage = document.getElementById('vaultManage');
+    if (!badge) return;
+
+    badge.textContent = !enabled ? 'off' : unlocked ? 'unlocked' : 'locked';
+    badge.className = 'pill' + (enabled ? '' : ' red');
+    if (setup) setup.style.display = enabled ? 'none' : '';
+    if (manage) manage.style.display = enabled ? '' : 'none';
+
+    const lockEl = document.getElementById('lockScreen');
+    if (lockEl) lockEl.classList.toggle('on', enabled && !unlocked);
+  }
+
+  async function enableVault() {
+    const a = document.getElementById('vaultPass').value;
+    const b = document.getElementById('vaultPass2').value;
+    if (a !== b) return alert('The two passphrases do not match.');
+    if (!confirm(
+      'Encrypt all Zero data on this device?\n\n' +
+      'Your passphrase is never stored, so it cannot be reset or recovered. ' +
+      'If you forget it, your tasks and notes are permanently unreadable.\n\n' +
+      'Continue?')) return;
+    try {
+      await Vault.enable(a);
+      await persist();                       // write the current data back, encrypted
+      document.getElementById('vaultPass').value = '';
+      document.getElementById('vaultPass2').value = '';
+      log('Vault enabled — stored data is now encrypted.');
+      vaultUi();
+      alert('Vault on. Your data is encrypted on this device.');
+    } catch (e) { alert(e.message); }
+  }
+
+  async function unlockVault() {
+    const el = document.getElementById('lockPass');
+    const err = document.getElementById('lockErr');
+    err.textContent = '';
+    try {
+      if (!await Vault.unlock(el.value)) { err.textContent = 'Wrong passphrase.'; el.select(); return; }
+    } catch (e) { err.textContent = e.message; return; }
+
+    el.value = '';
+    try {
+      const t = localStorage.getItem(LS.tasks), n = localStorage.getItem(LS.notes);
+      tasks = t ? JSON.parse(await Vault.decrypt(t)) : [];
+      notes = n ? JSON.parse(await Vault.decrypt(n)) : [];
+    } catch (e) {
+      err.textContent = 'Unlocked, but stored data could not be read: ' + e.message;
+      tasks = []; notes = [];
+    }
+    renderTasks(); renderNotes(); updateStatus();
+    log('Vault unlocked.');
+    vaultUi();
+  }
+
+  function lockVault() {
+    Vault.lock();
+    tasks = []; notes = [];               // drop plaintext from memory too
+    chatHistory = [];
+    renderTasks(); renderNotes(); updateStatus();
+    log('Vault locked.');
+    vaultUi();
+  }
+
+  async function disableVault() {
+    if (!Vault.isUnlocked()) return alert('Unlock the vault first.');
+    if (!confirm('Turn encryption OFF?\n\nTasks and notes will be written back as readable text on this device.')) return;
+    Vault.disable();
+    localStorage.setItem(LS.tasks, JSON.stringify(tasks));
+    localStorage.setItem(LS.notes, JSON.stringify(notes));
+    log('Vault disabled — data is stored unencrypted.', true);
+    vaultUi();
   }
 
   function exportData() {
@@ -452,8 +623,9 @@ const Zero = (() => {
   function wipeData() {
     if (!confirm('Wipe ALL Zero data on this device? This cannot be undone.')) return;
     Object.values(LS).forEach(k => localStorage.removeItem(k));
-    tasks = []; notes = [];
-    renderTasks(); renderNotes(); refreshAiStatus();
+    Vault.disable();                       // also clears the salt and check token
+    tasks = []; notes = []; chatHistory = [];
+    renderTasks(); renderNotes(); refreshAiStatus(); vaultUi();
     alert('All local data wiped.');
   }
 
@@ -465,7 +637,14 @@ const Zero = (() => {
     document.getElementById('nav').addEventListener('click', e => {
       const li = e.target.closest('li'); if (li) nav(li.dataset.view);
     });
-    document.getElementById('aiProvider').value = store.raw(LS.aiProvider) || 'anthropic';
+    const cfg = engineCfg();
+    document.getElementById('engineUrl').value = cfg.url;
+    document.getElementById('engineModel').value = cfg.model;
+    document.getElementById('engineMode').value = cfg.mode;
+    document.getElementById('lockPass')?.addEventListener('keydown', e => {
+      if (e.key === 'Enter') unlockVault();
+    });
+    vaultUi();
 
     // Keyboard kill switch: Esc twice, or Ctrl/Cmd + . — works from anywhere.
     let lastEsc = 0;
@@ -481,14 +660,16 @@ const Zero = (() => {
     renderTasks(); renderNotes(); refreshAiStatus(); updateStatus();
     log('Zero started. All capabilities on. Press STOP anytime.');
     loadMarkets(); startTimers();
-    bubble("I'm Zero. Type `help` to see what I can do offline, or add an AI key in Settings for full conversation.", 'zero');
+    bubble("I'm Zero, running on your machine. Type `help` for what I do without any model at all, " +
+           "or point me at a local engine in Settings to talk properly. Nothing you type here leaves this device.", 'zero');
   }
 
   return {
     nav, loadMarkets, addTask, toggleTask, delTask, addNote, delNote,
-    captureAsTask, captureAsNote, send, saveAiKey, clearAiKey, saveStockKey,
+    captureAsTask, captureAsNote, send, saveEngine, testEngine, saveStockKey,
     exportData, wipeData, init,
     toggleHalt, killNetwork, panic, setCap, clearLog,
+    enableVault, unlockVault, lockVault, disableVault,
   };
 })();
 

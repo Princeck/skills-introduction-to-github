@@ -418,6 +418,40 @@ input:focus, textarea:focus, select:focus {
 }
 #haltBanner p { color: var(--muted); font-size: 13.5px; line-height: 1.7; }
 
+/* ============ Vault lock screen ============
+   Sits above everything including the halt overlay: if the vault is
+   locked there is nothing else worth looking at. */
+#lockScreen {
+  display: none; position: fixed; inset: 0; z-index: 100000;
+  background: rgba(4,6,13,.96);
+  backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px);
+  place-items: center; text-align: center; padding: 20px;
+}
+#lockScreen.on { display: grid; animation: materialize .3s ease; }
+#lockScreen .box {
+  position: relative;
+  background: var(--glass); border-radius: var(--radius);
+  padding: 40px 44px; max-width: 440px; width: 100%;
+  box-shadow: 0 18px 60px rgba(0,0,0,.7);
+}
+#lockScreen .box::before {
+  content: ''; position: absolute; inset: 0;
+  border-radius: inherit; padding: 1px; pointer-events: none;
+  background: var(--holo); background-size: 200% 200%;
+  animation: shift 11s ease infinite;
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+          mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+          mask-composite: exclude;
+}
+#lockScreen h2 {
+  font-family: var(--mono); font-size: 25px; margin: 0 0 12px;
+  letter-spacing: 4px; color: var(--white);
+  text-shadow: -2px 0 var(--red), 2px 0 var(--blue);
+}
+#lockScreen p { color: var(--muted); font-size: 13.5px; line-height: 1.7; margin: 0; }
+.lock-err { color: var(--red); font-size: 12.5px; min-height: 18px; margin-top: 10px; font-family: var(--mono); }
+
 /* ============ Control panel ============ */
 .ctrl-row {
   display: flex; align-items: center; gap: 14px;
