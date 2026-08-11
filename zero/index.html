@@ -40,10 +40,9 @@
         <div class="name">ZER<b>0</b></div>
       </div>
       <ul class="nav" id="nav">
+        <li data-view="assistant" class="active"><span class="ic">◈</span> Assistant</li>
         <li data-view="control"><span class="ic">⏻</span> Control Panel</li>
-        <li data-view="dashboard" class="active"><span class="ic">▦</span> Dashboard</li>
         <li data-view="markets"><span class="ic">▲</span> Markets</li>
-        <li data-view="assistant"><span class="ic">◈</span> Assistant</li>
         <li data-view="tasks"><span class="ic">✓</span> Tasks</li>
         <li data-view="notes"><span class="ic">✎</span> Notes</li>
         <li data-view="settings"><span class="ic">⚙</span> Settings</li>
@@ -58,8 +57,8 @@
     <main class="main">
       <div class="topbar">
         <div>
-          <h1 id="viewTitle">Dashboard</h1>
-          <div class="sub" id="viewSub">Your day at a glance.</div>
+          <h1 id="viewTitle">Assistant</h1>
+          <div class="sub" id="viewSub">Ask Zero anything. Nothing leaves this device.</div>
         </div>
         <div class="clock"><b id="clock">--:--:--</b><br /><span id="date"></span></div>
       </div>
@@ -122,30 +121,6 @@
         </div>
       </section>
 
-      <!-- DASHBOARD -->
-      <section class="view active" id="view-dashboard">
-        <div class="grid cols-3" style="margin-bottom:16px">
-          <div class="card stat"><div class="n" id="statTasks" style="color:var(--red)">0</div><div class="l">Open Tasks</div></div>
-          <div class="card stat"><div class="n" id="statBtc" style="color:var(--blue)">—</div><div class="l">BTC / USD</div></div>
-          <div class="card stat"><div class="n" id="statNotes" style="color:var(--white)">0</div><div class="l">Notes</div></div>
-        </div>
-        <div class="grid cols-2">
-          <div class="card">
-            <h2>Daily Market Brief <span class="pill">live</span></h2>
-            <div id="miniMarket"><div class="spinner">Loading live prices…</div></div>
-            <div class="notice">📊 <b>Information only, not financial advice.</b> Prices are delayed/aggregated from public sources. Do your own research before trading.</div>
-          </div>
-          <div class="card">
-            <h2>Quick Capture</h2>
-            <p class="hint">Drop a thought, task, or idea — Zero routes it.</p>
-            <textarea id="quickCapture" rows="4" placeholder="e.g. 'Ship landing page for the racing game'…"></textarea>
-            <div style="display:flex;gap:10px;margin-top:10px">
-              <button class="btn" onclick="Zero.captureAsTask()">+ Add as Task</button>
-              <button class="btn blue" onclick="Zero.captureAsNote()">+ Save as Note</button>
-            </div>
-          </div>
-        </div>
-      </section>
 
       <!-- MARKETS -->
       <section class="view" id="view-markets">
@@ -162,7 +137,7 @@
       </section>
 
       <!-- ASSISTANT -->
-      <section class="view" id="view-assistant">
+      <section class="view active" id="view-assistant">
         <div class="card">
           <h2>Zero Assistant <span class="pill" id="aiStatus">local</span></h2>
           <div class="chat-wrap">

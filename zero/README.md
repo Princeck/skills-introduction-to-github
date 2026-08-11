@@ -54,7 +54,9 @@ these switches — only a direct click from you.
 
 ## What's in it
 
-- **Dashboard** — open tasks, live BTC, quick capture
+Zero opens straight into the assistant — there is no dashboard. Talking to it is
+the home screen; everything else is a side panel you visit when you need it.
+
 - **Markets** — live crypto prices (BTC, ETH, SOL, BNB, XRP, DOGE), auto-refresh every 60s
 - **Assistant** — built-in commands (`help`, `task …`, `note …`, `price btc`, `tasks`, `time`) that need no model at all, plus open conversation through a local engine
 - **Tasks / Notes** — saved locally, export to JSON anytime

@@ -115,7 +115,7 @@
     <div class="mark">0</div>
     <h1>ZER<b>0</b> — source</h1>
   </header>
-  <p class="meta">zero-standalone.html · 68.0 KB · 1599 lines · self-contained</p>
+  <p class="meta">zero-standalone.html · 66.1 KB · 1567 lines · self-contained</p>
 
   <div class="actions">
     <button id="copy">Copy all code</button>
@@ -717,10 +717,9 @@ input:focus, textarea:focus, select:focus {
         &lt;div class="name">ZER&lt;b>0&lt;/b>&lt;/div>
       &lt;/div>
       &lt;ul class="nav" id="nav">
+        &lt;li data-view="assistant" class="active">&lt;span class="ic">◈&lt;/span> Assistant&lt;/li>
         &lt;li data-view="control">&lt;span class="ic">⏻&lt;/span> Control Panel&lt;/li>
-        &lt;li data-view="dashboard" class="active">&lt;span class="ic">▦&lt;/span> Dashboard&lt;/li>
         &lt;li data-view="markets">&lt;span class="ic">▲&lt;/span> Markets&lt;/li>
-        &lt;li data-view="assistant">&lt;span class="ic">◈&lt;/span> Assistant&lt;/li>
         &lt;li data-view="tasks">&lt;span class="ic">✓&lt;/span> Tasks&lt;/li>
         &lt;li data-view="notes">&lt;span class="ic">✎&lt;/span> Notes&lt;/li>
         &lt;li data-view="settings">&lt;span class="ic">⚙&lt;/span> Settings&lt;/li>
@@ -735,8 +734,8 @@ input:focus, textarea:focus, select:focus {
     &lt;main class="main">
       &lt;div class="topbar">
         &lt;div>
-          &lt;h1 id="viewTitle">Dashboard&lt;/h1>
-          &lt;div class="sub" id="viewSub">Your day at a glance.&lt;/div>
+          &lt;h1 id="viewTitle">Assistant&lt;/h1>
+          &lt;div class="sub" id="viewSub">Ask Zero anything. Nothing leaves this device.&lt;/div>
         &lt;/div>
         &lt;div class="clock">&lt;b id="clock">--:--:--&lt;/b>&lt;br />&lt;span id="date">&lt;/span>&lt;/div>
       &lt;/div>
@@ -799,30 +798,6 @@ input:focus, textarea:focus, select:focus {
         &lt;/div>
       &lt;/section>
 
-      &lt;!-- DASHBOARD -->
-      &lt;section class="view active" id="view-dashboard">
-        &lt;div class="grid cols-3" style="margin-bottom:16px">
-          &lt;div class="card stat">&lt;div class="n" id="statTasks" style="color:var(--red)">0&lt;/div>&lt;div class="l">Open Tasks&lt;/div>&lt;/div>
-          &lt;div class="card stat">&lt;div class="n" id="statBtc" style="color:var(--blue)">—&lt;/div>&lt;div class="l">BTC / USD&lt;/div>&lt;/div>
-          &lt;div class="card stat">&lt;div class="n" id="statNotes" style="color:var(--white)">0&lt;/div>&lt;div class="l">Notes&lt;/div>&lt;/div>
-        &lt;/div>
-        &lt;div class="grid cols-2">
-          &lt;div class="card">
-            &lt;h2>Daily Market Brief &lt;span class="pill">live&lt;/span>&lt;/h2>
-            &lt;div id="miniMarket">&lt;div class="spinner">Loading live prices…&lt;/div>&lt;/div>
-            &lt;div class="notice">📊 &lt;b>Information only, not financial advice.&lt;/b> Prices are delayed/aggregated from public sources. Do your own research before trading.&lt;/div>
-          &lt;/div>
-          &lt;div class="card">
-            &lt;h2>Quick Capture&lt;/h2>
-            &lt;p class="hint">Drop a thought, task, or idea — Zero routes it.&lt;/p>
-            &lt;textarea id="quickCapture" rows="4" placeholder="e.g. 'Ship landing page for the racing game'…">&lt;/textarea>
-            &lt;div style="display:flex;gap:10px;margin-top:10px">
-              &lt;button class="btn" onclick="Zero.captureAsTask()">+ Add as Task&lt;/button>
-              &lt;button class="btn blue" onclick="Zero.captureAsNote()">+ Save as Note&lt;/button>
-            &lt;/div>
-          &lt;/div>
-        &lt;/div>
-      &lt;/section>
 
       &lt;!-- MARKETS -->
       &lt;section class="view" id="view-markets">
@@ -839,7 +814,7 @@ input:focus, textarea:focus, select:focus {
       &lt;/section>
 
       &lt;!-- ASSISTANT -->
-      &lt;section class="view" id="view-assistant">
+      &lt;section class="view active" id="view-assistant">
         &lt;div class="card">
           &lt;h2>Zero Assistant &lt;span class="pill" id="aiStatus">local&lt;/span>&lt;/h2>
           &lt;div class="chat-wrap">
@@ -1065,9 +1040,9 @@ const Vault = (() => {
 
 /* ============================================================
    ZERO — app logic
-   Private by design: all state lives in localStorage on THIS
-   device. No server, no analytics, no accounts. Your keys are
-   only ever sent to the AI/market provider you explicitly pick.
+   Private by design: all state lives on THIS device, encrypted
+   at rest once the vault is on. No server, no analytics, no
+   accounts, no AI provider — the model runs on your machine.
    ============================================================ */
 
 const Zero = (() => {
@@ -1236,7 +1211,7 @@ const Zero = (() => {
     const live = k => (!Control.halted &amp;&amp; Control.caps[k]) ? 'on' : 'off';
     led('ledNet', Control.halted ? 'hot' : live('network'));
     led('ledMkt', live('market'));
-    led('ledAi', (!Control.halted &amp;&amp; Control.caps.ai &amp;&amp; store.raw(LS.aiKey)) ? 'on' : 'off');
+    led('ledAi', live('ai'));
     led('ledStore', Control.caps.storage ? 'on' : 'off');
   }
 
@@ -1257,9 +1232,8 @@ const Zero = (() => {
   /* ---------------- Navigation ---------------- */
   const titles = {
     control:   ['Control Panel', 'You are in charge. Stop anything, anytime.'],
-    dashboard: ['Dashboard', 'Your day at a glance.'],
     markets:   ['Markets', 'Live readings — information, not advice.'],
-    assistant: ['Assistant', 'Ask Zero anything.'],
+    assistant: ['Assistant', 'Ask Zero anything. Nothing leaves this device.'],
     tasks:     ['Tasks', 'What needs doing.'],
     notes:     ['Notes', 'Your second brain.'],
     settings:  ['Settings', 'Keys &amp; privacy — all local.'],
@@ -1321,7 +1295,7 @@ const Zero = (() => {
       document.getElementById('marketUpdated').textContent =
         'Updated ' + new Date().toLocaleTimeString();
       const btc = data.bitcoin?.usd;
-      if (btc) document.getElementById('statBtc').textContent = '$' + fmt(btc);
+      setText('statBtc', btc ? '$' + fmt(btc) : '');
     } catch (e) {
       const msg = `&lt;div class="spinner">⚠ Couldn't reach live market feed (${e.message}). Check your connection and hit refresh.&lt;/div>`;
       if (table) table.innerHTML = msg;
@@ -1345,7 +1319,7 @@ const Zero = (() => {
           &lt;button class="del" onclick="Zero.delTask(${i})">×&lt;/button>
         &lt;/div>`).join('');
     }
-    document.getElementById('statTasks').textContent = tasks.filter(t => !t.done).length;
+    setText('statTasks', tasks.filter(t => !t.done).length);
     store.set(LS.tasks, tasks);
   }
   function addTask(text) {
@@ -1373,7 +1347,7 @@ const Zero = (() => {
           &lt;div class="hint" style="margin-top:8px">${new Date(n.ts).toLocaleString()}&lt;/div>
         &lt;/div>`).join('');
     }
-    document.getElementById('statNotes').textContent = notes.length;
+    setText('statNotes', notes.length);
     store.set(LS.notes, notes);
   }
   function addNote(text) {
@@ -1387,15 +1361,6 @@ const Zero = (() => {
   function delNote(i) { notes.splice(i, 1); renderNotes(); }
 
   /* ---------------- Quick capture ---------------- */
-  function captureAsTask() {
-    const el = document.getElementById('quickCapture');
-    if (el.value.trim()) { addTask(el.value.trim()); el.value = ''; nav('tasks'); }
-  }
-  function captureAsNote() {
-    const el = document.getElementById('quickCapture');
-    if (el.value.trim()) { addNote(el.value.trim()); el.value = ''; nav('notes'); }
-  }
-
   /* ---------------- Assistant ---------------- */
   function bubble(text, who) {
     const log = document.getElementById('chatLog');
@@ -1695,6 +1660,9 @@ const Zero = (() => {
   }
 
   /* ---------------- Helpers ---------------- */
+  /* Views come and go; a missing element is not an error. */
+  function setText(id, val) { const el = document.getElementById(id); if (el) el.textContent = val; }
+
   function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
 
   /* ---------------- Init ---------------- */
@@ -1731,7 +1699,7 @@ const Zero = (() => {
 
   return {
     nav, loadMarkets, addTask, toggleTask, delTask, addNote, delNote,
-    captureAsTask, captureAsNote, send, saveEngine, testEngine, saveStockKey,
+    send, saveEngine, testEngine, saveStockKey,
     exportData, wipeData, init,
     toggleHalt, killNetwork, panic, setCap, clearLog,
     enableVault, unlockVault, lockVault, disableVault,

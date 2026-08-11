@@ -570,10 +570,9 @@ input:focus, textarea:focus, select:focus {
         <div class="name">ZER<b>0</b></div>
       </div>
       <ul class="nav" id="nav">
+        <li data-view="assistant" class="active"><span class="ic">◈</span> Assistant</li>
         <li data-view="control"><span class="ic">⏻</span> Control Panel</li>
-        <li data-view="dashboard" class="active"><span class="ic">▦</span> Dashboard</li>
         <li data-view="markets"><span class="ic">▲</span> Markets</li>
-        <li data-view="assistant"><span class="ic">◈</span> Assistant</li>
         <li data-view="tasks"><span class="ic">✓</span> Tasks</li>
         <li data-view="notes"><span class="ic">✎</span> Notes</li>
         <li data-view="settings"><span class="ic">⚙</span> Settings</li>
@@ -588,8 +587,8 @@ input:focus, textarea:focus, select:focus {
     <main class="main">
       <div class="topbar">
         <div>
-          <h1 id="viewTitle">Dashboard</h1>
-          <div class="sub" id="viewSub">Your day at a glance.</div>
+          <h1 id="viewTitle">Assistant</h1>
+          <div class="sub" id="viewSub">Ask Zero anything. Nothing leaves this device.</div>
         </div>
         <div class="clock"><b id="clock">--:--:--</b><br /><span id="date"></span></div>
       </div>
@@ -652,30 +651,6 @@ input:focus, textarea:focus, select:focus {
         </div>
       </section>
 
-      <!-- DASHBOARD -->
-      <section class="view active" id="view-dashboard">
-        <div class="grid cols-3" style="margin-bottom:16px">
-          <div class="card stat"><div class="n" id="statTasks" style="color:var(--red)">0</div><div class="l">Open Tasks</div></div>
-          <div class="card stat"><div class="n" id="statBtc" style="color:var(--blue)">—</div><div class="l">BTC / USD</div></div>
-          <div class="card stat"><div class="n" id="statNotes" style="color:var(--white)">0</div><div class="l">Notes</div></div>
-        </div>
-        <div class="grid cols-2">
-          <div class="card">
-            <h2>Daily Market Brief <span class="pill">live</span></h2>
-            <div id="miniMarket"><div class="spinner">Loading live prices…</div></div>
-            <div class="notice">📊 <b>Information only, not financial advice.</b> Prices are delayed/aggregated from public sources. Do your own research before trading.</div>
-          </div>
-          <div class="card">
-            <h2>Quick Capture</h2>
-            <p class="hint">Drop a thought, task, or idea — Zero routes it.</p>
-            <textarea id="quickCapture" rows="4" placeholder="e.g. 'Ship landing page for the racing game'…"></textarea>
-            <div style="display:flex;gap:10px;margin-top:10px">
-              <button class="btn" onclick="Zero.captureAsTask()">+ Add as Task</button>
-              <button class="btn blue" onclick="Zero.captureAsNote()">+ Save as Note</button>
-            </div>
-          </div>
-        </div>
-      </section>
 
       <!-- MARKETS -->
       <section class="view" id="view-markets">
@@ -692,7 +667,7 @@ input:focus, textarea:focus, select:focus {
       </section>
 
       <!-- ASSISTANT -->
-      <section class="view" id="view-assistant">
+      <section class="view active" id="view-assistant">
         <div class="card">
           <h2>Zero Assistant <span class="pill" id="aiStatus">local</span></h2>
           <div class="chat-wrap">
@@ -918,9 +893,9 @@ const Vault = (() => {
 
 /* ============================================================
    ZERO — app logic
-   Private by design: all state lives in localStorage on THIS
-   device. No server, no analytics, no accounts. Your keys are
-   only ever sent to the AI/market provider you explicitly pick.
+   Private by design: all state lives on THIS device, encrypted
+   at rest once the vault is on. No server, no analytics, no
+   accounts, no AI provider — the model runs on your machine.
    ============================================================ */
 
 const Zero = (() => {
@@ -1089,7 +1064,7 @@ const Zero = (() => {
     const live = k => (!Control.halted && Control.caps[k]) ? 'on' : 'off';
     led('ledNet', Control.halted ? 'hot' : live('network'));
     led('ledMkt', live('market'));
-    led('ledAi', (!Control.halted && Control.caps.ai && store.raw(LS.aiKey)) ? 'on' : 'off');
+    led('ledAi', live('ai'));
     led('ledStore', Control.caps.storage ? 'on' : 'off');
   }
 
@@ -1110,9 +1085,8 @@ const Zero = (() => {
   /* ---------------- Navigation ---------------- */
   const titles = {
     control:   ['Control Panel', 'You are in charge. Stop anything, anytime.'],
-    dashboard: ['Dashboard', 'Your day at a glance.'],
     markets:   ['Markets', 'Live readings — information, not advice.'],
-    assistant: ['Assistant', 'Ask Zero anything.'],
+    assistant: ['Assistant', 'Ask Zero anything. Nothing leaves this device.'],
     tasks:     ['Tasks', 'What needs doing.'],
     notes:     ['Notes', 'Your second brain.'],
     settings:  ['Settings', 'Keys & privacy — all local.'],
@@ -1174,7 +1148,7 @@ const Zero = (() => {
       document.getElementById('marketUpdated').textContent =
         'Updated ' + new Date().toLocaleTimeString();
       const btc = data.bitcoin?.usd;
-      if (btc) document.getElementById('statBtc').textContent = '$' + fmt(btc);
+      setText('statBtc', btc ? '$' + fmt(btc) : '');
     } catch (e) {
       const msg = `<div class="spinner">⚠ Couldn't reach live market feed (${e.message}). Check your connection and hit refresh.</div>`;
       if (table) table.innerHTML = msg;
@@ -1198,7 +1172,7 @@ const Zero = (() => {
           <button class="del" onclick="Zero.delTask(${i})">×</button>
         </div>`).join('');
     }
-    document.getElementById('statTasks').textContent = tasks.filter(t => !t.done).length;
+    setText('statTasks', tasks.filter(t => !t.done).length);
     store.set(LS.tasks, tasks);
   }
   function addTask(text) {
@@ -1226,7 +1200,7 @@ const Zero = (() => {
           <div class="hint" style="margin-top:8px">${new Date(n.ts).toLocaleString()}</div>
         </div>`).join('');
     }
-    document.getElementById('statNotes').textContent = notes.length;
+    setText('statNotes', notes.length);
     store.set(LS.notes, notes);
   }
   function addNote(text) {
@@ -1240,15 +1214,6 @@ const Zero = (() => {
   function delNote(i) { notes.splice(i, 1); renderNotes(); }
 
   /* ---------------- Quick capture ---------------- */
-  function captureAsTask() {
-    const el = document.getElementById('quickCapture');
-    if (el.value.trim()) { addTask(el.value.trim()); el.value = ''; nav('tasks'); }
-  }
-  function captureAsNote() {
-    const el = document.getElementById('quickCapture');
-    if (el.value.trim()) { addNote(el.value.trim()); el.value = ''; nav('notes'); }
-  }
-
   /* ---------------- Assistant ---------------- */
   function bubble(text, who) {
     const log = document.getElementById('chatLog');
@@ -1548,6 +1513,9 @@ const Zero = (() => {
   }
 
   /* ---------------- Helpers ---------------- */
+  /* Views come and go; a missing element is not an error. */
+  function setText(id, val) { const el = document.getElementById(id); if (el) el.textContent = val; }
+
   function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
 
   /* ---------------- Init ---------------- */
@@ -1584,7 +1552,7 @@ const Zero = (() => {
 
   return {
     nav, loadMarkets, addTask, toggleTask, delTask, addNote, delNote,
-    captureAsTask, captureAsNote, send, saveEngine, testEngine, saveStockKey,
+    send, saveEngine, testEngine, saveStockKey,
     exportData, wipeData, init,
     toggleHalt, killNetwork, panic, setCap, clearLog,
     enableVault, unlockVault, lockVault, disableVault,

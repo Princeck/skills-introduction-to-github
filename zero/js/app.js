@@ -1,8 +1,8 @@
 /* ============================================================
    ZERO — app logic
-   Private by design: all state lives in localStorage on THIS
-   device. No server, no analytics, no accounts. Your keys are
-   only ever sent to the AI/market provider you explicitly pick.
+   Private by design: all state lives on THIS device, encrypted
+   at rest once the vault is on. No server, no analytics, no
+   accounts, no AI provider — the model runs on your machine.
    ============================================================ */
 
 const Zero = (() => {
@@ -171,7 +171,7 @@ const Zero = (() => {
     const live = k => (!Control.halted && Control.caps[k]) ? 'on' : 'off';
     led('ledNet', Control.halted ? 'hot' : live('network'));
     led('ledMkt', live('market'));
-    led('ledAi', (!Control.halted && Control.caps.ai && store.raw(LS.aiKey)) ? 'on' : 'off');
+    led('ledAi', live('ai'));
     led('ledStore', Control.caps.storage ? 'on' : 'off');
   }
 
@@ -192,9 +192,8 @@ const Zero = (() => {
   /* ---------------- Navigation ---------------- */
   const titles = {
     control:   ['Control Panel', 'You are in charge. Stop anything, anytime.'],
-    dashboard: ['Dashboard', 'Your day at a glance.'],
     markets:   ['Markets', 'Live readings — information, not advice.'],
-    assistant: ['Assistant', 'Ask Zero anything.'],
+    assistant: ['Assistant', 'Ask Zero anything. Nothing leaves this device.'],
     tasks:     ['Tasks', 'What needs doing.'],
     notes:     ['Notes', 'Your second brain.'],
     settings:  ['Settings', 'Keys & privacy — all local.'],
@@ -256,7 +255,7 @@ const Zero = (() => {
       document.getElementById('marketUpdated').textContent =
         'Updated ' + new Date().toLocaleTimeString();
       const btc = data.bitcoin?.usd;
-      if (btc) document.getElementById('statBtc').textContent = '$' + fmt(btc);
+      setText('statBtc', btc ? '$' + fmt(btc) : '');
     } catch (e) {
       const msg = `<div class="spinner">⚠ Couldn't reach live market feed (${e.message}). Check your connection and hit refresh.</div>`;
       if (table) table.innerHTML = msg;
@@ -280,7 +279,7 @@ const Zero = (() => {
           <button class="del" onclick="Zero.delTask(${i})">×</button>
         </div>`).join('');
     }
-    document.getElementById('statTasks').textContent = tasks.filter(t => !t.done).length;
+    setText('statTasks', tasks.filter(t => !t.done).length);
     store.set(LS.tasks, tasks);
   }
   function addTask(text) {
@@ -308,7 +307,7 @@ const Zero = (() => {
           <div class="hint" style="margin-top:8px">${new Date(n.ts).toLocaleString()}</div>
         </div>`).join('');
     }
-    document.getElementById('statNotes').textContent = notes.length;
+    setText('statNotes', notes.length);
     store.set(LS.notes, notes);
   }
   function addNote(text) {
@@ -322,15 +321,6 @@ const Zero = (() => {
   function delNote(i) { notes.splice(i, 1); renderNotes(); }
 
   /* ---------------- Quick capture ---------------- */
-  function captureAsTask() {
-    const el = document.getElementById('quickCapture');
-    if (el.value.trim()) { addTask(el.value.trim()); el.value = ''; nav('tasks'); }
-  }
-  function captureAsNote() {
-    const el = document.getElementById('quickCapture');
-    if (el.value.trim()) { addNote(el.value.trim()); el.value = ''; nav('notes'); }
-  }
-
   /* ---------------- Assistant ---------------- */
   function bubble(text, who) {
     const log = document.getElementById('chatLog');
@@ -630,6 +620,9 @@ const Zero = (() => {
   }
 
   /* ---------------- Helpers ---------------- */
+  /* Views come and go; a missing element is not an error. */
+  function setText(id, val) { const el = document.getElementById(id); if (el) el.textContent = val; }
+
   function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
 
   /* ---------------- Init ---------------- */
@@ -666,7 +659,7 @@ const Zero = (() => {
 
   return {
     nav, loadMarkets, addTask, toggleTask, delTask, addNote, delNote,
-    captureAsTask, captureAsNote, send, saveEngine, testEngine, saveStockKey,
+    send, saveEngine, testEngine, saveStockKey,
     exportData, wipeData, init,
     toggleHalt, killNetwork, panic, setCap, clearLog,
     enableVault, unlockVault, lockVault, disableVault,
