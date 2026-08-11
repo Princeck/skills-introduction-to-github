@@ -3,7 +3,19 @@
 A private, local-first personal assistant with live market readings, tasks, notes,
 and a master control panel with an always-visible kill switch.
 
-**Theme:** red · blue · black · white
+**Theme:** holographic — red · blue · black · white
+
+The interface is built as glass plates floating over a scanlined field. The
+hologram comes from the brand's own red and blue rather than the usual rainbow
+iridescence: panels carry a prismatic edge, headings carry a red/blue chromatic
+split, and the halt overlay glitches. Running text stays solid white, so the
+effect lives in edges and glow and never costs readability.
+
+The kill switch is the deliberate exception — opaque, solid, no glass. It reads
+as physical hardware because it is the one control that must never look like a
+projection.
+
+All motion is disabled under `prefers-reduced-motion`.
 
 ---
 
