@@ -125,21 +125,38 @@
       <!-- MARKETS -->
       <section class="view" id="view-markets">
         <div class="card">
-          <h2>Live Markets <span class="pill">crypto · live</span> <span class="pill red">stocks · needs key</span></h2>
+          <h2>Crypto <span class="pill">live</span></h2>
           <div class="mkt-row mkt-head"><div>Asset</div><div>Price</div><div>24h</div></div>
           <div id="marketTable"><div class="spinner">Loading live prices…</div></div>
           <div style="margin-top:14px;display:flex;gap:10px;align-items:center">
             <button class="btn blue" onclick="Zero.loadMarkets()">↻ Refresh</button>
             <span class="hint" id="marketUpdated"></span>
           </div>
-          <div class="notice">Crypto is live from CoinGecko's free public API (no key needed). To add <b>stocks & indices</b>, drop a free API key (Finnhub / Alpha Vantage) in <b>Settings</b>. Nothing here is financial advice.</div>
+          <div class="notice">Live from CoinGecko's public API. Every figure is fetched — where the feed gives no value, Zero shows <b>&mdash;</b> rather than a number it invented. Nothing here is financial advice.</div>
+        </div>
+
+        <div class="card" style="margin-top:16px">
+          <h2>Stocks &amp; Indices</h2>
+          <div class="mkt-row mkt-head"><div>Symbol</div><div>Price</div><div>Today</div></div>
+          <div id="stockTable"></div>
+          <div style="margin-top:14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+            <button class="btn blue" onclick="Zero.loadStocks()">↻ Refresh</button>
+            <span class="hint" id="stockUpdated"></span>
+          </div>
         </div>
       </section>
 
       <!-- ASSISTANT -->
       <section class="view active" id="view-assistant">
         <div class="card">
-          <h2>Zero Assistant <span class="pill" id="aiStatus">local</span></h2>
+          <h2>Zero Assistant <span class="pill" id="aiStatus">Core</span></h2>
+          <div class="assist-bar">
+            <label class="think-opt">
+              <input type="checkbox" id="thinkToggle" onchange="Zero.setThink(this.checked)" />
+              <span>Show reasoning</span>
+            </label>
+            <button class="btn ghost" onclick="Zero.updateNow(true)">↻ Update now</button>
+          </div>
           <div class="chat-wrap">
             <div class="chat-log" id="chatLog"></div>
             <div class="chat-input">
@@ -147,7 +164,7 @@
               <button class="btn" onclick="Zero.send()">Send</button>
             </div>
           </div>
-          <div class="notice">Zero answers <b>help</b>, <b>task …</b>, <b>note …</b>, <b>price btc</b> and <b>time</b> with no model at all. For open conversation, point it at a local engine in <b>Settings</b> — the prompt goes to your own machine and never leaves it.</div>
+          <div class="notice">Zero answers <b>help</b>, <b>task …</b>, <b>note …</b>, <b>price btc</b>, <b>time</b> and <b>update</b> with no model at all. For open conversation, point Core at your local engine in <b>Settings</b> — the prompt goes to your own machine and never leaves it.</div>
         </div>
       </section>
 
@@ -177,26 +194,27 @@
       <section class="view" id="view-settings">
         <div class="grid cols-2">
           <div class="card">
-            <h2>Local Engine <span class="pill">no account</span></h2>
-            <p class="hint">Zero's brain runs on this machine. No provider, no API key, no sign-in — your prompts go to <code>localhost</code> and stop there.</p>
-            <label class="hint" style="margin-top:12px;display:block">Address</label>
+            <h2>Zero Core <span class="pill">no account</span></h2>
+            <p class="hint">Core is Zero's reasoning engine. It drives a model on this machine — no vendor, no sign-in, no key. Prompts go to the address below and nowhere else.</p>
+            <label class="hint" style="margin-top:12px;display:block">Engine address</label>
             <input id="engineUrl" placeholder="http://localhost:11434" />
-            <label class="hint" style="margin-top:10px;display:block">Model</label>
-            <input id="engineModel" placeholder="llama3.2" />
-            <label class="hint" style="margin-top:10px;display:block">Request format</label>
+            <label class="hint" style="margin-top:10px;display:block">Model <span style="opacity:.7">— leave blank and Core adopts whichever model your engine has</span></label>
+            <input id="engineModel" placeholder="auto-detect" />
+            <label class="hint" style="margin-top:10px;display:block">Wire format</label>
             <select id="engineMode">
-              <option value="ollama">Ollama</option>
-              <option value="openai">Local server (llama.cpp, LM Studio, Jan)</option>
+              <option value="native">Native (/api/chat)</option>
+              <option value="compatible">Compatible (/v1/chat/completions)</option>
             </select>
             <div style="margin-top:12px">
               <button class="btn" onclick="Zero.saveEngine()">Save &amp; test</button>
-              <button class="btn ghost" onclick="Zero.testEngine()">Test connection</button>
+              <button class="btn ghost" onclick="Zero.testEngine()">Test Core</button>
             </div>
             <div id="engineStatus" class="hint" style="margin-top:12px"></div>
             <div class="notice">
-              <b>Getting an engine running:</b> install <a href="https://ollama.com" target="_blank" rel="noopener noreferrer">Ollama</a>, then
-              <code>ollama pull llama3.2</code>. Because Zero runs from a file, Ollama must be told to accept it —
-              start it with <code>OLLAMA_ORIGINS=* ollama serve</code>, otherwise the browser blocks the request.
+              <b>Running an engine.</b> Core works with any local runtime that speaks one of the two formats above —
+              Ollama, llama.cpp, LM Studio and Jan all do. These are open-source runtimes you install yourself, not hosted services.
+              Serving Zero from a file means the runtime must be told to accept it: for Ollama that is
+              <code>OLLAMA_ORIGINS=* ollama serve</code>, otherwise the browser blocks the request and a working engine looks dead.
             </div>
           </div>
 
@@ -225,6 +243,8 @@
             <h2>Market Data Key <span class="pill">optional</span></h2>
             <p class="hint">Add a free Finnhub key to enable live stocks & indices.</p>
             <input id="stockKey" type="password" placeholder="Finnhub API key…" />
+            <label class="hint" style="margin-top:10px;display:block">Symbols to track</label>
+            <input id="stockSymbols" placeholder="AAPL, MSFT, NVDA, TSLA, SPY" />
             <div style="margin-top:12px"><button class="btn blue" onclick="Zero.saveStockKey()">Save</button></div>
           </div>
           <div class="card">

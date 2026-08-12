@@ -1,7 +1,8 @@
 # ZERO
 
 A private, local-first personal assistant with live market readings, tasks, notes,
-and a master control panel with an always-visible kill switch.
+and a master control panel with an always-visible kill switch. Its reasoning
+engine, Zero Core, runs on your own hardware — no vendor, no account, no key.
 
 **Theme:** holographic — red · blue · black · white
 
@@ -64,29 +65,45 @@ the home screen; everything else is a side panel you visit when you need it.
 
 ---
 
-## The engine is yours
+## Zero Core
 
-Zero has no AI provider. No Anthropic, no OpenAI, no account, no API key, no
-hosted service of any kind. It talks to a model running on your own machine:
+Core is Zero's reasoning engine. It is not a front-end for anyone's hosted AI —
+there is no vendor, no account, no API key and no telemetry. Core drives a model
+on your own hardware and speaks two wire formats, so the runtime underneath is
+yours to choose and swap:
+
+| Format | Endpoint |
+|---|---|
+| Native | `/api/chat` |
+| Compatible | `/v1/chat/completions` |
+
+Point Settings → Zero Core at your engine's address and hit **Save & test**.
+Leave the model blank and Core adopts whichever model your engine actually has,
+rather than assuming one is installed.
+
+**Reasoning.** Tick *Show reasoning* and Core asks the model to work through the
+problem in `<think>` tags. Zero renders that working in its own panel, separate
+from the answer, so you can see how it got there — and so reasoning is never
+mistaken for a conclusion.
+
+**Update on command.** Type `update` (or hit *Update now*) and Zero pulls fresh
+market readings and re-checks Core. Nothing rewrites its own code behind your
+back; updates happen when you say so, and every one is logged.
+
+### Running an engine
+
+Core works with any local runtime speaking one of those formats. These are
+open-source runtimes you install and run yourself, not hosted services — which
+is why they are named here: you cannot install software you cannot name.
 
 ```bash
-# one-time setup
-brew install ollama          # or download from ollama.com
-ollama pull llama3.2
-
-# start it so Zero (running from a file) is allowed to reach it
+ollama pull <a-model>
 OLLAMA_ORIGINS=* ollama serve
 ```
 
-Then point Settings → Local Engine at `http://localhost:11434` and hit
-**Save & test**. LM Studio, llama.cpp's server and Jan work too — switch the
-request format to *Local server*.
-
-`OLLAMA_ORIGINS=*` matters: without it the browser's origin check blocks the
-request and the engine looks dead when it is actually running fine.
-
-Your prompts go to localhost and stop there. Turn off the network entirely from
-the Control Panel and the assistant keeps working, because the model is local.
+That environment variable matters. Serving Zero from a file means the runtime
+must be told to accept it; without it the browser blocks the request and a
+perfectly healthy engine looks dead.
 
 ---
 
@@ -132,11 +149,18 @@ claim available, and it is verifiable in the activity log.
 
 ---
 
-## Adding live stocks
+## Market data — real, or absent
 
-Crypto works out of the box (CoinGecko's free public API, no key).
-For stocks and indices, get a free key from [Finnhub](https://finnhub.io) and
-paste it into **Settings → Market Data Key**.
+Every figure Zero displays is fetched from a live feed. Nothing is simulated,
+sampled or filled in.
+
+- **Crypto** — CoinGecko's public API, no key, refreshed every 60s
+- **Stocks & indices** — live quotes via a free [Finnhub](https://finnhub.io) key in Settings, with your own symbol list
+
+Where a feed returns no value, Zero prints **—**. It will not render a missing
+24h change as `0.00%`, and it will not print `$0.00` for a symbol the feed
+doesn't recognise — both are numbers nobody reported. When a fetch fails the
+table empties rather than leaving stale prices on screen looking current.
 
 ---
 
@@ -151,9 +175,10 @@ professional.
 
 ## Roadmap
 
-- [ ] Live stocks & indices via Finnhub
+- [x] Live stocks & indices via Finnhub
 - [ ] Price alerts and watchlist
 - [ ] Vault-backed encrypted export
 - [ ] Plugin system so new capabilities drop in without touching core
-- [x] Local-model support (Ollama) so the assistant runs fully offline
+- [x] Local engine so the assistant runs fully offline
+- [x] Reasoning mode and update-on-command
 - [ ] PWA install so Zero works as a desktop/mobile app

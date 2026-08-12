@@ -260,7 +260,35 @@ body::after {
   border-bottom: 1px solid var(--edge);
 }
 
+/* Absent readings are marked absent, never rendered as a number. */
+.nodata { color: var(--dim); font-family: var(--mono); }
+
 /* ============ Chat ============ */
+.assist-bar {
+  display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+  margin-bottom: 12px; padding-bottom: 12px;
+  border-bottom: 1px solid rgba(120,165,255,.1);
+}
+.think-opt { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+.think-opt input { width: 16px; height: 16px; accent-color: var(--cyan); cursor: pointer; }
+.think-opt span { font-size: 12.5px; color: var(--muted); font-family: var(--mono); letter-spacing: .4px; }
+.think-opt:hover span { color: var(--white); }
+
+/* Reasoning is shown as working, visually distinct from the answer. */
+details.think {
+  margin-bottom: 10px; border-left: 2px solid var(--violet);
+  background: rgba(139,92,246,.07); border-radius: 0 8px 8px 0; padding: 8px 12px;
+}
+details.think summary {
+  cursor: pointer; font-family: var(--mono); font-size: 11px;
+  letter-spacing: 1.4px; text-transform: uppercase; color: var(--violet);
+}
+details.think > div {
+  margin-top: 8px; font-size: 12.5px; line-height: 1.6;
+  color: var(--muted); white-space: pre-wrap; font-family: var(--mono);
+  max-height: 260px; overflow-y: auto;
+}
+
 .chat-wrap { display: flex; flex-direction: column; height: calc(100vh - 260px); min-height: 340px; }
 .chat-log { flex: 1; overflow-y: auto; padding: 6px 2px; display: flex; flex-direction: column; gap: 13px; }
 .msg {

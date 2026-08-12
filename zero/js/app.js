@@ -12,7 +12,9 @@ const Zero = (() => {
     engineUrl: 'zero.engineUrl',
     engineModel: 'zero.engineModel',
     engineMode: 'zero.engineMode',
+    think: 'zero.think',
     stockKey: 'zero.stockKey',
+    stockSymbols: 'zero.stockSymbols',
   };
 
   // Short rolling context so the assistant remembers the current thread.
@@ -207,7 +209,7 @@ const Zero = (() => {
     const [t, s] = titles[view] || ['', ''];
     document.getElementById('viewTitle').textContent = t;
     document.getElementById('viewSub').textContent = s;
-    if (view === 'markets') loadMarkets();
+    if (view === 'markets') { loadMarkets(); loadStocks(); }
   }
 
   /* ---------------- Clock ---------------- */
@@ -228,7 +230,7 @@ const Zero = (() => {
     ['dogecoin', 'DOGE', 'Dogecoin'],
   ];
 
-  async function loadMarkets() {
+  async function fetchMarkets() {
     const table = document.getElementById('marketTable');
     const mini = document.getElementById('miniMarket');
     const ids = COINS.map(c => c[0]).join(',');
@@ -241,26 +243,71 @@ const Zero = (() => {
       const rows = COINS.map(([id, sym, name]) => {
         const p = data[id];
         if (!p) return '';
-        const chg = p.usd_24h_change ?? 0;
-        const cls = chg >= 0 ? 'up' : 'down';
-        const arrow = chg >= 0 ? '▲' : '▼';
+        const chg = p.usd_24h_change;
+        const known = typeof chg === 'number' && isFinite(chg);
+        // A missing 24h figure is reported as missing. Showing 0.00%
+        // would be a number the feed never gave us.
+        const cell = known
+          ? `<div class="${chg >= 0 ? 'up' : 'down'}">${chg >= 0 ? '▲' : '▼'} ${Math.abs(chg).toFixed(2)}%</div>`
+          : `<div class="nodata">—</div>`;
         return `<div class="mkt-row">
           <div class="sym">${sym}<small>${name}</small></div>
           <div>$${fmt(p.usd)}</div>
-          <div class="${cls}">${arrow} ${Math.abs(chg).toFixed(2)}%</div>
+          ${cell}
         </div>`;
       }).join('');
       if (table) table.innerHTML = rows;
       if (mini) mini.innerHTML = `<div class="mkt-row mkt-head"><div>Asset</div><div>Price</div><div>24h</div></div>` + rows;
-      document.getElementById('marketUpdated').textContent =
-        'Updated ' + new Date().toLocaleTimeString();
-      const btc = data.bitcoin?.usd;
-      setText('statBtc', btc ? '$' + fmt(btc) : '');
+      setText('marketUpdated', 'Live · updated ' + new Date().toLocaleTimeString());
     } catch (e) {
-      const msg = `<div class="spinner">⚠ Couldn't reach live market feed (${e.message}). Check your connection and hit refresh.</div>`;
+      const msg = `<div class="spinner">⚠ No live feed (${esc(e.message)}). Nothing is shown rather than showing you stale prices.</div>`;
       if (table) table.innerHTML = msg;
       if (mini) mini.innerHTML = msg;
+      setText('marketUpdated', 'No live data');
+      throw e;
     }
+  }
+
+  /* fetchMarkets throws so callers like updateNow can report failure.
+     Everything user-facing goes through this wrapper, so a click while
+     halted surfaces in the log rather than as an unhandled rejection. */
+  function loadMarkets() { return fetchMarkets().catch(() => {}); }
+
+  /* ---------------- Stocks (real quotes, or nothing) ---------------- */
+  async function loadStocks() {
+    const box = document.getElementById('stockTable');
+    if (!box) return;
+    const key = store.raw(LS.stockKey);
+    if (!key) {
+      box.innerHTML = '<p class="hint">No stock feed connected. Add a free Finnhub key in Settings and Zero will pull live quotes here.</p>';
+      return;
+    }
+    const syms = (store.raw(LS.stockSymbols) || 'AAPL,MSFT,NVDA,TSLA,SPY')
+      .split(',').map(x => x.trim().toUpperCase()).filter(Boolean).slice(0, 12);
+    box.innerHTML = '<div class="spinner">Loading live quotes</div>';
+    const rows = [];
+    for (const sym of syms) {
+      let row = `<div class="mkt-row"><div class="sym">${esc(sym)}</div><div class="nodata">—</div><div class="nodata">no data</div></div>`;
+      try {
+        const r = await guardedFetch(
+          `https://finnhub.io/api/v1/quote?symbol=${encodeURIComponent(sym)}&token=${encodeURIComponent(key)}`, {}, 'market');
+        const d = await r.json();
+        // Finnhub answers 0 for symbols it doesn't know. Zero is never
+        // going to print $0.00 and call it a quote.
+        if (typeof d.c === 'number' && d.c > 0) {
+          const chg = typeof d.dp === 'number' && isFinite(d.dp) ? d.dp : null;
+          const cell = chg === null
+            ? `<div class="nodata">—</div>`
+            : `<div class="${chg >= 0 ? 'up' : 'down'}">${chg >= 0 ? '▲' : '▼'} ${Math.abs(chg).toFixed(2)}%</div>`;
+          row = `<div class="mkt-row"><div class="sym">${esc(sym)}</div><div>$${fmt(d.c)}</div>${cell}</div>`;
+        }
+      } catch (e) {
+        if (/halted|switched off/i.test(e.message)) { box.innerHTML = `<div class="spinner">${esc(e.message)}</div>`; return; }
+      }
+      rows.push(row);
+    }
+    box.innerHTML = rows.join('');
+    setText('stockUpdated', 'Live · updated ' + new Date().toLocaleTimeString());
   }
 
   const fmt = n => n >= 1
@@ -346,8 +393,8 @@ const Zero = (() => {
     // Otherwise hand it to the local engine, streaming the reply in.
     const thinking = bubble('…', 'zero');
     try {
-      const reply = await callEngine(q, partial => { thinking.textContent = partial; });
-      thinking.textContent = reply;
+      const reply = await callEngine(q, partial => renderReply(thinking, partial, false));
+      renderReply(thinking, reply, true);
       chatHistory.push({ role: 'user', content: q }, { role: 'assistant', content: reply });
       if (chatHistory.length > 16) chatHistory = chatHistory.slice(-16);
     } catch (e) {
@@ -367,11 +414,16 @@ const Zero = (() => {
         '• tasks           — list open tasks',
         '• price btc|eth|sol — live crypto price',
         '• time            — current time',
+        '• update          — pull fresh market data and re-check Core',
         '',
-        'Add an AI key in Settings for full conversation.'
+        'Point Core at your local engine in Settings for open conversation.'
       ].join('\n');
     }
     if (low === 'time') return new Date().toLocaleString();
+    if (low === 'update' || low === 'refresh' || low === 'sync') {
+      updateNow(true);
+      return 'Updating — pulling fresh market data and re-checking Core…';
+    }
     if (low === 'tasks') {
       const open = tasks.filter(t => !t.done);
       return open.length ? open.map((t, i) => `${i + 1}. ${t.text}`).join('\n') : 'No open tasks. 🎉';
@@ -399,39 +451,104 @@ const Zero = (() => {
   }
 
   /* ============================================================
-     LOCAL ENGINE
+     ZERO CORE — the reasoning engine
 
-     Zero talks to a model running on this machine — Ollama,
-     llama.cpp, LM Studio, Jan. There is no hosted provider and no
-     API key: the request goes to localhost and the prompt never
-     leaves the device.
+     Zero is not a front-end for anyone's hosted AI. Core drives a
+     model running on your own hardware, and speaks two wire
+     formats so you can swap the underlying runtime without Zero
+     caring which one you chose:
 
-     "OpenAI-compatible" below names a request *format* that local
-     servers implement. Nothing is sent to OpenAI; the URL is
-     whatever local address you point Zero at.
+       native     — the /api/chat protocol
+       compatible — the /v1/chat/completions protocol
+
+     No vendor, no account, no key, no telemetry. Requests go to
+     the address you set and nowhere else.
      ============================================================ */
-  const SYSTEM_PROMPT =
-    "You are Zero, a private personal assistant running locally on the user's own machine. " +
-    "The user builds websites and games. Be direct, concrete and brief. " +
-    "For market or trading questions, give information and analysis, and note that it is not financial advice.";
+  const CORE_PROMPT =
+    "You are Zero, a private assistant running on the user's own machine. " +
+    "The user builds websites and games and follows the markets. " +
+    "Be direct, concrete and brief. " +
+    "For market questions, give information and analysis, and note that it is not financial advice. " +
+    "Never invent numbers: if you do not have a real figure, say so.";
 
-  const engineCfg = () => ({
-    url: (store.raw(LS.engineUrl) || 'http://localhost:11434').replace(/\/+$/, ''),
-    model: store.raw(LS.engineModel) || 'llama3.2',
-    mode: store.raw(LS.engineMode) || 'ollama',
-  });
+  const THINK_PROMPT =
+    "\n\nWork through the problem step by step inside <think></think> tags first, " +
+    "then give your final answer after the closing tag.";
+
+  const engineCfg = () => {
+    // Wire format, by what it is rather than who ships it. Anything
+    // unrecognised falls back to native and shows as such in Settings.
+    const raw = store.raw(LS.engineMode);
+    const mode = raw === 'compatible' ? 'compatible' : 'native';
+    return {
+      url: (store.raw(LS.engineUrl) || 'http://localhost:11434').replace(/\/+$/, ''),
+      model: store.raw(LS.engineModel),
+      mode,
+      think: store.raw(LS.think) === '1',
+    };
+  };
+
+  /* Ask the engine what it has. Used for auto-selection and for Test. */
+  async function listModels() {
+    const { url, mode } = engineCfg();
+    const r = await guardedFetch(mode === 'compatible' ? url + '/v1/models' : url + '/api/tags', {}, 'ai');
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const d = await r.json();
+    return (d.models || d.data || []).map(m => m.name || m.id).filter(Boolean);
+  }
+
+  /* No model configured? Adopt whatever the engine actually has rather
+     than shipping a hardcoded default that may not be installed. */
+  async function resolveModel() {
+    const { model } = engineCfg();
+    if (model) return model;
+    const names = await listModels();
+    if (!names.length) throw new Error('Your engine is running but has no models installed yet.');
+    store.rawSet(LS.engineModel, names[0]);
+    const el = document.getElementById('engineModel');
+    if (el) el.value = names[0];
+    log('Core adopted model "' + names[0] + '".');
+    return names[0];
+  }
+
+  /* Reasoning models wrap their working in <think> tags. Split it out so
+     the thinking is visible but never mistaken for the answer. */
+  function splitThinking(text) {
+    const closed = text.match(/^\s*<think>([\s\S]*?)<\/think>\s*([\s\S]*)$/i);
+    if (closed) return { thought: closed[1].trim(), answer: closed[2].trim() };
+    const open = text.match(/^\s*<think>([\s\S]*)$/i);
+    if (open) return { thought: open[1].trim(), answer: '' };
+    return { thought: '', answer: text };
+  }
+
+  function renderReply(el, text, done) {
+    const { thought, answer } = splitThinking(text);
+    el.innerHTML = '';
+    if (thought) {
+      const d = document.createElement('details');
+      d.className = 'think';
+      d.open = !done;                    // follow along live, collapse once answered
+      const sum = document.createElement('summary');
+      sum.textContent = done ? 'reasoning' : 'thinking…';
+      const body = document.createElement('div');
+      body.textContent = thought;
+      d.append(sum, body);
+      el.appendChild(d);
+    }
+    const out = document.createElement('div');
+    out.textContent = answer || (thought ? '' : text);
+    el.appendChild(out);
+  }
 
   async function callEngine(q, onToken) {
-    const { url, model, mode } = engineCfg();
-    const history = chatHistory.slice(-8);
+    const { url, mode, think } = engineCfg();
+    const model = await resolveModel();
+    const system = CORE_PROMPT + (think ? THINK_PROMPT : '');
+    const messages = [{ role: 'system', content: system }, ...chatHistory.slice(-8), { role: 'user', content: q }];
 
-    const [endpoint, body, pluck] = mode === 'openai'
-      ? [url + '/v1/chat/completions',
-         { model, stream: true, messages: [{ role: 'system', content: SYSTEM_PROMPT }, ...history, { role: 'user', content: q }] },
-         d => d.choices?.[0]?.delta?.content]
-      : [url + '/api/chat',
-         { model, stream: true, messages: [{ role: 'system', content: SYSTEM_PROMPT }, ...history, { role: 'user', content: q }] },
-         d => d.message?.content];
+    const [endpoint, body, pluck] = mode === 'compatible'
+      ? [url + '/v1/chat/completions', { model, stream: true, messages }, d => d.choices?.[0]?.delta?.content]
+      : [url + '/api/chat',            { model, stream: true, messages }, d => d.message?.content];
 
     let r;
     try {
@@ -441,19 +558,16 @@ const Zero = (() => {
         body: JSON.stringify(body),
       }, 'ai');
     } catch (e) {
-      // A blocked request carries its own explanation; a dead socket does not.
       if (/halted|switched off/i.test(e.message)) throw e;
-      throw new Error(`Can't reach the engine at ${url}. Is it running? (${e.message})`);
+      throw new Error(`Core can't reach the engine at ${url}. Is it running? (${e.message})`);
     }
 
     if (!r.ok) {
       const detail = await r.text().catch(() => '');
-      if (r.status === 404) throw new Error(`Engine reached, but model "${model}" was not found. Pull it first, or change the model name in Settings.`);
+      if (r.status === 404) throw new Error(`Engine reached, but model "${model}" was not found. Install it, or change the model in Settings.`);
       throw new Error(`Engine returned ${r.status}. ${detail.slice(0, 180)}`);
     }
 
-    // Local models are slow enough that streaming is the difference
-    // between "thinking" and "frozen".
     let full = '';
     const reader = r.body?.getReader();
     if (!reader) { full = await r.text(); onToken?.(full); return full; }
@@ -461,7 +575,7 @@ const Zero = (() => {
     const take = line => {
       line = line.trim();
       if (!line) return;
-      if (line.startsWith('data:')) line = line.slice(5).trim();     // SSE framing
+      if (line.startsWith('data:')) line = line.slice(5).trim();
       if (line === '[DONE]') return;
       try {
         const piece = pluck(JSON.parse(line));
@@ -476,7 +590,7 @@ const Zero = (() => {
       if (done) break;
       buf += decoder.decode(value, { stream: true });
       const lines = buf.split('\n');
-      buf = lines.pop() || '';                 // last item may be a partial line
+      buf = lines.pop() || '';
       lines.forEach(take);
     }
     // A stream that ends without a trailing newline leaves its final —
@@ -487,24 +601,43 @@ const Zero = (() => {
 
   async function testEngine() {
     const out = document.getElementById('engineStatus');
-    const { url, model, mode } = engineCfg();
+    const { url, model } = engineCfg();
     out.textContent = 'Checking ' + url + ' …';
-    out.className = 'hint';
     try {
-      const r = await guardedFetch(mode === 'openai' ? url + '/v1/models' : url + '/api/tags', {}, 'ai');
-      if (!r.ok) throw new Error('HTTP ' + r.status);
-      const d = await r.json();
-      const names = (d.models || d.data || []).map(m => m.name || m.id).filter(Boolean);
-      const has = names.some(n => n === model || n.startsWith(model + ':'));
-      out.innerHTML = names.length
-        ? `<b style="color:var(--green)">Connected.</b> ${names.length} model(s) available.` +
-          (has ? ` "${esc(model)}" is ready.` : ` <span style="color:var(--red)">"${esc(model)}" not among them:</span> ${esc(names.slice(0, 6).join(', '))}`)
-        : `<b style="color:var(--green)">Connected</b>, but no models are installed yet.`;
+      const names = await listModels();
+      if (!names.length) {
+        out.innerHTML = `<b style="color:var(--green)">Core connected</b>, but no models are installed in your engine yet.`;
+      } else {
+        const active = model || names[0];
+        const has = names.some(n => n === active || n.startsWith(active + ':'));
+        out.innerHTML = `<b style="color:var(--green)">Core online.</b> ${names.length} model(s) available. ` +
+          (has ? `Running "${esc(active)}".`
+               : `<span style="color:var(--red)">"${esc(active)}" is not installed.</span> Available: ${esc(names.slice(0, 6).join(', '))}`);
+      }
       refreshAiStatus();
     } catch (e) {
       out.innerHTML = `<b style="color:var(--red)">No engine at ${esc(url)}.</b> ${esc(e.message)}<br>` +
-        `Start one, then try again. With Ollama: <code>ollama serve</code>, then <code>ollama pull ${esc(model)}</code>.`;
+        `Start your local runtime and try again — see the setup note below.`;
     }
+  }
+
+  /* ---------------- Update on command ---------------- */
+  /* "update" pulls fresh readings and re-checks Core. Nothing in Zero
+     rewrites its own code; this refreshes live state on your say-so. */
+  async function updateNow(announce) {
+    log('Update requested by user.');
+    const results = [];
+    try { await fetchMarkets(); results.push('market data refreshed'); }
+    catch (e) { results.push('market refresh failed (' + e.message + ')'); }
+    try { await loadStocks(); } catch { /* reported in its own panel */ }
+    try {
+      const names = await listModels();
+      results.push(`Core online, ${names.length} model(s)`);
+    } catch (e) { results.push('Core unreachable (' + e.message + ')'); }
+    const line = 'Update complete — ' + results.join('; ') + '.';
+    log(line);
+    if (announce) bubble(line, 'zero');
+    return line;
   }
 
   /* ---------------- Settings ---------------- */
@@ -515,7 +648,16 @@ const Zero = (() => {
     refreshAiStatus();
     testEngine();
   }
-  function saveStockKey() { store.rawSet(LS.stockKey, document.getElementById('stockKey').value.trim()); alert('Market key saved locally.'); }
+  function setThink(on) {
+    store.rawSet(LS.think, on ? '1' : '');
+    log('Reasoning mode turned ' + (on ? 'ON' : 'OFF') + ' by user.');
+  }
+
+  function saveStockKey() {
+    store.rawSet(LS.stockKey, document.getElementById('stockKey').value.trim());
+    store.rawSet(LS.stockSymbols, document.getElementById('stockSymbols').value.trim());
+    loadStocks();
+  }
 
   function refreshAiStatus() {
     const el = document.getElementById('aiStatus');
@@ -557,7 +699,9 @@ const Zero = (() => {
       document.getElementById('vaultPass').value = '';
       document.getElementById('vaultPass2').value = '';
       log('Vault enabled — stored data is now encrypted.');
-      vaultUi();
+      const thinkEl = document.getElementById('thinkToggle');
+    if (thinkEl) thinkEl.checked = engineCfg().think;
+    vaultUi();
       alert('Vault on. Your data is encrypted on this device.');
     } catch (e) { alert(e.message); }
   }
@@ -634,6 +778,8 @@ const Zero = (() => {
     document.getElementById('engineUrl').value = cfg.url;
     document.getElementById('engineModel').value = cfg.model;
     document.getElementById('engineMode').value = cfg.mode;
+    document.getElementById('stockKey').value = store.raw(LS.stockKey);
+    document.getElementById('stockSymbols').value = store.raw(LS.stockSymbols);
     document.getElementById('lockPass')?.addEventListener('keydown', e => {
       if (e.key === 'Enter') unlockVault();
     });
@@ -652,14 +798,14 @@ const Zero = (() => {
     tick(); setInterval(tick, 1000);
     renderTasks(); renderNotes(); refreshAiStatus(); updateStatus();
     log('Zero started. All capabilities on. Press STOP anytime.');
-    loadMarkets(); startTimers();
+    loadMarkets(); loadStocks(); startTimers();
     bubble("I'm Zero, running on your machine. Type `help` for what I do without any model at all, " +
            "or point me at a local engine in Settings to talk properly. Nothing you type here leaves this device.", 'zero');
   }
 
   return {
     nav, loadMarkets, addTask, toggleTask, delTask, addNote, delNote,
-    send, saveEngine, testEngine, saveStockKey,
+    send, saveEngine, testEngine, saveStockKey, setThink, updateNow, loadStocks,
     exportData, wipeData, init,
     toggleHalt, killNetwork, panic, setCap, clearLog,
     enableVault, unlockVault, lockVault, disableVault,
