@@ -317,6 +317,68 @@ details.think > div {
 .msg.sys { align-self: center; background: none; color: var(--dim); font-size: 12px; text-align: center; }
 .chat-input { display: flex; gap: 11px; margin-top: 14px; }
 
+/* ============ Security ============ */
+.sec-verdict { font-family: var(--mono); font-size: 22px; font-weight: 800; letter-spacing: 1px; }
+.sec-line { font-size: 12.5px; color: var(--muted); margin-top: 8px; line-height: 1.6; }
+.sec-notes { margin: 10px 0 0; padding-left: 18px; color: var(--muted); font-size: 12.5px; line-height: 1.7; }
+.sec-item { padding: 10px 0; border-bottom: 1px solid rgba(120,165,255,.1); }
+.sec-item:last-child { border: none; }
+.sec-item b { display: block; font-size: 13px; }
+.sec-item span { display: block; color: var(--dim); font-size: 11.5px; margin-top: 3px; line-height: 1.5; }
+
+/* ============ Boot ============ */
+#boot {
+  position: fixed; inset: 0; z-index: 100001; background: var(--void);
+  display: grid; place-items: center; transition: opacity .4s ease;
+}
+#boot.gone { opacity: 0; pointer-events: none; }
+.boot-inner { text-align: center; }
+.boot-mark {
+  width: 62px; height: 62px; margin: 0 auto 22px; border-radius: 16px;
+  display: grid; place-items: center; font-family: var(--mono);
+  font-weight: 800; font-size: 30px; color: #fff;
+  background: var(--holo); background-size: 200% 200%;
+  animation: shift 3s ease infinite;
+  box-shadow: 0 0 40px rgba(255,45,85,.5), 0 0 70px rgba(47,123,255,.4);
+}
+.boot-feed { font-family: var(--mono); font-size: 12px; color: var(--muted); line-height: 2; }
+.boot-feed div { animation: materialize .3s ease; }
+.boot-feed div:last-child { color: var(--cyan); }
+
+/* ============ Always-listening bar ============ */
+#wakeBar {
+  display: none; position: fixed; top: 0; left: 0; right: 0; z-index: 99997;
+  background: linear-gradient(90deg, rgba(255,45,85,.95), rgba(216,56,200,.95));
+  color: #fff; font-family: var(--mono); font-size: 11.5px; letter-spacing: .6px;
+  padding: 7px 16px; text-align: center;
+}
+#wakeBar.on { display: block; }
+#wakeBar #wakeHeard { opacity: .85; font-style: italic; margin-left: 10px; }
+.wake-dot {
+  display: inline-block; width: 8px; height: 8px; border-radius: 50%;
+  background: #fff; margin-right: 7px; animation: breathe 1s ease-in-out infinite;
+}
+#wakeBtn.live { background: linear-gradient(135deg, var(--red), #c01838); color: #fff; border-color: transparent; }
+
+/* ============ Overview ============ */
+.ov-grid { display: grid; grid-template-columns: 320px 1fr 1fr; gap: 18px; align-items: start; }
+.ov-orb { display: flex; flex-direction: column; align-items: center; }
+#orb { width: 100%; height: 250px; display: block; }
+.ov-row {
+  display: flex; justify-content: space-between; align-items: center;
+  font-family: var(--mono); font-size: 13px; padding: 8px 0;
+  border-bottom: 1px solid rgba(120,165,255,.1);
+}
+.ov-row:last-child { border: none; }
+.ov-row .sym { font-weight: 700; }
+.ov-news {
+  font-size: 12.5px; line-height: 1.5; padding: 7px 0; color: var(--muted);
+  border-bottom: 1px solid rgba(120,165,255,.08);
+}
+.ov-news:last-child { border: none; }
+.ov-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+@media (max-width: 1100px) { .ov-grid { grid-template-columns: 1fr; } }
+
 /* ============ App launcher ============ */
 #appList { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 12px; }
 .app-tile {
@@ -616,6 +678,12 @@ input:focus, textarea:focus, select:focus {
   </style>
 </head>
 <body>
+  <!-- ============ BOOT ============ -->
+  <div id="boot"><div class="boot-inner"><div class="boot-mark">0</div><div class="boot-feed"></div></div></div>
+
+  <!-- ============ ALWAYS-LISTENING INDICATOR ============ -->
+  <div id="wakeBar"><span class="wake-dot"></span> LISTENING — audio is streaming to your browser's speech service <span id="wakeHeard"></span></div>
+
   <!-- ============ KILL SWITCH — always visible, always first ============ -->
   <button id="killSwitch" onclick="Zero.toggleHalt()" title="Immediately stop all Zero activity">■ STOP</button>
 
@@ -649,11 +717,13 @@ input:focus, textarea:focus, select:focus {
       </div>
       <ul class="nav" id="nav">
         <li data-view="assistant" class="active"><span class="ic">◈</span> Assistant</li>
+        <li data-view="overview"><span class="ic">⬡</span> Overview</li>
         <li data-view="control"><span class="ic">⏻</span> Control Panel</li>
         <li data-view="markets"><span class="ic">▲</span> Markets</li>
         <li data-view="news"><span class="ic">◉</span> News</li>
         <li data-view="apps"><span class="ic">◱</span> Apps</li>
         <li data-view="memory"><span class="ic">❖</span> Memory</li>
+        <li data-view="security"><span class="ic">⛨</span> Security</li>
         <li data-view="tasks"><span class="ic">✓</span> Tasks</li>
         <li data-view="notes"><span class="ic">✎</span> Notes</li>
         <li data-view="settings"><span class="ic">⚙</span> Settings</li>
@@ -774,6 +844,58 @@ input:focus, textarea:focus, select:focus {
             <button class="btn blue" onclick="Zero.loadNews()">↻ Refresh</button>
             <span class="hint" id="newsUpdated"></span>
           </div>
+        </div>
+      </section>
+
+      <!-- OVERVIEW -->
+      <section class="view" id="view-overview">
+        <div class="ov-grid">
+          <div class="card ov-orb">
+            <canvas id="orb"></canvas>
+            <button class="btn ghost" id="wakeBtn" onclick="Zero.toggleWake()">◎ Wake word off</button>
+            <p class="hint" style="text-align:center;margin-top:10px">Say <b>“Zero, …”</b> and it acts on what follows.</p>
+          </div>
+          <div class="card">
+            <h2>Markets</h2>
+            <div id="ovMarket"><div class="nodata" style="font-size:12px">loading…</div></div>
+            <h2 style="margin-top:18px">Headlines</h2>
+            <div id="ovNews"><div class="nodata" style="font-size:12px">loading…</div></div>
+          </div>
+          <div class="card">
+            <h2>State</h2>
+            <div class="ov-stats">
+              <div class="stat"><div class="n" id="ovState" style="font-size:19px">RUNNING</div><div class="l">System</div></div>
+              <div class="stat"><div class="n" id="ovTasks" style="font-size:19px;color:var(--red)">0</div><div class="l">Open tasks</div></div>
+              <div class="stat"><div class="n" id="ovNotes" style="font-size:19px">0</div><div class="l">Notes</div></div>
+              <div class="stat"><div class="n" id="ovMem" style="font-size:19px;color:var(--cyan)">0</div><div class="l">Memories</div></div>
+            </div>
+            <div class="notice">Always-listening streams audio continuously while armed — not only when you address Zero. The bar at the top of the screen is on whenever it is live.</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- SECURITY -->
+      <section class="view" id="view-security">
+        <div class="grid cols-2">
+          <div class="card">
+            <h2>Password Check</h2>
+            <p class="hint">Measures strength here on your machine, then checks whether it appears in public breach data.</p>
+            <div class="chat-input" style="margin-top:14px">
+              <input id="secPass" type="password" placeholder="Password to test" onkeydown="if(event.key==='Enter')Zero.checkPassword()" />
+              <button class="btn" onclick="Zero.checkPassword()">Check</button>
+            </div>
+            <div id="secResult" style="margin-top:14px"></div>
+            <div class="notice"><b>Your password is never sent.</b> It is hashed on this device and only the <b>first five characters of that hash</b> go out. The service replies with every suffix sharing that prefix and the match is made here — so it never learns which one you asked about. That is the only reason this check is acceptable to build.</div>
+          </div>
+          <div class="card">
+            <h2>Hardening Checklist</h2>
+            <p class="hint">For the sites and games you ship. Ordered by how often each one is what actually went wrong.</p>
+            <div id="secChecklist" style="margin-top:14px"></div>
+          </div>
+        </div>
+        <div class="card" style="margin-top:16px">
+          <h2>Scope</h2>
+          <p class="hint">Zero's security tooling is defensive: it hardens things you own and control. It contains no scanner, no exploit and no payload, and I won't add them — a tool built to break into other people's systems is a liability to whoever owns it first, and every serious security professional works inside written authorisation. If you're doing authorised testing, the real toolchain lives outside a browser tab anyway.</p>
         </div>
       </section>
 
@@ -1051,6 +1173,150 @@ const Vault = (() => {
 })();
 
 /* ============================================================
+   ZERO — HUD
+   The face of the machine: a reactive orb, a boot sequence, and
+   the live overview. Purely presentational; it reads state and
+   draws it, and holds no authority over anything.
+   ============================================================ */
+
+const Orb = (() => {
+  let canvas = null, ctx = null, raf = null;
+  let state = 'idle';              // idle | listening | thinking | speaking
+  let energy = 0;                  // 0..1, eased toward the state's target
+  let t = 0;
+  const particles = [];
+
+  const PALETTE = {
+    idle:      ['#2f7bff', '#8b5cf6'],
+    listening: ['#ff2d55', '#d838c8'],
+    thinking:  ['#8b5cf6', '#5ce1ff'],
+    speaking:  ['#23e7a0', '#5ce1ff'],
+  };
+  const TARGET = { idle: 0.18, listening: 0.85, thinking: 0.55, speaking: 0.7 };
+
+  function attach(el) {
+    canvas = el;
+    ctx = canvas.getContext('2d');
+    if (!particles.length) {
+      for (let i = 0; i < 54; i++) {
+        particles.push({ a: (i / 54) * Math.PI * 2, r: 0.72 + Math.random() * 0.1, s: 0.4 + Math.random() * 0.9 });
+      }
+    }
+    start();
+  }
+
+  function set(next) { if (next !== state) state = next; }
+
+  function start() {
+    if (raf) return;
+    const loop = () => { draw(); raf = requestAnimationFrame(loop); };
+    raf = requestAnimationFrame(loop);
+  }
+  function stop() { if (raf) cancelAnimationFrame(raf); raf = null; }
+
+  function draw() {
+    if (!canvas || !ctx) return;
+    const dpr = window.devicePixelRatio || 1;
+    const w = canvas.clientWidth || 220, h = canvas.clientHeight || 220;
+    if (canvas.width !== w * dpr || canvas.height !== h * dpr) {
+      canvas.width = w * dpr; canvas.height = h * dpr;
+    }
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, w, h);
+
+    t += 0.016;
+    energy += (TARGET[state] - energy) * 0.07;      // ease, never snap
+
+    const cx = w / 2, cy = h / 2;
+    const base = Math.min(w, h) * 0.30;
+    const [c1, c2] = PALETTE[state] || PALETTE.idle;
+
+    // core glow
+    const glow = ctx.createRadialGradient(cx, cy, 0, cx, cy, base * (1.5 + energy));
+    glow.addColorStop(0, hexA(c1, 0.42 + energy * 0.3));
+    glow.addColorStop(0.55, hexA(c2, 0.14));
+    glow.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = glow;
+    ctx.beginPath(); ctx.arc(cx, cy, base * (1.5 + energy), 0, Math.PI * 2); ctx.fill();
+
+    // breathing rings
+    for (let i = 0; i < 3; i++) {
+      const phase = t * (0.5 + i * 0.22) + i * 1.7;
+      const r = base * (0.82 + i * 0.16) + Math.sin(phase) * (3 + energy * 11);
+      ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2);
+      ctx.strokeStyle = hexA(i % 2 ? c2 : c1, 0.30 - i * 0.07 + energy * 0.28);
+      ctx.lineWidth = 1.2;
+      ctx.stroke();
+    }
+
+    // reactive particle ring — the part that reads as "hearing"
+    particles.forEach(p => {
+      const wobble = Math.sin(t * p.s * 2.2 + p.a * 3) * energy * 15;
+      const r = base * p.r + wobble + 12;
+      const x = cx + Math.cos(p.a + t * 0.16) * r;
+      const y = cy + Math.sin(p.a + t * 0.16) * r;
+      ctx.beginPath();
+      ctx.arc(x, y, 0.9 + energy * 1.7, 0, Math.PI * 2);
+      ctx.fillStyle = hexA(c2, 0.35 + energy * 0.5);
+      ctx.fill();
+    });
+
+    // solid core
+    const core = ctx.createLinearGradient(cx - base, cy - base, cx + base, cy + base);
+    core.addColorStop(0, c1); core.addColorStop(1, c2);
+    ctx.beginPath();
+    ctx.arc(cx, cy, base * (0.42 + energy * 0.1), 0, Math.PI * 2);
+    ctx.fillStyle = core;
+    ctx.shadowColor = c1; ctx.shadowBlur = 22 + energy * 30;
+    ctx.fill();
+    ctx.shadowBlur = 0;
+  }
+
+  function hexA(hex, a) {
+    const n = parseInt(hex.slice(1), 16);
+    return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${Math.max(0, Math.min(1, a))})`;
+  }
+
+  return { attach, set, start, stop, get state() { return state; } };
+})();
+
+
+/* Boot sequence. Cosmetic, and deliberately brief — a machine that
+   makes you wait to admire itself is a machine you stop opening. */
+const Boot = (() => {
+  const LINES = [
+    'ZERO — local core',
+    'no vendor · no account · no telemetry',
+    'storage … local database',
+    'controls … armed',
+    'ready',
+  ];
+
+  function run(el, done) {
+    if (!el) { done?.(); return; }
+    if (matchMedia('(prefers-reduced-motion: reduce)').matches) { el.remove(); done?.(); return; }
+    const feed = el.querySelector('.boot-feed');
+    let i = 0;
+    const tick = () => {
+      if (i >= LINES.length) {
+        setTimeout(() => {
+          el.classList.add('gone');
+          setTimeout(() => { el.remove(); done?.(); }, 420);
+        }, 260);
+        return;
+      }
+      const d = document.createElement('div');
+      d.textContent = LINES[i++];
+      feed.appendChild(d);
+      setTimeout(tick, 150);
+    };
+    setTimeout(tick, 120);
+  }
+
+  return { run };
+})();
+
+/* ============================================================
    ZERO — STORAGE
 
    localStorage caps out around 5 MB and is synchronous, which
@@ -1233,10 +1499,67 @@ const Voice = (() => {
     return true;
   }
 
+  /* Always-on wake-word loop.
+
+     This is a real escalation and is named as such: continuous
+     recognition streams audio to the browser's speech service the whole
+     time it is armed, not just while you are talking to Zero. It exists
+     because it was asked for; it is off by default, announces itself,
+     and stops the moment anything asks it to. */
+  let awake = false, wakeRestart = null;
+
+  function startWake(word, onWake, onHeard, onState, onError) {
+    if (!canHear()) { onError?.('This browser has no speech recognition.'); return false; }
+    awake = true;
+    const spin = () => {
+      if (!awake) return;
+      const r = new SR();
+      recog = r;
+      r.continuous = true;
+      r.interimResults = true;
+      r.lang = navigator.language || 'en-US';
+      r.onstart = () => onState?.('armed');
+      r.onerror = e => {
+        if (e.error === 'not-allowed') { awake = false; onState?.('off'); onError?.('Microphone permission was refused.'); }
+      };
+      r.onend = () => {
+        // Browsers cut long sessions; re-arm unless we were told to stop.
+        if (awake) { clearTimeout(wakeRestart); wakeRestart = setTimeout(spin, 350); }
+        else onState?.('off');
+      };
+      r.onresult = ev => {
+        let text = '', final = false;
+        for (let i = ev.resultIndex; i < ev.results.length; i++) {
+          text += ev.results[i][0].transcript;
+          if (ev.results[i].isFinal) final = true;
+        }
+        text = text.trim();
+        if (!text) return;
+        onHeard?.(text);
+        const low = text.toLowerCase();
+        const at = low.lastIndexOf(word.toLowerCase());
+        if (at >= 0 && final) {
+          const after = text.slice(at + word.length).replace(/^[\s,.:;!?-]+/, '').trim();
+          if (after) onWake?.(after);
+        }
+      };
+      try { r.start(); } catch { /* a spin already in flight */ }
+    };
+    spin();
+    return true;
+  }
+
+  function stopWake() {
+    awake = false;
+    clearTimeout(wakeRestart);
+    try { recog?.stop(); } catch {}
+  }
+  const isAwake = () => awake;
+
   function stopListening() { try { recog?.stop(); } catch {} listening = false; }
   const isListening = () => listening;
 
-  return { canSpeak, canHear, speak, stop, listen, stopListening, isListening };
+  return { canSpeak, canHear, speak, stop, listen, stopListening, isListening, startWake, stopWake, isAwake };
 })();
 
 
@@ -1589,6 +1912,106 @@ const Chart = (() => {
   return { draw, describe, sma, rsi, volatility };
 })();
 
+
+/* ------------------------------------------------------------
+   SECURITY — defensive tooling
+
+   Scope, stated plainly: this hardens things you own. Password
+   strength, breach exposure, and a review checklist for your own
+   sites. There is no scanner, no exploit and no payload here,
+   because a tool that attacks other people's systems is a
+   liability to its owner first.
+   ------------------------------------------------------------ */
+const Sec = (() => {
+
+  const COMMON = new Set(['password','123456','12345678','qwerty','abc123','letmein',
+    'monkey','dragon','111111','iloveyou','admin','welcome','login','princess',
+    'football','baseball','master','sunshine','shadow','superman','trustno1',
+    'passw0rd','zaq12wsx','qwerty123','000000','password1','1q2w3e4r']);
+
+  /* Entropy from the character space actually used, then penalties for
+     the patterns that make a long password weak anyway. */
+  function strength(pw) {
+    if (!pw) return null;
+    let space = 0;
+    if (/[a-z]/.test(pw)) space += 26;
+    if (/[A-Z]/.test(pw)) space += 26;
+    if (/\d/.test(pw)) space += 10;
+    if (/[^a-zA-Z0-9]/.test(pw)) space += 33;
+    let bits = pw.length * Math.log2(space || 1);
+
+    const notes = [];
+    const low = pw.toLowerCase();
+    if (COMMON.has(low)) { bits = Math.min(bits, 8); notes.push('This is on every attacker’s first-guess list.'); }
+    if (/^(.)\1+$/.test(pw)) { bits = Math.min(bits, 10); notes.push('One repeated character.'); }
+    if (/^\d+$/.test(pw)) { bits = Math.min(bits, pw.length * 3.3); notes.push('Digits only — a tiny search space.'); }
+    if (/(abc|bcd|cde|123|234|345|456|567|678|789|qwe|wer|ert|asd)/i.test(pw)) {
+      bits *= 0.75; notes.push('Contains a keyboard or alphabet run.');
+    }
+    if (/(19|20)\d\d/.test(pw)) { bits *= 0.85; notes.push('Contains something shaped like a year.'); }
+    if (pw.length < 12) notes.push('Under 12 characters — length beats complexity, every time.');
+
+    // Offline guessing at a deliberately pessimistic 100 billion tries/sec.
+    const seconds = Math.pow(2, bits - 1) / 1e11;
+    let verdict, tone;
+    if (bits < 40) { verdict = 'Weak'; tone = 'bad'; }
+    else if (bits < 60) { verdict = 'Fair'; tone = 'warn'; }
+    else if (bits < 80) { verdict = 'Strong'; tone = 'ok'; }
+    else { verdict = 'Very strong'; tone = 'ok'; }
+
+    return { bits: Math.round(bits), verdict, tone, notes, crackTime: humanTime(seconds) };
+  }
+
+  function humanTime(sec) {
+    if (sec < 1) return 'instantly';
+    const u = [['second',60],['minute',60],['hour',24],['day',365],['year',1e3],
+               ['thousand years',1e3],['million years',1e3],['billion years',1e9]];
+    let v = sec;
+    for (const [name, step] of u) {
+      if (v < step) return `about ${v < 10 ? v.toFixed(1) : Math.round(v)} ${name}${v >= 2 ? (name.endsWith('s') ? '' : 's') : ''}`;
+      v /= step;
+    }
+    return 'longer than the universe has existed';
+  }
+
+  /* Breach lookup by k-anonymity.
+
+     The password is hashed locally, and only the FIRST FIVE characters
+     of that hash are sent. The service returns every suffix under that
+     prefix and the match is found here. Your password, and the full
+     hash of it, never leave this machine — which is the only reason
+     this feature is acceptable at all. */
+  async function breachCount(pw, fetcher) {
+    const buf = await crypto.subtle.digest('SHA-1', new TextEncoder().encode(pw));
+    const hash = [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, '0')).join('').toUpperCase();
+    const prefix = hash.slice(0, 5), suffix = hash.slice(5);
+    const res = await fetcher('https://api.pwnedpasswords.com/range/' + prefix);
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const body = await res.text();
+    for (const line of body.split('\n')) {
+      const [suf, count] = line.trim().split(':');
+      if (suf === suffix) return parseInt(count, 10) || 0;
+    }
+    return 0;
+  }
+
+  /* Review checklist for a site you run. */
+  const CHECKLIST = [
+    ['Serve everything over HTTPS', 'Redirect http→https and set HSTS. Anything less means the page can be rewritten in transit.'],
+    ['Set a Content-Security-Policy', 'The single most effective defence against cross-site scripting. Start with default-src \'self\'.'],
+    ['Never build HTML from user input with innerHTML', 'Use textContent, or escape. Most site compromises start here.'],
+    ['Parameterise every database query', 'String-concatenated SQL is how databases get emptied.'],
+    ['Hash passwords with argon2id or bcrypt', 'Never SHA-256 alone, never unsalted, never reversible.'],
+    ['Set cookies HttpOnly, Secure, SameSite=Lax', 'Stops script theft and most cross-site request forgery.'],
+    ['Keep secrets out of the repository', 'Rotate anything ever committed — git history keeps it forever.'],
+    ['Rate-limit login and reset endpoints', 'Unlimited guesses makes every other password control decorative.'],
+    ['Patch dependencies on a schedule', 'Most real breaches use a known bug with a published fix.'],
+    ['Turn on 2FA everywhere you can', 'It defeats credential stuffing even when a password is already leaked.'],
+  ];
+
+  return { strength, breachCount, CHECKLIST };
+})();
+
 /* ============================================================
    ZERO — app logic
    Private by design: all state lives on THIS device, encrypted
@@ -1609,6 +2032,7 @@ const Zero = (() => {
     memories: 'zero.memories',
     apps: 'zero.apps',
     micOk: 'zero.micOk',
+    wakeOk: 'zero.wakeOk',
     speak: 'zero.speak',
   };
 
@@ -1814,6 +2238,8 @@ const Zero = (() => {
   const titles = {
     control:   ['Control Panel', 'You are in charge. Stop anything, anytime.'],
     markets:   ['Markets', 'Live readings — information, not advice.'],
+    overview:  ['Overview', 'Everything at a glance, live.'],
+    security:  ['Security', 'Harden what is yours.'],
     news:      ['News', 'What is happening right now.'],
     apps:      ['Apps', 'Your things, one keystroke away.'],
     memory:    ['Memory', 'What Zero carries between conversations.'],
@@ -1833,6 +2259,8 @@ const Zero = (() => {
     document.getElementById('viewSub').textContent = s;
     if (view === 'markets') { loadMarkets(); loadStocks(); loadRates(); }
     if (view === 'news') loadNews();
+    if (view === 'overview') renderOverview();
+    if (view === 'security') renderChecklist();
   }
 
   /* ---------------- Clock ---------------- */
@@ -1895,6 +2323,130 @@ const Zero = (() => {
      Everything user-facing goes through this wrapper, so a click while
      halted surfaces in the log rather than as an unhandled rejection. */
   function loadMarkets() { return fetchMarkets().catch(() => {}); }
+
+  /* ---------------- Security ---------------- */
+  async function checkPassword() {
+    const inp = document.getElementById('secPass');
+    const out = document.getElementById('secResult');
+    const pw = inp.value;
+    if (!pw) { out.innerHTML = '<p class="hint">Type a password above.</p>'; return; }
+
+    const st = Sec.strength(pw);
+    const tone = { bad: 'var(--red)', warn: '#ffb020', ok: 'var(--green)' }[st.tone];
+    out.innerHTML =
+      `<div class="sec-verdict" style="color:${tone}">${st.verdict}</div>` +
+      `<div class="sec-line"><b>${st.bits} bits</b> of entropy · offline guessing would take <b>${esc(st.crackTime)}</b></div>` +
+      (st.notes.length ? '<ul class="sec-notes">' + st.notes.map(n => `<li>${esc(n)}</li>`).join('') + '</ul>' : '') +
+      `<div class="sec-line" id="secBreach">Checking public breach corpus…</div>`;
+
+    const bl = document.getElementById('secBreach');
+    try {
+      const n = await Sec.breachCount(pw, url => guardedFetch(url, {}, 'network'));
+      bl.innerHTML = n > 0
+        ? `<span style="color:var(--red)"><b>Found in ${n.toLocaleString()} known breaches.</b></span> ` +
+          `Treat it as public and stop using it anywhere.`
+        : `<span style="color:var(--green)"><b>Not in the public breach corpus.</b></span> ` +
+          `That is not proof it is safe — only that it has not turned up yet.`;
+    } catch (e) {
+      bl.innerHTML = `<span class="nodata">Breach check unavailable (${esc(e.message)}).</span>`;
+    }
+  }
+
+  function renderChecklist() {
+    const el = document.getElementById('secChecklist');
+    if (!el) return;
+    el.innerHTML = Sec.CHECKLIST.map(([t, d]) =>
+      `<div class="sec-item"><b>${esc(t)}</b><span>${esc(d)}</span></div>`).join('');
+  }
+
+  /* ---------------- Wake word ---------------- */
+  function orbState(st) { if (typeof Orb !== 'undefined') Orb.set(st); }
+
+  function toggleWake() {
+    const btn = document.getElementById('wakeBtn');
+    const bar = document.getElementById('wakeBar');
+    if (Voice.isAwake()) {
+      Voice.stopWake();
+      btn.textContent = '◎ Wake word off';
+      btn.classList.remove('live');
+      bar?.classList.remove('on');
+      orbState('idle');
+      log('Always-listening turned OFF by user.');
+      return;
+    }
+    if (!Voice.canHear()) { bubble('This browser has no speech recognition. Chrome and Edge do.', 'zero'); return; }
+    if (Control.halted || !Control.caps.network) {
+      bubble('Always-listening needs the network, and Zero is blocking it right now.', 'zero');
+      return;
+    }
+    if (!store.raw(LS.wakeOk)) {
+      if (!confirm(
+        'Turn on always-listening?\n\n' +
+        'Zero will wait for the word "Zero" and act on whatever follows.\n\n' +
+        'READ THIS FIRST: your browser does speech recognition in the cloud. While this is ' +
+        'armed it streams audio from your microphone CONTINUOUSLY — not only when you are ' +
+        'talking to Zero, but whatever else is said near this machine.\n\n' +
+        'That is how browser dictation works and Zero cannot change it. The mic button ' +
+        '(press to talk) sends far less. Only turn this on if that trade is one you want.\n\n' +
+        'Arm always-listening?')) return;
+      store.rawSet(LS.wakeOk, '1');
+    }
+    log('ALWAYS-LISTENING ARMED — audio streams to the browser speech service until turned off.', true);
+    btn.textContent = '◉ Listening';
+    btn.classList.add('live');
+    bar?.classList.add('on');
+    orbState('listening');
+    Voice.startWake('zero',
+      cmd => {                                    // heard "zero <something>"
+        setText('wakeHeard', '“' + cmd + '”');
+        orbState('thinking');
+        document.getElementById('chatInput').value = cmd;
+        send();
+      },
+      partial => setText('wakeHeard', partial.slice(-70)),
+      st => { if (st === 'off') { btn.textContent = '◎ Wake word off'; btn.classList.remove('live'); bar?.classList.remove('on'); orbState('idle'); } },
+      err => bubble(err, 'zero')
+    );
+  }
+
+  /* ---------------- Live overview ---------------- */
+  async function renderOverview() {
+    const set = (id, v) => setText(id, v);
+    set('ovTasks', tasks.filter(t => !t.done).length);
+    set('ovNotes', notes.length);
+    set('ovMem', memories.length);
+    set('ovState', Control.halted ? 'HALTED' : 'RUNNING');
+    const el = document.getElementById('ovState');
+    if (el) el.style.color = Control.halted ? 'var(--red)' : 'var(--green)';
+
+    const box = document.getElementById('ovMarket');
+    if (box) {
+      try {
+        const r = await guardedFetch('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum,solana&vs_currencies=usd&include_24hr_change=true', {}, 'market');
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        const d = await r.json();
+        box.innerHTML = [['bitcoin','BTC'],['ethereum','ETH'],['solana','SOL']].map(([id, sym]) => {
+          const p = d[id]; if (!p) return '';
+          const c = p.usd_24h_change;
+          const known = typeof c === 'number' && isFinite(c);
+          return `<div class="ov-row"><span class="sym">${sym}</span><span>$${fmt(p.usd)}</span>` +
+                 (known ? `<span class="${c >= 0 ? 'up' : 'down'}">${c >= 0 ? '▲' : '▼'} ${Math.abs(c).toFixed(2)}%</span>`
+                        : `<span class="nodata">—</span>`) + `</div>`;
+        }).join('');
+      } catch (e) { box.innerHTML = `<div class="nodata" style="font-size:12px">no live feed</div>`; }
+    }
+
+    const nb = document.getElementById('ovNews');
+    if (nb && !nb.dataset.loaded) {
+      try {
+        const items = await loadNews();
+        if (items.length) {
+          nb.innerHTML = items.slice(0, 4).map(i => `<div class="ov-news">${esc(i.title)}</div>`).join('');
+          nb.dataset.loaded = '1';
+        } else nb.innerHTML = '<div class="nodata" style="font-size:12px">no feed</div>';
+      } catch { nb.innerHTML = '<div class="nodata" style="font-size:12px">no feed</div>'; }
+    }
+  }
 
   /* ---------------- Memory ---------------- */
   function renderMemories() {
@@ -2223,7 +2775,10 @@ const Zero = (() => {
   /* ---------------- Quick capture ---------------- */
   /* ---------------- Assistant ---------------- */
   function bubble(text, who) {
-    if (who === 'zero' && speakReplies && text && text !== '…') Voice.speak(text);
+    if (who === 'zero' && speakReplies && text && text !== '…') {
+      orbState('speaking');
+      Voice.speak(text, { onend: () => orbState(Voice.isAwake() ? 'listening' : 'idle') });
+    }
     const log = document.getElementById('chatLog');
     const d = document.createElement('div');
     d.className = 'msg ' + who;
@@ -2287,6 +2842,10 @@ const Zero = (() => {
         '  slug <text>         url-safe slug',
         '  uuid / password     generate one',
         '  hash <text>         SHA-256',
+        '  password            generate a strong one',
+        '',
+        'SECURITY',
+        '  Security tab        password strength, breach check, site checklist',
         '',
         'ORGANISING',
         '  task <text>         add a task        tasks   list them',
@@ -2771,6 +3330,9 @@ const Zero = (() => {
       .then(n => { if (n) log(`Moved ${n} record(s) into the larger local database.`); })
       .catch(e => log('Storage upgrade unavailable: ' + e.message, true));
     storageInfo();
+    if (typeof Orb !== 'undefined') { Orb.attach(document.getElementById('orb')); Orb.set('idle'); }
+    if (typeof Boot !== 'undefined') Boot.run(document.getElementById('boot'));
+    setInterval(() => { if (document.getElementById('view-overview')?.classList.contains('active')) renderOverview(); }, 30000);
     log('Zero started. All capabilities on. Press STOP anytime.');
     loadMarkets(); loadStocks(); startTimers();
     bubble("I'm Zero, running on your machine. Type `help` for what I do without any model at all, " +
@@ -2781,6 +3343,7 @@ const Zero = (() => {
     nav, loadMarkets, addTask, toggleTask, delTask, addNote, delNote,
     send, saveEngine, testEngine, saveStockKey, setThink, updateNow, loadStocks,
     loadRates, loadNews, setSpeak, micToggle, stopSpeaking: () => Voice.stop(),
+    toggleWake, renderOverview, checkPassword,
     addApp, removeApp, launchApp, forgetMemory, storageInfo,
     exportData, wipeData, init,
     toggleHalt, killNetwork, panic, setCap, clearLog,

@@ -8,6 +8,12 @@
   <link rel="stylesheet" href="css/styles.css" />
 </head>
 <body>
+  <!-- ============ BOOT ============ -->
+  <div id="boot"><div class="boot-inner"><div class="boot-mark">0</div><div class="boot-feed"></div></div></div>
+
+  <!-- ============ ALWAYS-LISTENING INDICATOR ============ -->
+  <div id="wakeBar"><span class="wake-dot"></span> LISTENING — audio is streaming to your browser's speech service <span id="wakeHeard"></span></div>
+
   <!-- ============ KILL SWITCH — always visible, always first ============ -->
   <button id="killSwitch" onclick="Zero.toggleHalt()" title="Immediately stop all Zero activity">■ STOP</button>
 
@@ -41,11 +47,13 @@
       </div>
       <ul class="nav" id="nav">
         <li data-view="assistant" class="active"><span class="ic">◈</span> Assistant</li>
+        <li data-view="overview"><span class="ic">⬡</span> Overview</li>
         <li data-view="control"><span class="ic">⏻</span> Control Panel</li>
         <li data-view="markets"><span class="ic">▲</span> Markets</li>
         <li data-view="news"><span class="ic">◉</span> News</li>
         <li data-view="apps"><span class="ic">◱</span> Apps</li>
         <li data-view="memory"><span class="ic">❖</span> Memory</li>
+        <li data-view="security"><span class="ic">⛨</span> Security</li>
         <li data-view="tasks"><span class="ic">✓</span> Tasks</li>
         <li data-view="notes"><span class="ic">✎</span> Notes</li>
         <li data-view="settings"><span class="ic">⚙</span> Settings</li>
@@ -166,6 +174,58 @@
             <button class="btn blue" onclick="Zero.loadNews()">↻ Refresh</button>
             <span class="hint" id="newsUpdated"></span>
           </div>
+        </div>
+      </section>
+
+      <!-- OVERVIEW -->
+      <section class="view" id="view-overview">
+        <div class="ov-grid">
+          <div class="card ov-orb">
+            <canvas id="orb"></canvas>
+            <button class="btn ghost" id="wakeBtn" onclick="Zero.toggleWake()">◎ Wake word off</button>
+            <p class="hint" style="text-align:center;margin-top:10px">Say <b>“Zero, …”</b> and it acts on what follows.</p>
+          </div>
+          <div class="card">
+            <h2>Markets</h2>
+            <div id="ovMarket"><div class="nodata" style="font-size:12px">loading…</div></div>
+            <h2 style="margin-top:18px">Headlines</h2>
+            <div id="ovNews"><div class="nodata" style="font-size:12px">loading…</div></div>
+          </div>
+          <div class="card">
+            <h2>State</h2>
+            <div class="ov-stats">
+              <div class="stat"><div class="n" id="ovState" style="font-size:19px">RUNNING</div><div class="l">System</div></div>
+              <div class="stat"><div class="n" id="ovTasks" style="font-size:19px;color:var(--red)">0</div><div class="l">Open tasks</div></div>
+              <div class="stat"><div class="n" id="ovNotes" style="font-size:19px">0</div><div class="l">Notes</div></div>
+              <div class="stat"><div class="n" id="ovMem" style="font-size:19px;color:var(--cyan)">0</div><div class="l">Memories</div></div>
+            </div>
+            <div class="notice">Always-listening streams audio continuously while armed — not only when you address Zero. The bar at the top of the screen is on whenever it is live.</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- SECURITY -->
+      <section class="view" id="view-security">
+        <div class="grid cols-2">
+          <div class="card">
+            <h2>Password Check</h2>
+            <p class="hint">Measures strength here on your machine, then checks whether it appears in public breach data.</p>
+            <div class="chat-input" style="margin-top:14px">
+              <input id="secPass" type="password" placeholder="Password to test" onkeydown="if(event.key==='Enter')Zero.checkPassword()" />
+              <button class="btn" onclick="Zero.checkPassword()">Check</button>
+            </div>
+            <div id="secResult" style="margin-top:14px"></div>
+            <div class="notice"><b>Your password is never sent.</b> It is hashed on this device and only the <b>first five characters of that hash</b> go out. The service replies with every suffix sharing that prefix and the match is made here — so it never learns which one you asked about. That is the only reason this check is acceptable to build.</div>
+          </div>
+          <div class="card">
+            <h2>Hardening Checklist</h2>
+            <p class="hint">For the sites and games you ship. Ordered by how often each one is what actually went wrong.</p>
+            <div id="secChecklist" style="margin-top:14px"></div>
+          </div>
+        </div>
+        <div class="card" style="margin-top:16px">
+          <h2>Scope</h2>
+          <p class="hint">Zero's security tooling is defensive: it hardens things you own and control. It contains no scanner, no exploit and no payload, and I won't add them — a tool built to break into other people's systems is a liability to whoever owns it first, and every serious security professional works inside written authorisation. If you're doing authorised testing, the real toolchain lives outside a browser tab anyway.</p>
         </div>
       </section>
 
@@ -320,6 +380,7 @@
   </div>
 
   <script src="js/vault.js"></script>
+  <script src="js/hud.js"></script>
   <script src="js/storage.js"></script>
   <script src="js/abilities.js"></script>
   <script src="js/app.js"></script>

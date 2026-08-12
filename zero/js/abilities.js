@@ -90,10 +90,67 @@ const Voice = (() => {
     return true;
   }
 
+  /* Always-on wake-word loop.
+
+     This is a real escalation and is named as such: continuous
+     recognition streams audio to the browser's speech service the whole
+     time it is armed, not just while you are talking to Zero. It exists
+     because it was asked for; it is off by default, announces itself,
+     and stops the moment anything asks it to. */
+  let awake = false, wakeRestart = null;
+
+  function startWake(word, onWake, onHeard, onState, onError) {
+    if (!canHear()) { onError?.('This browser has no speech recognition.'); return false; }
+    awake = true;
+    const spin = () => {
+      if (!awake) return;
+      const r = new SR();
+      recog = r;
+      r.continuous = true;
+      r.interimResults = true;
+      r.lang = navigator.language || 'en-US';
+      r.onstart = () => onState?.('armed');
+      r.onerror = e => {
+        if (e.error === 'not-allowed') { awake = false; onState?.('off'); onError?.('Microphone permission was refused.'); }
+      };
+      r.onend = () => {
+        // Browsers cut long sessions; re-arm unless we were told to stop.
+        if (awake) { clearTimeout(wakeRestart); wakeRestart = setTimeout(spin, 350); }
+        else onState?.('off');
+      };
+      r.onresult = ev => {
+        let text = '', final = false;
+        for (let i = ev.resultIndex; i < ev.results.length; i++) {
+          text += ev.results[i][0].transcript;
+          if (ev.results[i].isFinal) final = true;
+        }
+        text = text.trim();
+        if (!text) return;
+        onHeard?.(text);
+        const low = text.toLowerCase();
+        const at = low.lastIndexOf(word.toLowerCase());
+        if (at >= 0 && final) {
+          const after = text.slice(at + word.length).replace(/^[\s,.:;!?-]+/, '').trim();
+          if (after) onWake?.(after);
+        }
+      };
+      try { r.start(); } catch { /* a spin already in flight */ }
+    };
+    spin();
+    return true;
+  }
+
+  function stopWake() {
+    awake = false;
+    clearTimeout(wakeRestart);
+    try { recog?.stop(); } catch {}
+  }
+  const isAwake = () => awake;
+
   function stopListening() { try { recog?.stop(); } catch {} listening = false; }
   const isListening = () => listening;
 
-  return { canSpeak, canHear, speak, stop, listen, stopListening, isListening };
+  return { canSpeak, canHear, speak, stop, listen, stopListening, isListening, startWake, stopWake, isAwake };
 })();
 
 
@@ -444,4 +501,104 @@ const Chart = (() => {
   }
 
   return { draw, describe, sma, rsi, volatility };
+})();
+
+
+/* ------------------------------------------------------------
+   SECURITY — defensive tooling
+
+   Scope, stated plainly: this hardens things you own. Password
+   strength, breach exposure, and a review checklist for your own
+   sites. There is no scanner, no exploit and no payload here,
+   because a tool that attacks other people's systems is a
+   liability to its owner first.
+   ------------------------------------------------------------ */
+const Sec = (() => {
+
+  const COMMON = new Set(['password','123456','12345678','qwerty','abc123','letmein',
+    'monkey','dragon','111111','iloveyou','admin','welcome','login','princess',
+    'football','baseball','master','sunshine','shadow','superman','trustno1',
+    'passw0rd','zaq12wsx','qwerty123','000000','password1','1q2w3e4r']);
+
+  /* Entropy from the character space actually used, then penalties for
+     the patterns that make a long password weak anyway. */
+  function strength(pw) {
+    if (!pw) return null;
+    let space = 0;
+    if (/[a-z]/.test(pw)) space += 26;
+    if (/[A-Z]/.test(pw)) space += 26;
+    if (/\d/.test(pw)) space += 10;
+    if (/[^a-zA-Z0-9]/.test(pw)) space += 33;
+    let bits = pw.length * Math.log2(space || 1);
+
+    const notes = [];
+    const low = pw.toLowerCase();
+    if (COMMON.has(low)) { bits = Math.min(bits, 8); notes.push('This is on every attacker’s first-guess list.'); }
+    if (/^(.)\1+$/.test(pw)) { bits = Math.min(bits, 10); notes.push('One repeated character.'); }
+    if (/^\d+$/.test(pw)) { bits = Math.min(bits, pw.length * 3.3); notes.push('Digits only — a tiny search space.'); }
+    if (/(abc|bcd|cde|123|234|345|456|567|678|789|qwe|wer|ert|asd)/i.test(pw)) {
+      bits *= 0.75; notes.push('Contains a keyboard or alphabet run.');
+    }
+    if (/(19|20)\d\d/.test(pw)) { bits *= 0.85; notes.push('Contains something shaped like a year.'); }
+    if (pw.length < 12) notes.push('Under 12 characters — length beats complexity, every time.');
+
+    // Offline guessing at a deliberately pessimistic 100 billion tries/sec.
+    const seconds = Math.pow(2, bits - 1) / 1e11;
+    let verdict, tone;
+    if (bits < 40) { verdict = 'Weak'; tone = 'bad'; }
+    else if (bits < 60) { verdict = 'Fair'; tone = 'warn'; }
+    else if (bits < 80) { verdict = 'Strong'; tone = 'ok'; }
+    else { verdict = 'Very strong'; tone = 'ok'; }
+
+    return { bits: Math.round(bits), verdict, tone, notes, crackTime: humanTime(seconds) };
+  }
+
+  function humanTime(sec) {
+    if (sec < 1) return 'instantly';
+    const u = [['second',60],['minute',60],['hour',24],['day',365],['year',1e3],
+               ['thousand years',1e3],['million years',1e3],['billion years',1e9]];
+    let v = sec;
+    for (const [name, step] of u) {
+      if (v < step) return `about ${v < 10 ? v.toFixed(1) : Math.round(v)} ${name}${v >= 2 ? (name.endsWith('s') ? '' : 's') : ''}`;
+      v /= step;
+    }
+    return 'longer than the universe has existed';
+  }
+
+  /* Breach lookup by k-anonymity.
+
+     The password is hashed locally, and only the FIRST FIVE characters
+     of that hash are sent. The service returns every suffix under that
+     prefix and the match is found here. Your password, and the full
+     hash of it, never leave this machine — which is the only reason
+     this feature is acceptable at all. */
+  async function breachCount(pw, fetcher) {
+    const buf = await crypto.subtle.digest('SHA-1', new TextEncoder().encode(pw));
+    const hash = [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, '0')).join('').toUpperCase();
+    const prefix = hash.slice(0, 5), suffix = hash.slice(5);
+    const res = await fetcher('https://api.pwnedpasswords.com/range/' + prefix);
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const body = await res.text();
+    for (const line of body.split('\n')) {
+      const [suf, count] = line.trim().split(':');
+      if (suf === suffix) return parseInt(count, 10) || 0;
+    }
+    return 0;
+  }
+
+  /* Review checklist for a site you run. */
+  const CHECKLIST = [
+    ['Serve everything over HTTPS', 'Redirect http→https and set HSTS. Anything less means the page can be rewritten in transit.'],
+    ['Set a Content-Security-Policy', 'The single most effective defence against cross-site scripting. Start with default-src \'self\'.'],
+    ['Never build HTML from user input with innerHTML', 'Use textContent, or escape. Most site compromises start here.'],
+    ['Parameterise every database query', 'String-concatenated SQL is how databases get emptied.'],
+    ['Hash passwords with argon2id or bcrypt', 'Never SHA-256 alone, never unsalted, never reversible.'],
+    ['Set cookies HttpOnly, Secure, SameSite=Lax', 'Stops script theft and most cross-site request forgery.'],
+    ['Keep secrets out of the repository', 'Rotate anything ever committed — git history keeps it forever.'],
+    ['Rate-limit login and reset endpoints', 'Unlimited guesses makes every other password control decorative.'],
+    ['Patch dependencies on a schedule', 'Most real breaches use a known bug with a published fix.'],
+    ['Turn on 2FA everywhere you can', 'It defeats credential stuffing even when a password is already leaked.'],
+  ];
+
+  return { strength, breachCount, CHECKLIST };
 })();

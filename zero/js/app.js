@@ -18,6 +18,7 @@ const Zero = (() => {
     memories: 'zero.memories',
     apps: 'zero.apps',
     micOk: 'zero.micOk',
+    wakeOk: 'zero.wakeOk',
     speak: 'zero.speak',
   };
 
@@ -223,6 +224,8 @@ const Zero = (() => {
   const titles = {
     control:   ['Control Panel', 'You are in charge. Stop anything, anytime.'],
     markets:   ['Markets', 'Live readings — information, not advice.'],
+    overview:  ['Overview', 'Everything at a glance, live.'],
+    security:  ['Security', 'Harden what is yours.'],
     news:      ['News', 'What is happening right now.'],
     apps:      ['Apps', 'Your things, one keystroke away.'],
     memory:    ['Memory', 'What Zero carries between conversations.'],
@@ -242,6 +245,8 @@ const Zero = (() => {
     document.getElementById('viewSub').textContent = s;
     if (view === 'markets') { loadMarkets(); loadStocks(); loadRates(); }
     if (view === 'news') loadNews();
+    if (view === 'overview') renderOverview();
+    if (view === 'security') renderChecklist();
   }
 
   /* ---------------- Clock ---------------- */
@@ -304,6 +309,130 @@ const Zero = (() => {
      Everything user-facing goes through this wrapper, so a click while
      halted surfaces in the log rather than as an unhandled rejection. */
   function loadMarkets() { return fetchMarkets().catch(() => {}); }
+
+  /* ---------------- Security ---------------- */
+  async function checkPassword() {
+    const inp = document.getElementById('secPass');
+    const out = document.getElementById('secResult');
+    const pw = inp.value;
+    if (!pw) { out.innerHTML = '<p class="hint">Type a password above.</p>'; return; }
+
+    const st = Sec.strength(pw);
+    const tone = { bad: 'var(--red)', warn: '#ffb020', ok: 'var(--green)' }[st.tone];
+    out.innerHTML =
+      `<div class="sec-verdict" style="color:${tone}">${st.verdict}</div>` +
+      `<div class="sec-line"><b>${st.bits} bits</b> of entropy · offline guessing would take <b>${esc(st.crackTime)}</b></div>` +
+      (st.notes.length ? '<ul class="sec-notes">' + st.notes.map(n => `<li>${esc(n)}</li>`).join('') + '</ul>' : '') +
+      `<div class="sec-line" id="secBreach">Checking public breach corpus…</div>`;
+
+    const bl = document.getElementById('secBreach');
+    try {
+      const n = await Sec.breachCount(pw, url => guardedFetch(url, {}, 'network'));
+      bl.innerHTML = n > 0
+        ? `<span style="color:var(--red)"><b>Found in ${n.toLocaleString()} known breaches.</b></span> ` +
+          `Treat it as public and stop using it anywhere.`
+        : `<span style="color:var(--green)"><b>Not in the public breach corpus.</b></span> ` +
+          `That is not proof it is safe — only that it has not turned up yet.`;
+    } catch (e) {
+      bl.innerHTML = `<span class="nodata">Breach check unavailable (${esc(e.message)}).</span>`;
+    }
+  }
+
+  function renderChecklist() {
+    const el = document.getElementById('secChecklist');
+    if (!el) return;
+    el.innerHTML = Sec.CHECKLIST.map(([t, d]) =>
+      `<div class="sec-item"><b>${esc(t)}</b><span>${esc(d)}</span></div>`).join('');
+  }
+
+  /* ---------------- Wake word ---------------- */
+  function orbState(st) { if (typeof Orb !== 'undefined') Orb.set(st); }
+
+  function toggleWake() {
+    const btn = document.getElementById('wakeBtn');
+    const bar = document.getElementById('wakeBar');
+    if (Voice.isAwake()) {
+      Voice.stopWake();
+      btn.textContent = '◎ Wake word off';
+      btn.classList.remove('live');
+      bar?.classList.remove('on');
+      orbState('idle');
+      log('Always-listening turned OFF by user.');
+      return;
+    }
+    if (!Voice.canHear()) { bubble('This browser has no speech recognition. Chrome and Edge do.', 'zero'); return; }
+    if (Control.halted || !Control.caps.network) {
+      bubble('Always-listening needs the network, and Zero is blocking it right now.', 'zero');
+      return;
+    }
+    if (!store.raw(LS.wakeOk)) {
+      if (!confirm(
+        'Turn on always-listening?\n\n' +
+        'Zero will wait for the word "Zero" and act on whatever follows.\n\n' +
+        'READ THIS FIRST: your browser does speech recognition in the cloud. While this is ' +
+        'armed it streams audio from your microphone CONTINUOUSLY — not only when you are ' +
+        'talking to Zero, but whatever else is said near this machine.\n\n' +
+        'That is how browser dictation works and Zero cannot change it. The mic button ' +
+        '(press to talk) sends far less. Only turn this on if that trade is one you want.\n\n' +
+        'Arm always-listening?')) return;
+      store.rawSet(LS.wakeOk, '1');
+    }
+    log('ALWAYS-LISTENING ARMED — audio streams to the browser speech service until turned off.', true);
+    btn.textContent = '◉ Listening';
+    btn.classList.add('live');
+    bar?.classList.add('on');
+    orbState('listening');
+    Voice.startWake('zero',
+      cmd => {                                    // heard "zero <something>"
+        setText('wakeHeard', '“' + cmd + '”');
+        orbState('thinking');
+        document.getElementById('chatInput').value = cmd;
+        send();
+      },
+      partial => setText('wakeHeard', partial.slice(-70)),
+      st => { if (st === 'off') { btn.textContent = '◎ Wake word off'; btn.classList.remove('live'); bar?.classList.remove('on'); orbState('idle'); } },
+      err => bubble(err, 'zero')
+    );
+  }
+
+  /* ---------------- Live overview ---------------- */
+  async function renderOverview() {
+    const set = (id, v) => setText(id, v);
+    set('ovTasks', tasks.filter(t => !t.done).length);
+    set('ovNotes', notes.length);
+    set('ovMem', memories.length);
+    set('ovState', Control.halted ? 'HALTED' : 'RUNNING');
+    const el = document.getElementById('ovState');
+    if (el) el.style.color = Control.halted ? 'var(--red)' : 'var(--green)';
+
+    const box = document.getElementById('ovMarket');
+    if (box) {
+      try {
+        const r = await guardedFetch('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum,solana&vs_currencies=usd&include_24hr_change=true', {}, 'market');
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        const d = await r.json();
+        box.innerHTML = [['bitcoin','BTC'],['ethereum','ETH'],['solana','SOL']].map(([id, sym]) => {
+          const p = d[id]; if (!p) return '';
+          const c = p.usd_24h_change;
+          const known = typeof c === 'number' && isFinite(c);
+          return `<div class="ov-row"><span class="sym">${sym}</span><span>$${fmt(p.usd)}</span>` +
+                 (known ? `<span class="${c >= 0 ? 'up' : 'down'}">${c >= 0 ? '▲' : '▼'} ${Math.abs(c).toFixed(2)}%</span>`
+                        : `<span class="nodata">—</span>`) + `</div>`;
+        }).join('');
+      } catch (e) { box.innerHTML = `<div class="nodata" style="font-size:12px">no live feed</div>`; }
+    }
+
+    const nb = document.getElementById('ovNews');
+    if (nb && !nb.dataset.loaded) {
+      try {
+        const items = await loadNews();
+        if (items.length) {
+          nb.innerHTML = items.slice(0, 4).map(i => `<div class="ov-news">${esc(i.title)}</div>`).join('');
+          nb.dataset.loaded = '1';
+        } else nb.innerHTML = '<div class="nodata" style="font-size:12px">no feed</div>';
+      } catch { nb.innerHTML = '<div class="nodata" style="font-size:12px">no feed</div>'; }
+    }
+  }
 
   /* ---------------- Memory ---------------- */
   function renderMemories() {
@@ -632,7 +761,10 @@ const Zero = (() => {
   /* ---------------- Quick capture ---------------- */
   /* ---------------- Assistant ---------------- */
   function bubble(text, who) {
-    if (who === 'zero' && speakReplies && text && text !== '…') Voice.speak(text);
+    if (who === 'zero' && speakReplies && text && text !== '…') {
+      orbState('speaking');
+      Voice.speak(text, { onend: () => orbState(Voice.isAwake() ? 'listening' : 'idle') });
+    }
     const log = document.getElementById('chatLog');
     const d = document.createElement('div');
     d.className = 'msg ' + who;
@@ -696,6 +828,10 @@ const Zero = (() => {
         '  slug <text>         url-safe slug',
         '  uuid / password     generate one',
         '  hash <text>         SHA-256',
+        '  password            generate a strong one',
+        '',
+        'SECURITY',
+        '  Security tab        password strength, breach check, site checklist',
         '',
         'ORGANISING',
         '  task <text>         add a task        tasks   list them',
@@ -1180,6 +1316,9 @@ const Zero = (() => {
       .then(n => { if (n) log(`Moved ${n} record(s) into the larger local database.`); })
       .catch(e => log('Storage upgrade unavailable: ' + e.message, true));
     storageInfo();
+    if (typeof Orb !== 'undefined') { Orb.attach(document.getElementById('orb')); Orb.set('idle'); }
+    if (typeof Boot !== 'undefined') Boot.run(document.getElementById('boot'));
+    setInterval(() => { if (document.getElementById('view-overview')?.classList.contains('active')) renderOverview(); }, 30000);
     log('Zero started. All capabilities on. Press STOP anytime.');
     loadMarkets(); loadStocks(); startTimers();
     bubble("I'm Zero, running on your machine. Type `help` for what I do without any model at all, " +
@@ -1190,6 +1329,7 @@ const Zero = (() => {
     nav, loadMarkets, addTask, toggleTask, delTask, addNote, delNote,
     send, saveEngine, testEngine, saveStockKey, setThink, updateNow, loadStocks,
     loadRates, loadNews, setSpeak, micToggle, stopSpeaking: () => Voice.stop(),
+    toggleWake, renderOverview, checkPassword,
     addApp, removeApp, launchApp, forgetMemory, storageInfo,
     exportData, wipeData, init,
     toggleHalt, killNetwork, panic, setCap, clearLog,

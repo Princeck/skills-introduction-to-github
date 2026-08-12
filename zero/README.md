@@ -58,6 +58,9 @@ these switches — only a direct click from you.
 Zero opens straight into the assistant — there is no dashboard. Talking to it is
 the home screen; everything else is a side panel you visit when you need it.
 
+- **Overview** — a live command screen: reactive orb, markets, headlines, system state
+- **Wake word** — say “Zero, …” and it acts on what follows (read the warning below)
+- **Security** — password strength, breach exposure, and a hardening checklist for your own sites
 - **Memory** — say `remember …` and Zero carries it into every future conversation
 - **Apps** — launch your tools by name: `open figma`
 - **Voice** — Zero speaks replies aloud and takes dictation from the mic
@@ -126,6 +129,40 @@ tasks and notes: encrypted when the vault is on, gone from memory when it locks.
 
 Working context also grew — Zero now carries 24 recent messages into each turn
 rather than 8.
+
+---
+
+## Always-listening
+
+The Overview screen has a wake-word mode: say “Zero, …” and it acts on what
+follows. A reactive orb shows what it is doing — idle, hearing, thinking,
+speaking.
+
+**Understand the trade before arming it.** Browsers do speech recognition in the
+cloud. While the wake word is armed, audio from your microphone streams
+continuously to the browser's speech service — not only when you address Zero,
+but whatever else is said near the machine. Zero cannot change that; it is how
+browser dictation works.
+
+So it is off by default, it asks once in plain words, a red bar sits across the
+top of the screen the entire time it is live, and the Control Panel's network
+switch kills it like anything else. The press-to-talk mic button sends far less
+and is the better default.
+
+---
+
+## Security
+
+Zero's security tooling is **defensive**. It hardens what you own.
+
+- **Password strength** — entropy from the character space actually used, with penalties for the patterns that make a long password weak anyway, and an offline-guessing estimate at a pessimistic 100 billion tries/second.
+- **Breach exposure** — checks whether a password appears in public breach data. It is hashed on your device and **only the first five characters of that hash are sent**; the service returns every suffix sharing that prefix and the match happens locally. The service never learns which password you asked about.
+- **Hardening checklist** — the controls that matter for the sites and games you ship, ordered by how often each one is what actually went wrong.
+
+There is no scanner, no exploit and no payload, and I won't add them. A tool
+built to break into other people's systems is a liability to whoever owns it
+first, and legitimate security work happens inside written authorisation with a
+toolchain that does not live in a browser tab.
 
 ---
 
