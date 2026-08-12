@@ -44,6 +44,8 @@
         <li data-view="control"><span class="ic">⏻</span> Control Panel</li>
         <li data-view="markets"><span class="ic">▲</span> Markets</li>
         <li data-view="news"><span class="ic">◉</span> News</li>
+        <li data-view="apps"><span class="ic">◱</span> Apps</li>
+        <li data-view="memory"><span class="ic">❖</span> Memory</li>
         <li data-view="tasks"><span class="ic">✓</span> Tasks</li>
         <li data-view="notes"><span class="ic">✎</span> Notes</li>
         <li data-view="settings"><span class="ic">⚙</span> Settings</li>
@@ -167,6 +169,38 @@
         </div>
       </section>
 
+      <!-- APPS -->
+      <section class="view" id="view-apps">
+        <div class="card">
+          <h2>Your Apps</h2>
+          <p class="hint">Add anything the operating system can open — a website, or an app link like <code>vscode://</code>, <code>figma://</code>, <code>spotify:</code>. Then say <b>open figma</b> in chat and Zero launches it.</p>
+          <div id="appList" style="margin-top:16px"></div>
+          <div class="chat-input" style="margin-top:16px">
+            <input id="appName" placeholder="Name — e.g. Figma" style="max-width:220px" />
+            <input id="appUrl" placeholder="https://figma.com  or  vscode://" />
+            <button class="btn" onclick="Zero.addApp()">Add</button>
+          </div>
+          <div class="notice"><b>What this is and isn't.</b> A web page cannot reach inside other programs — that boundary is precisely why a browser is safe to open. What Zero can do is hand a link to your operating system and let it choose the app, which is how every deep link works. Launching: yes. Controlling: no, and anything claiming otherwise in a browser tab is misleading you.</div>
+        </div>
+      </section>
+
+      <!-- MEMORY -->
+      <section class="view" id="view-memory">
+        <div class="card">
+          <h2>Memory</h2>
+          <p class="hint">Facts Zero carries into every future conversation. Say <b>remember &lt;something&gt;</b> in chat to add one, <b>forget 2</b> to drop one.</p>
+          <div id="memoryList" style="margin-top:16px"></div>
+          <div class="notice">Memories are stored with your tasks and notes — encrypted when the vault is on, and dropped from memory the moment it locks.</div>
+        </div>
+
+        <div class="card" style="margin-top:16px">
+          <h2>Storage</h2>
+          <p class="hint">Zero keeps everything in a local database on this device — hundreds of megabytes rather than the ~5 MB a browser allows the simpler store.</p>
+          <div id="storageInfo" class="hint" style="margin-top:12px"></div>
+          <div style="margin-top:12px"><button class="btn ghost" onclick="Zero.storageInfo()">↻ Recheck</button></div>
+        </div>
+      </section>
+
       <!-- ASSISTANT -->
       <section class="view active" id="view-assistant">
         <div class="card">
@@ -286,6 +320,7 @@
   </div>
 
   <script src="js/vault.js"></script>
+  <script src="js/storage.js"></script>
   <script src="js/abilities.js"></script>
   <script src="js/app.js"></script>
 </body>

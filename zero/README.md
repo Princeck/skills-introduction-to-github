@@ -58,6 +58,8 @@ these switches — only a direct click from you.
 Zero opens straight into the assistant — there is no dashboard. Talking to it is
 the home screen; everything else is a side panel you visit when you need it.
 
+- **Memory** — say `remember …` and Zero carries it into every future conversation
+- **Apps** — launch your tools by name: `open figma`
 - **Voice** — Zero speaks replies aloud and takes dictation from the mic
 - **Built-in skills** — maths, unit and currency conversion, code scaffolds, hashes, slugs, passwords: all with no model
 - **Charts** — real price history drawn on canvas, with indicators computed from it
@@ -108,6 +110,35 @@ OLLAMA_ORIGINS=* ollama serve
 That environment variable matters. Serving Zero from a file means the runtime
 must be told to accept it; without it the browser blocks the request and a
 perfectly healthy engine looks dead.
+
+---
+
+## Memory and storage
+
+Zero keeps everything in IndexedDB on this device — typically hundreds of
+megabytes to gigabytes, against the ~5 MB a browser allows the simpler store it
+used before. Records written by the old version migrate automatically on first
+run, and the old copy is only deleted once the new one is confirmed written.
+
+`remember I trade XAUUSD on Fridays` stores a fact Zero brings into every later
+conversation. `memories` lists them, `forget 2` drops one. They live with your
+tasks and notes: encrypted when the vault is on, gone from memory when it locks.
+
+Working context also grew — Zero now carries 24 recent messages into each turn
+rather than 8.
+
+---
+
+## Apps
+
+Add a name and a link, then say `open figma`. Anything the operating system can
+open works: `https://…`, `vscode://`, `figma://`, `spotify:`.
+
+Being precise about what this is: **a web page cannot reach inside other
+programs.** That boundary is exactly why opening a browser is safe. What Zero
+can do is hand a link to your OS and let it pick the app — which is how every
+deep link works. Launching, yes. Controlling, no; anything claiming otherwise
+from a browser tab is misleading you.
 
 ---
 

@@ -309,6 +309,25 @@ details.think > div {
 .msg.sys { align-self: center; background: none; color: var(--dim); font-size: 12px; text-align: center; }
 .chat-input { display: flex; gap: 11px; margin-top: 14px; }
 
+/* ============ App launcher ============ */
+#appList { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 12px; }
+.app-tile {
+  position: relative; cursor: pointer;
+  background: rgba(120,165,255,.06); border: 1px solid var(--edge);
+  border-radius: 12px; padding: 14px 15px;
+  transition: border-color .18s, background .18s, transform .12s;
+}
+.app-tile:hover {
+  border-color: rgba(92,225,255,.5); background: rgba(92,225,255,.09);
+  transform: translateY(-2px);
+}
+.app-name { display: block; font-weight: 700; font-size: 14px; }
+.app-url {
+  display: block; margin-top: 4px; font-family: var(--mono);
+  font-size: 11px; color: var(--dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.app-tile .del { position: absolute; top: 8px; right: 9px; margin: 0; }
+
 /* ============ Charts ============ */
 .chart-msg { max-width: 92%; align-self: flex-start; }
 .chart-head {

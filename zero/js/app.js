@@ -15,6 +15,8 @@ const Zero = (() => {
     think: 'zero.think',
     stockKey: 'zero.stockKey',
     stockSymbols: 'zero.stockSymbols',
+    memories: 'zero.memories',
+    apps: 'zero.apps',
     micOk: 'zero.micOk',
     speak: 'zero.speak',
   };
@@ -32,6 +34,7 @@ const Zero = (() => {
       // these keys and writes ciphertext instead.
       if (Vault.isEnabled()) { persist(); return; }
       localStorage.setItem(k, JSON.stringify(v));
+      persistPlain();
     },
     raw(k) { return localStorage.getItem(k) || ''; },
     rawSet(k, v) { localStorage.setItem(k, v); },
@@ -41,6 +44,13 @@ const Zero = (() => {
   // empty until unlock() decrypts them, so a locked Zero holds nothing.
   let tasks = Vault.isEnabled() ? [] : store.get(LS.tasks, []);
   let notes = Vault.isEnabled() ? [] : store.get(LS.notes, []);
+  // Things Zero should still know next time you open it.
+  let memories = Vault.isEnabled() ? [] : store.get(LS.memories, []);
+  let apps = store.get(LS.apps, []);
+
+  // Keys that hold user content and must never survive as plaintext
+  // once the vault is on.
+  const PLAINTEXT_KEYS = ['zero.tasks', 'zero.notes', 'zero.memories'];
 
   /* Encrypt the in-memory model and write it. Fire-and-forget: callers
      stay synchronous, and a locked vault simply declines to write. */
@@ -48,11 +58,27 @@ const Zero = (() => {
     if (!Vault.isEnabled() || !Vault.isUnlocked()) return;
     if (!Control.caps.storage) return;
     try {
-      localStorage.setItem(LS.tasks, await Vault.encrypt(JSON.stringify(tasks)));
-      localStorage.setItem(LS.notes, await Vault.encrypt(JSON.stringify(notes)));
+      await Store.set(LS.tasks, await Vault.encrypt(JSON.stringify(tasks)));
+      await Store.set(LS.notes, await Vault.encrypt(JSON.stringify(notes)));
+      await Store.set(LS.memories, await Vault.encrypt(JSON.stringify(memories)));
+      // Anything written before the vault existed is still readable where it
+      // was left. Encrypting the new copy is only half the job; the old
+      // plaintext has to go, or "encrypted" is a claim the disk contradicts.
+      PLAINTEXT_KEYS.forEach(k => localStorage.removeItem(k));
     } catch (e) {
       log('Could not save: ' + e.message, true);
     }
+  }
+
+  /* Vault off: still use IndexedDB, just without encryption. */
+  async function persistPlain() {
+    if (Vault.isEnabled() || !Control.caps.storage) return;
+    try {
+      await Store.set(LS.tasks, JSON.stringify(tasks));
+      await Store.set(LS.notes, JSON.stringify(notes));
+      await Store.set(LS.memories, JSON.stringify(memories));
+      await Store.set(LS.apps, JSON.stringify(apps));
+    } catch (e) { log('Could not save: ' + e.message, true); }
   }
 
   /* ============================================================
@@ -198,6 +224,8 @@ const Zero = (() => {
     control:   ['Control Panel', 'You are in charge. Stop anything, anytime.'],
     markets:   ['Markets', 'Live readings — information, not advice.'],
     news:      ['News', 'What is happening right now.'],
+    apps:      ['Apps', 'Your things, one keystroke away.'],
+    memory:    ['Memory', 'What Zero carries between conversations.'],
     assistant: ['Assistant', 'Ask Zero anything. Nothing leaves this device.'],
     tasks:     ['Tasks', 'What needs doing.'],
     notes:     ['Notes', 'Your second brain.'],
@@ -276,6 +304,56 @@ const Zero = (() => {
      Everything user-facing goes through this wrapper, so a click while
      halted surfaces in the log rather than as an unhandled rejection. */
   function loadMarkets() { return fetchMarkets().catch(() => {}); }
+
+  /* ---------------- Memory ---------------- */
+  function renderMemories() {
+    const list = document.getElementById('memoryList');
+    if (!list) return;
+    list.innerHTML = memories.length
+      ? memories.map((m, i) => `<div class="task">
+          <span>${esc(m.text)}</span>
+          <button class="del" onclick="Zero.forgetMemory(${i})" title="Forget">×</button>
+        </div>`).join('')
+      : '<p class="hint">Nothing yet. Say <b>remember I trade gold on Fridays</b> in chat, and Zero carries it into every future conversation.</p>';
+  }
+  function forgetMemory(i) {
+    memories.splice(i, 1);
+    store.set(LS.memories, memories);
+    renderMemories();
+  }
+
+  /* ---------------- App launcher ----------------
+     A browser page cannot reach into other programs — that boundary is
+     the whole reason a web page is safe to open. What it CAN do is hand
+     the operating system a link and let it decide, which is how
+     vscode://, spotify:, figma:// and every https:// app open. */
+  function renderApps() {
+    const list = document.getElementById('appList');
+    if (!list) return;
+    list.innerHTML = apps.length
+      ? apps.map((a, i) => `<div class="app-tile" onclick="Zero.launchApp(${i})" title="${esc(a.url)}">
+          <span class="app-name">${esc(a.name)}</span>
+          <span class="app-url">${esc(a.url.replace(/^https?:\/\//, '').slice(0, 34))}</span>
+          <button class="del" onclick="event.stopPropagation();Zero.removeApp(${i})">×</button>
+        </div>`).join('')
+      : '<p class="hint">No apps yet. Add one below, then say <b>open figma</b> in chat.</p>';
+  }
+  function addApp() {
+    const n = document.getElementById('appName'), u = document.getElementById('appUrl');
+    const name = n.value.trim(), url = u.value.trim();
+    if (!name || !url) return alert('Both a name and a link are needed.');
+    apps.push({ name, url });
+    store.set(LS.apps, apps); persistPlain();
+    n.value = ''; u.value = '';
+    renderApps();
+  }
+  function removeApp(i) { apps.splice(i, 1); store.set(LS.apps, apps); persistPlain(); renderApps(); }
+  function launchApp(i) {
+    const a = apps[i];
+    if (!a) return;
+    log('Opening ' + a.name + ' (' + a.url + ') — handed to the operating system.');
+    window.open(a.url, '_blank', 'noopener,noreferrer');
+  }
 
   /* ---------------- Charts & analysis ---------------- */
   const CHART_IDS = { btc:'bitcoin', eth:'ethereum', sol:'solana', bnb:'binancecoin',
@@ -583,7 +661,7 @@ const Zero = (() => {
       renderReply(thinking, reply, true);
       if (speakReplies) Voice.speak(splitThinking(reply).answer || reply);
       chatHistory.push({ role: 'user', content: q }, { role: 'assistant', content: reply });
-      if (chatHistory.length > 16) chatHistory = chatHistory.slice(-16);
+      if (chatHistory.length > 40) chatHistory = chatHistory.slice(-40);
     } catch (e) {
       thinking.textContent = '⚠ ' + e.message;
     }
@@ -653,6 +731,31 @@ const Zero = (() => {
     }
 
     if (low === 'news') { loadNews(true); return 'Pulling the latest stories…'; }
+
+    if (low.startsWith('remember ')) {
+      const text = s.slice(9).trim();
+      if (!text) return 'Remember what?';
+      memories.push({ text, ts: Date.now() });
+      store.set(LS.memories, memories); renderMemories();
+      return '✓ Noted. I will bring that to future conversations.';
+    }
+    if (low === 'memories' || low === 'memory') {
+      return memories.length
+        ? 'I am carrying:\n' + memories.map((m, i) => `${i + 1}. ${m.text}`).join('\n')
+        : 'I am not carrying anything yet. Say "remember <something>".';
+    }
+    if (low.startsWith('forget ')) {
+      const n = parseInt(low.slice(7), 10);
+      if (!n || n < 1 || n > memories.length) return `Say "forget 1" through "forget ${memories.length}". "memories" lists them.`;
+      const [gone] = memories.splice(n - 1, 1);
+      store.set(LS.memories, memories); renderMemories();
+      return '✓ Forgotten: ' + gone.text;
+    }
+    if (low.startsWith('open ') && apps.length) {
+      const want = low.slice(5).trim();
+      const hit = apps.find(a => a.name.toLowerCase().includes(want));
+      if (hit) { launchApp(apps.indexOf(hit)); return 'Opening ' + hit.name + '…'; }
+    }
 
     // chart / analyse:  "chart btc",  "chart eth 90",  "analyse sol"
     const ch = low.match(/^(?:chart|analyse|analyze|open)\s+([a-z0-9-]+)(?:\s+(\d{1,3}))?$/);
@@ -791,8 +894,12 @@ const Zero = (() => {
   async function callEngine(q, onToken) {
     const { url, mode, think } = engineCfg();
     const model = await resolveModel();
-    const system = CORE_PROMPT + (think ? THINK_PROMPT : '');
-    const messages = [{ role: 'system', content: system }, ...chatHistory.slice(-8), { role: 'user', content: q }];
+    let system = CORE_PROMPT + (think ? THINK_PROMPT : '');
+    if (memories.length) {
+      system += '\n\nThings the user has told you to remember:\n' +
+        memories.map(m => '- ' + m.text).join('\n');
+    }
+    const messages = [{ role: 'system', content: system }, ...chatHistory.slice(-24), { role: 'user', content: q }];
 
     const [endpoint, body, pluck] = mode === 'compatible'
       ? [url + '/v1/chat/completions', { model, stream: true, messages }, d => d.choices?.[0]?.delta?.content]
@@ -898,6 +1005,18 @@ const Zero = (() => {
     refreshAiStatus();
     testEngine();
   }
+  async function storageInfo() {
+    const el = document.getElementById('storageInfo');
+    if (!el) return;
+    const q = await Store.quota();
+    const persisted = await Store.persistRequest();
+    el.innerHTML = q
+      ? `Using <b>${Store.fmtBytes(q.usage)}</b> of roughly <b>${Store.fmtBytes(q.quota)}</b> available ` +
+        `(${q.pct < 0.1 ? '<0.1' : q.pct.toFixed(1)}%).<br>` +
+        `Eviction protection: <b>${persisted === true ? 'on' : persisted === false ? 'not granted' : 'unavailable'}</b>.`
+      : 'This browser will not report a storage estimate.';
+  }
+
   function setSpeak(on) { store.rawSet(LS.speak, on ? '1' : ''); toggleSpeak(on); }
 
   function setThink(on) {
@@ -948,6 +1067,9 @@ const Zero = (() => {
     try {
       await Vault.enable(a);
       await persist();                       // write the current data back, encrypted
+      // persist() clears localStorage; confirm before telling the user it worked.
+      const leaked = PLAINTEXT_KEYS.filter(k => localStorage.getItem(k) !== null);
+      if (leaked.length) throw new Error('Could not remove the unencrypted copy of: ' + leaked.join(', '));
       document.getElementById('vaultPass').value = '';
       document.getElementById('vaultPass2').value = '';
       log('Vault enabled — stored data is now encrypted.');
@@ -972,23 +1094,24 @@ const Zero = (() => {
 
     el.value = '';
     try {
-      const t = localStorage.getItem(LS.tasks), n = localStorage.getItem(LS.notes);
+      const t = await Store.get(LS.tasks), n = await Store.get(LS.notes), m = await Store.get(LS.memories);
       tasks = t ? JSON.parse(await Vault.decrypt(t)) : [];
       notes = n ? JSON.parse(await Vault.decrypt(n)) : [];
+      memories = m ? JSON.parse(await Vault.decrypt(m)) : [];
     } catch (e) {
       err.textContent = 'Unlocked, but stored data could not be read: ' + e.message;
-      tasks = []; notes = [];
+      tasks = []; notes = []; memories = [];
     }
-    renderTasks(); renderNotes(); updateStatus();
+    renderTasks(); renderNotes(); renderMemories(); updateStatus();
     log('Vault unlocked.');
     vaultUi();
   }
 
   function lockVault() {
     Vault.lock();
-    tasks = []; notes = [];               // drop plaintext from memory too
+    tasks = []; notes = []; memories = [];   // drop plaintext from memory too
     chatHistory = [];
-    renderTasks(); renderNotes(); updateStatus();
+    renderTasks(); renderNotes(); renderMemories(); updateStatus();
     log('Vault locked.');
     vaultUi();
   }
@@ -997,14 +1120,13 @@ const Zero = (() => {
     if (!Vault.isUnlocked()) return alert('Unlock the vault first.');
     if (!confirm('Turn encryption OFF?\n\nTasks and notes will be written back as readable text on this device.')) return;
     Vault.disable();
-    localStorage.setItem(LS.tasks, JSON.stringify(tasks));
-    localStorage.setItem(LS.notes, JSON.stringify(notes));
+    await persistPlain();
     log('Vault disabled — data is stored unencrypted.', true);
     vaultUi();
   }
 
   function exportData() {
-    const blob = new Blob([JSON.stringify({ tasks, notes }, null, 2)], { type: 'application/json' });
+    const blob = new Blob([JSON.stringify({ tasks, notes, memories, apps }, null, 2)], { type: 'application/json' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
     a.download = 'zero-data.json';
@@ -1052,7 +1174,12 @@ const Zero = (() => {
     });
 
     tick(); setInterval(tick, 1000);
-    renderTasks(); renderNotes(); refreshAiStatus(); updateStatus();
+    renderTasks(); renderNotes(); renderMemories(); renderApps(); refreshAiStatus(); updateStatus();
+    // Move any records left behind by the localStorage era.
+    Store.migrate([LS.tasks, LS.notes, LS.memories, LS.apps])
+      .then(n => { if (n) log(`Moved ${n} record(s) into the larger local database.`); })
+      .catch(e => log('Storage upgrade unavailable: ' + e.message, true));
+    storageInfo();
     log('Zero started. All capabilities on. Press STOP anytime.');
     loadMarkets(); loadStocks(); startTimers();
     bubble("I'm Zero, running on your machine. Type `help` for what I do without any model at all, " +
@@ -1063,6 +1190,7 @@ const Zero = (() => {
     nav, loadMarkets, addTask, toggleTask, delTask, addNote, delNote,
     send, saveEngine, testEngine, saveStockKey, setThink, updateNow, loadStocks,
     loadRates, loadNews, setSpeak, micToggle, stopSpeaking: () => Voice.stop(),
+    addApp, removeApp, launchApp, forgetMemory, storageInfo,
     exportData, wipeData, init,
     toggleHalt, killNetwork, panic, setCap, clearLog,
     enableVault, unlockVault, lockVault, disableVault,
