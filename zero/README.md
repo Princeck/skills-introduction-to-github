@@ -58,6 +58,10 @@ these switches — only a direct click from you.
 Zero opens straight into the assistant — there is no dashboard. Talking to it is
 the home screen; everything else is a side panel you visit when you need it.
 
+- **Voice** — Zero speaks replies aloud and takes dictation from the mic
+- **Built-in skills** — maths, unit and currency conversion, code scaffolds, hashes, slugs, passwords: all with no model
+- **Charts** — real price history drawn on canvas, with indicators computed from it
+- **News** — live top stories, no key
 - **Markets** — live crypto prices (BTC, ETH, SOL, BNB, XRP, DOGE), auto-refresh every 60s
 - **Assistant** — built-in commands (`help`, `task …`, `note …`, `price btc`, `tasks`, `time`) that need no model at all, plus open conversation through a local engine
 - **Tasks / Notes** — saved locally, export to JSON anytime
@@ -161,6 +165,29 @@ Where a feed returns no value, Zero prints **—**. It will not render a missing
 24h change as `0.00%`, and it will not print `$0.00` for a symbol the feed
 doesn't recognise — both are numbers nobody reported. When a fetch fails the
 table empties rather than leaving stale prices on screen looking current.
+
+---
+
+## Charts and market analysis
+
+`chart btc 90` pulls real price history and draws it, then prints indicators
+computed from that history: change, range, position in range, moving averages,
+RSI(14) and annualised volatility.
+
+Every one of those is arithmetic over prices that have **already happened**.
+They describe the past. Zero deliberately exposes no function that returns "up"
+or "down", because no honest one exists — if a 99%-accurate market predictor
+were possible, it would not be a feature in a personal assistant.
+
+What actually separates traders who survive from those who don't is position
+sizing and risk limits, which is why the chart footer says so every time.
+
+---
+
+## Voice
+
+- **Speaking** uses the browser's own speech engine and prefers an on-device voice. Nothing is transmitted.
+- **Listening** is not equivalent: browser dictation uploads your audio to the browser vendor's speech service to transcribe it. Zero treats the mic as a network capability — off by default, warned on first use, and cut by the network switch like anything else.
 
 ---
 

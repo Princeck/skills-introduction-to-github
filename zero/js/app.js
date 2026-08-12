@@ -15,6 +15,8 @@ const Zero = (() => {
     think: 'zero.think',
     stockKey: 'zero.stockKey',
     stockSymbols: 'zero.stockSymbols',
+    micOk: 'zero.micOk',
+    speak: 'zero.speak',
   };
 
   // Short rolling context so the assistant remembers the current thread.
@@ -195,6 +197,7 @@ const Zero = (() => {
   const titles = {
     control:   ['Control Panel', 'You are in charge. Stop anything, anytime.'],
     markets:   ['Markets', 'Live readings — information, not advice.'],
+    news:      ['News', 'What is happening right now.'],
     assistant: ['Assistant', 'Ask Zero anything. Nothing leaves this device.'],
     tasks:     ['Tasks', 'What needs doing.'],
     notes:     ['Notes', 'Your second brain.'],
@@ -209,7 +212,8 @@ const Zero = (() => {
     const [t, s] = titles[view] || ['', ''];
     document.getElementById('viewTitle').textContent = t;
     document.getElementById('viewSub').textContent = s;
-    if (view === 'markets') { loadMarkets(); loadStocks(); }
+    if (view === 'markets') { loadMarkets(); loadStocks(); loadRates(); }
+    if (view === 'news') loadNews();
   }
 
   /* ---------------- Clock ---------------- */
@@ -272,6 +276,186 @@ const Zero = (() => {
      Everything user-facing goes through this wrapper, so a click while
      halted surfaces in the log rather than as an unhandled rejection. */
   function loadMarkets() { return fetchMarkets().catch(() => {}); }
+
+  /* ---------------- Charts & analysis ---------------- */
+  const CHART_IDS = { btc:'bitcoin', eth:'ethereum', sol:'solana', bnb:'binancecoin',
+    xrp:'ripple', doge:'dogecoin', ada:'cardano', link:'chainlink', avax:'avalanche-2',
+    dot:'polkadot', matic:'matic-network', ltc:'litecoin' };
+
+  async function showChart(symRaw, days = 30) {
+    const sym = symRaw.toLowerCase().replace(/[^a-z0-9-]/g, '');
+    const id = CHART_IDS[sym] || sym;
+    bubble(`Pulling ${days} days of ${sym.toUpperCase()} history…`, 'zero');
+    try {
+      const r = await guardedFetch(
+        `https://api.coingecko.com/api/v3/coins/${encodeURIComponent(id)}/market_chart?vs_currency=usd&days=${days}`,
+        {}, 'market');
+      if (r.status === 404) throw new Error(`I have no history for "${symRaw}". Zero charts crypto; for stocks and metals it would need a data feed that publishes them.`);
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      const d = await r.json();
+      const values = (d.prices || []).map(pt => pt[1]).filter(v => typeof v === 'number');
+      if (values.length < 5) throw new Error('the feed returned too little history to chart');
+
+      const holder = document.createElement('div');
+      holder.className = 'msg zero chart-msg';
+      const head = document.createElement('div');
+      head.className = 'chart-head';
+      head.textContent = `${sym.toUpperCase()} / USD · ${days}d · ${values.length} points`;
+      const cv = document.createElement('canvas');
+      cv.className = 'chart-canvas';
+      holder.append(head, cv);
+      document.getElementById('chatLog').appendChild(holder);
+      Chart.draw(cv, values, { ma: Math.min(7, Math.floor(values.length / 3)) });
+
+      const a = Chart.describe(values);
+      const body = document.createElement('div');
+      body.className = 'chart-read';
+      const f = n => n >= 1000 ? n.toLocaleString(undefined,{maximumFractionDigits:0}) : n.toPrecision(5);
+      body.textContent = [
+        `Last            $${f(a.last)}`,
+        `${days}d change      ${a.change >= 0 ? '+' : ''}${a.change.toFixed(2)}%`,
+        `${days}d range       $${f(a.lo)} – $${f(a.hi)}`,
+        `Position in range   ${a.pos.toFixed(0)}% (0 = low, 100 = high)`,
+        a.ma7  != null ? `7-period average    $${f(a.ma7)}` : '',
+        a.ma30 != null ? `30-period average   $${f(a.ma30)}` : '',
+        a.rsi  != null ? `RSI(14)             ${a.rsi.toFixed(1)}` : '',
+        a.vol  != null ? `Volatility (ann.)   ${a.vol.toFixed(1)}%` : '',
+      ].filter(Boolean).join('\n');
+      holder.appendChild(body);
+
+      const note = document.createElement('div');
+      note.className = 'chart-note';
+      note.textContent =
+        'Every figure above is arithmetic over prices that already happened. ' +
+        'None of it forecasts the next move, and Zero will not pretend otherwise — ' +
+        'nothing predicts markets reliably. Position sizing and risk limits are what you actually control.';
+      holder.appendChild(note);
+      document.getElementById('chatLog').scrollTop = 1e9;
+      if (speakReplies) Voice.speak(
+        `${sym.toUpperCase()} is at ${f(a.last)}, ${a.change >= 0 ? 'up' : 'down'} ${Math.abs(a.change).toFixed(1)} percent over ${days} days.`);
+    } catch (e) {
+      bubble('Could not chart that: ' + e.message, 'zero');
+    }
+  }
+
+  /* ---------------- Currency (live ECB rates, keyless) ---------------- */
+  const CURRENCIES = new Set(('USD EUR GBP JPY CHF CAD AUD NZD CNY HKD SGD SEK NOK DKK PLN ' +
+    'CZK HUF RON BGN TRY ILS INR KRW MXN BRL ZAR THB MYR PHP IDR ISK').split(' '));
+
+  async function convertMoney(n, from, to) {
+    try {
+      const r = await guardedFetch(
+        `https://api.frankfurter.app/latest?amount=${n}&from=${from}&to=${to}`, {}, 'market');
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      const d = await r.json();
+      const v = d.rates?.[to];
+      if (typeof v !== 'number') throw new Error('no rate published for that pair');
+      bubble(`${n} ${from} = ${v.toLocaleString(undefined, { maximumFractionDigits: 4 })} ${to}` +
+             `  (ECB, ${d.date})`, 'zero');
+    } catch (e) {
+      bubble('Could not get that rate: ' + e.message, 'zero');
+    }
+  }
+
+  async function loadRates() {
+    const box = document.getElementById('fxTable');
+    if (!box) return;
+    const base = 'USD', against = ['EUR', 'GBP', 'JPY', 'CHF', 'CAD', 'AUD'];
+    try {
+      const r = await guardedFetch(
+        `https://api.frankfurter.app/latest?from=${base}&to=${against.join(',')}`, {}, 'market');
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      const d = await r.json();
+      box.innerHTML = against.map(c => {
+        const v = d.rates?.[c];
+        return `<div class="mkt-row"><div class="sym">${base}/${c}</div>` +
+               (typeof v === 'number'
+                 ? `<div>${v.toFixed(4)}</div>` : `<div class="nodata">&mdash;</div>`) +
+               `<div class="nodata">${esc(d.date || '')}</div></div>`;
+      }).join('');
+    } catch (e) {
+      box.innerHTML = `<div class="spinner">No live rates (${esc(e.message)}).</div>`;
+    }
+  }
+
+  /* ---------------- News (live, keyless) ---------------- */
+  async function loadNews(alsoSay) {
+    const box = document.getElementById('newsList');
+    if (box) box.innerHTML = '<div class="spinner">Loading stories</div>';
+    try {
+      const r = await guardedFetch('https://hacker-news.firebaseio.com/v0/topstories.json', {}, 'market');
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      const ids = (await r.json()).slice(0, 12);
+      const items = [];
+      for (const id of ids) {
+        try {
+          const ir = await guardedFetch(`https://hacker-news.firebaseio.com/v0/item/${id}.json`, {}, 'market');
+          const it = await ir.json();
+          if (it?.title) items.push(it);
+        } catch { /* one dud story shouldn't sink the feed */ }
+      }
+      if (!items.length) throw new Error('no stories returned');
+      if (box) {
+        box.innerHTML = items.map(it => {
+          const host = it.url ? (() => { try { return new URL(it.url).hostname.replace(/^www\./, ''); } catch { return ''; } })() : '';
+          const when = it.time ? new Date(it.time * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+          return `<div class="news-item">
+            <a href="${esc(it.url || 'https://news.ycombinator.com/item?id=' + it.id)}" target="_blank" rel="noopener noreferrer">${esc(it.title)}</a>
+            <div class="news-meta">${esc(host)}${host && when ? ' · ' : ''}${esc(when)} · ${it.score ?? 0} points</div>
+          </div>`;
+        }).join('');
+      }
+      setText('newsUpdated', 'Live · updated ' + new Date().toLocaleTimeString());
+      if (alsoSay) {
+        const top = items.slice(0, 5).map((it, i) => `${i + 1}. ${it.title}`).join('\n');
+        bubble('Top stories right now:\n\n' + top, 'zero');
+      }
+      return items;
+    } catch (e) {
+      if (box) box.innerHTML = `<div class="spinner">No live news (${esc(e.message)}).</div>`;
+      if (alsoSay) bubble('Could not reach the news feed: ' + e.message, 'zero');
+      return [];
+    }
+  }
+
+  /* ---------------- Voice ---------------- */
+  let speakReplies = false;
+
+  function toggleSpeak(on) {
+    speakReplies = on;
+    if (!on) Voice.stop();
+    log('Spoken replies turned ' + (on ? 'ON' : 'OFF') + ' by user.');
+  }
+
+  function micToggle() {
+    if (Voice.isListening()) { Voice.stopListening(); return; }
+    if (!Voice.canHear()) {
+      bubble('This browser has no speech recognition. Chrome and Edge do; Firefox does not.', 'zero');
+      return;
+    }
+    // Dictation is not local, so it is gated like any other network use.
+    if (Control.halted || !Control.caps.network) {
+      bubble('Dictation needs the network, and Zero is currently blocking it. Typing still works.', 'zero');
+      return;
+    }
+    if (!store.raw(LS.micOk)) {
+      if (!confirm(
+        'Turn on the microphone?\n\n' +
+        "Speaking is done on your device. LISTENING IS NOT: your browser uploads the audio " +
+        "to its speech service to transcribe it — for Chrome that means Google.\n\n" +
+        'Zero cannot change that; it is how browser dictation works. Type instead if you would rather nothing left this machine.\n\n' +
+        'Enable dictation?')) return;
+      store.rawSet(LS.micOk, '1');
+    }
+    const btn = document.getElementById('micBtn');
+    const inp = document.getElementById('chatInput');
+    log('Microphone opened by user — audio goes to the browser speech service.', true);
+    Voice.listen(
+      (text, final) => { inp.value = text; if (final && text) send(); },
+      on => { btn?.classList.toggle('live', on); if (btn) btn.textContent = on ? '● listening' : '🎤'; },
+      err => { bubble(err, 'zero'); btn?.classList.remove('live'); if (btn) btn.textContent = '🎤'; }
+    );
+  }
 
   /* ---------------- Stocks (real quotes, or nothing) ---------------- */
   async function loadStocks() {
@@ -370,6 +554,7 @@ const Zero = (() => {
   /* ---------------- Quick capture ---------------- */
   /* ---------------- Assistant ---------------- */
   function bubble(text, who) {
+    if (who === 'zero' && speakReplies && text && text !== '…') Voice.speak(text);
     const log = document.getElementById('chatLog');
     const d = document.createElement('div');
     d.className = 'msg ' + who;
@@ -388,6 +573,7 @@ const Zero = (() => {
 
     // Try built-in offline commands first — always works, no key, no network.
     const handled = offlineCommand(q);
+    if (handled === HANDLED) return;                 // already answered itself
     if (handled !== null) { bubble(handled, 'zero'); return; }
 
     // Otherwise hand it to the local engine, streaming the reply in.
@@ -395,6 +581,7 @@ const Zero = (() => {
     try {
       const reply = await callEngine(q, partial => renderReply(thinking, partial, false));
       renderReply(thinking, reply, true);
+      if (speakReplies) Voice.speak(splitThinking(reply).answer || reply);
       chatHistory.push({ role: 'user', content: q }, { role: 'assistant', content: reply });
       if (chatHistory.length > 16) chatHistory = chatHistory.slice(-16);
     } catch (e) {
@@ -402,24 +589,85 @@ const Zero = (() => {
     }
   }
 
+  // Returned when a command handled itself and has nothing to say back —
+  // distinct from null, which means "not mine, try the engine".
+  const HANDLED = Symbol('handled');
+
   function offlineCommand(q) {
     const s = q.trim();
     const low = s.toLowerCase();
     if (low === 'help') {
       return [
-        'Zero offline commands:',
-        '• help            — this list',
-        '• task <text>     — add a task',
-        '• note <text>     — save a note',
-        '• tasks           — list open tasks',
-        '• price btc|eth|sol — live crypto price',
-        '• time            — current time',
-        '• update          — pull fresh market data and re-check Core',
+        'Zero works with no AI model at all. Try:',
         '',
-        'Point Core at your local engine in Settings for open conversation.'
+        'MATH & UNITS',
+        '  = 12*(3+4)^2        arithmetic, sqrt/sin/log, pi, e',
+        '  20 km to miles      length, mass, data, time, temperature',
+        '  100 usd to eur      live exchange rates',
+        '',
+        'MARKETS & NEWS',
+        '  price btc           live crypto price',
+        '  chart btc 90        price chart + indicators',
+        '  news                top stories right now',
+        '  update              refresh everything',
+        '',
+        'BUILDING',
+        '  scaffold page       starter HTML page',
+        '  scaffold game       canvas game loop, fixed timestep',
+        '  scaffold fetch      fetch with timeout + cleanup',
+        '  slug <text>         url-safe slug',
+        '  uuid / password     generate one',
+        '  hash <text>         SHA-256',
+        '',
+        'ORGANISING',
+        '  task <text>         add a task        tasks   list them',
+        '  note <text>         save a note       time    date & time',
+        '',
+        'Say it out loud with the mic button — Zero can talk back.',
       ].join('\n');
     }
     if (low === 'time') return new Date().toLocaleString();
+
+    // --- arithmetic: "= expr" or a bare expression ---
+    if (s.startsWith('=') || /^[-+(]?[\d.]+[\d\s+\-*/%^().a-z]*$/i.test(s) && /[+\-*/%^]/.test(s)) {
+      try { return Skills.calc(s.replace(/^=/, '')).toLocaleString(undefined, { maximumFractionDigits: 10 }); }
+      catch (err) { if (s.startsWith('=')) return "I couldn't work that out: " + err.message; }
+    }
+
+    // --- unit and currency conversion: "20 km to miles" ---
+    const conv = s.match(/^([-+]?[\d.]+)\s*([a-z°]+)\s*(?:to|in|as)\s*([a-z°]+)$/i);
+    if (conv) {
+      const [, rawN, from, to] = conv;
+      const n = parseFloat(rawN);
+      const f = from.toLowerCase().replace('°', ''), t = to.toLowerCase().replace('°', '');
+      if (CURRENCIES.has(f.toUpperCase()) && CURRENCIES.has(t.toUpperCase())) {
+        convertMoney(n, f.toUpperCase(), t.toUpperCase());
+        return `Fetching the live ${f.toUpperCase()}→${t.toUpperCase()} rate…`;
+      }
+      try {
+        const r = Skills.convert(n, f, t);
+        const out = Math.abs(r.value) >= 1000 || Math.abs(r.value) < 0.001
+          ? r.value.toPrecision(6) : r.value.toFixed(4).replace(/\.?0+$/, '');
+        return `${rawN} ${from} = ${out} ${to}`;
+      } catch (err) { return err.message; }
+    }
+
+    if (low === 'news') { loadNews(true); return 'Pulling the latest stories…'; }
+
+    // chart / analyse:  "chart btc",  "chart eth 90",  "analyse sol"
+    const ch = low.match(/^(?:chart|analyse|analyze|open)\s+([a-z0-9-]+)(?:\s+(\d{1,3}))?$/);
+    if (ch) { showChart(ch[1], Math.min(parseInt(ch[2] || '30', 10), 365)); return HANDLED; }
+
+    if (low.startsWith('scaffold')) {
+      const which = low.split(/\s+/)[1];
+      const code = Skills.SCAFFOLDS[which];
+      if (!code) return 'I have scaffolds for: ' + Object.keys(Skills.SCAFFOLDS).join(', ') + '.';
+      return code;
+    }
+    if (low.startsWith('slug ')) return Skills.slug(s.slice(5));
+    if (low === 'uuid') return Skills.uuid();
+    if (low === 'password') return Skills.password();
+    if (low.startsWith('hash ')) { Skills.sha256(s.slice(5)).then(h => bubble(h, 'zero')); return 'Hashing…'; }
     if (low === 'update' || low === 'refresh' || low === 'sync') {
       updateNow(true);
       return 'Updating — pulling fresh market data and re-checking Core…';
@@ -630,6 +878,8 @@ const Zero = (() => {
     try { await fetchMarkets(); results.push('market data refreshed'); }
     catch (e) { results.push('market refresh failed (' + e.message + ')'); }
     try { await loadStocks(); } catch { /* reported in its own panel */ }
+    try { await loadRates(); } catch { /* reported in its own panel */ }
+    try { const n = await loadNews(); if (n.length) results.push(n.length + ' stories'); } catch { /* reported in its own panel */ }
     try {
       const names = await listModels();
       results.push(`Core online, ${names.length} model(s)`);
@@ -648,6 +898,8 @@ const Zero = (() => {
     refreshAiStatus();
     testEngine();
   }
+  function setSpeak(on) { store.rawSet(LS.speak, on ? '1' : ''); toggleSpeak(on); }
+
   function setThink(on) {
     store.rawSet(LS.think, on ? '1' : '');
     log('Reasoning mode turned ' + (on ? 'ON' : 'OFF') + ' by user.');
@@ -699,7 +951,11 @@ const Zero = (() => {
       document.getElementById('vaultPass').value = '';
       document.getElementById('vaultPass2').value = '';
       log('Vault enabled — stored data is now encrypted.');
-      const thinkEl = document.getElementById('thinkToggle');
+      const speakEl = document.getElementById('speakToggle');
+    if (speakEl) { speakEl.checked = store.raw(LS.speak) === '1'; speakReplies = speakEl.checked; }
+    if (!Voice.canSpeak()) document.getElementById('speakOpt')?.style.setProperty('display', 'none');
+    if (!Voice.canHear()) document.getElementById('micBtn')?.style.setProperty('display', 'none');
+    const thinkEl = document.getElementById('thinkToggle');
     if (thinkEl) thinkEl.checked = engineCfg().think;
     vaultUi();
       alert('Vault on. Your data is encrypted on this device.');
@@ -806,6 +1062,7 @@ const Zero = (() => {
   return {
     nav, loadMarkets, addTask, toggleTask, delTask, addNote, delNote,
     send, saveEngine, testEngine, saveStockKey, setThink, updateNow, loadStocks,
+    loadRates, loadNews, setSpeak, micToggle, stopSpeaking: () => Voice.stop(),
     exportData, wipeData, init,
     toggleHalt, killNetwork, panic, setCap, clearLog,
     enableVault, unlockVault, lockVault, disableVault,
