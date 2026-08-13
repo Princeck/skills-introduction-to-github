@@ -310,6 +310,76 @@ const Zero = (() => {
      halted surfaces in the log rather than as an unhandled rejection. */
   function loadMarkets() { return fetchMarkets().catch(() => {}); }
 
+  /* ---------------- Knowledge ----------------
+     Zero cannot contain the world's knowledge — that takes a trained
+     model of many gigabytes. What it can do is look things up, live,
+     from open sources that need no key and belong to no AI company.
+     Wikipedia first, then DuckDuckGo's instant answers. */
+  async function lookUp(query, quiet) {
+    const q = query.trim();
+    if (!q) return false;
+    try {
+      const sr = await guardedFetch(
+        'https://en.wikipedia.org/w/api.php?action=query&list=search&format=json&origin=*' +
+        '&srlimit=1&srsearch=' + encodeURIComponent(q), {}, 'network');
+      if (sr.ok) {
+        const sd = await sr.json();
+        const hit = sd.query?.search?.[0];
+        if (hit) {
+          const pr = await guardedFetch(
+            'https://en.wikipedia.org/api/rest_v1/page/summary/' +
+            encodeURIComponent(hit.title.replace(/ /g, '_')), {}, 'network');
+          if (pr.ok) {
+            const pd = await pr.json();
+            const text = pd.extract;
+            if (text) {
+              const holder = document.createElement('div');
+              holder.className = 'msg zero';
+              const body = document.createElement('div');
+              body.textContent = text;
+              const src = document.createElement('div');
+              src.className = 'src-line';
+              const a = document.createElement('a');
+              a.href = pd.content_urls?.desktop?.page || 'https://en.wikipedia.org/wiki/' + encodeURIComponent(hit.title);
+              a.target = '_blank'; a.rel = 'noopener noreferrer';
+              a.textContent = 'Wikipedia · ' + pd.title;
+              src.appendChild(a);
+              holder.append(body, src);
+              document.getElementById('chatLog').appendChild(holder);
+              document.getElementById('chatLog').scrollTop = 1e9;
+              if (speakReplies) Voice.speak(text);
+              return true;
+            }
+          }
+        }
+      }
+    } catch (e) {
+      if (/halted|switched off/i.test(e.message)) { bubble(e.message, 'zero'); return true; }
+    }
+
+    // Second source: instant answers cover definitions and calculations
+    // that do not have an encyclopaedia article.
+    try {
+      const r = await guardedFetch(
+        'https://api.duckduckgo.com/?format=json&no_html=1&skip_disambig=1&q=' + encodeURIComponent(q),
+        {}, 'network');
+      if (r.ok) {
+        const d = await r.json();
+        const text = d.AbstractText || d.Answer || d.Definition;
+        if (text) {
+          bubble(text + (d.AbstractSource ? '\n\n— ' + d.AbstractSource : ''), 'zero');
+          return true;
+        }
+      }
+    } catch { /* fall through to the honest answer */ }
+
+    if (!quiet) {
+      bubble(`I could not find anything solid on "${q}". I would rather say that than make something up.\n\n` +
+             `I can still do: maths, conversions, live rates, charts, news, tasks, notes and passwords — type help.`, 'zero');
+    }
+    return false;
+  }
+
   /* ---------------- Security ---------------- */
   async function checkPassword() {
     const inp = document.getElementById('secPass');
@@ -782,21 +852,79 @@ const Zero = (() => {
     bubble(q, 'user');
 
     // Try built-in offline commands first — always works, no key, no network.
+    // 1. Exact commands.
     const handled = offlineCommand(q);
     if (handled === HANDLED) return;                 // already answered itself
     if (handled !== null) { bubble(handled, 'zero'); return; }
 
-    // Otherwise hand it to the local engine, streaming the reply in.
-    const thinking = bubble('…', 'zero');
-    try {
-      const reply = await callEngine(q, partial => renderReply(thinking, partial, false));
-      renderReply(thinking, reply, true);
-      if (speakReplies) Voice.speak(splitThinking(reply).answer || reply);
-      chatHistory.push({ role: 'user', content: q }, { role: 'assistant', content: reply });
-      if (chatHistory.length > 40) chatHistory = chatHistory.slice(-40);
-    } catch (e) {
-      thinking.textContent = '⚠ ' + e.message;
+    // 2. Ordinary conversation — instant, no model, no network.
+    const chat = Converse.reply(q, {
+      tasks: tasks.filter(t => !t.done).length,
+      memories: memories.length,
+      hasEngine: !!store.raw(LS.engineModel),
+      name: userName(),
+    });
+    if (chat) { bubble(chat, 'zero'); return; }
+
+    if (/\bmy name is\s+(.+)$/i.test(q)) {
+      const n = q.match(/\bmy name is\s+(.+)$/i)[1].replace(/[.!]$/, '').trim();
+      memories.push({ text: 'The user is called ' + n, ts: Date.now() });
+      store.set(LS.memories, memories); renderMemories();
+      bubble(`Good to meet you, ${n}. I will remember that.`, 'zero');
+      return;
     }
+
+    // 3. A configured engine gets first refusal on open questions.
+    if (store.raw(LS.engineUrl) || store.raw(LS.engineModel)) {
+      const thinking = bubble('…', 'zero');
+      try {
+        const reply = await callEngine(q, partial => renderReply(thinking, partial, false));
+        renderReply(thinking, reply, true);
+        if (speakReplies) Voice.speak(splitThinking(reply).answer || reply);
+        chatHistory.push({ role: 'user', content: q }, { role: 'assistant', content: reply });
+        if (chatHistory.length > 40) chatHistory = chatHistory.slice(-40);
+        return;
+      } catch (e) {
+        // An unreachable engine is not a reason to give the user nothing.
+        thinking.remove();
+        log('Core unavailable, answering from live sources instead: ' + e.message);
+      }
+    }
+
+    // 4. A near-miss on a command is almost always a typo, not a research
+    //    question — catch it before spending a network round trip on it.
+    const looksLikeQuestion = /^(what|who|where|when|why|how|which|is|are|can|does|do|tell|explain|define)\b/i.test(q) || q.includes('?');
+    if (!looksLikeQuestion) {
+      const near = Converse.suggest(q, COMMAND_WORDS);
+      if (near && near !== q.split(/\s+/)[0].toLowerCase()) {
+        bubble(`Did you mean \`${near}\`? ` +
+               `Say \`${[near, ...q.split(/\s+/).slice(1)].join(' ')}\` and I will run it.`, 'zero');
+        return;
+      }
+    }
+
+    // 5. Look it up rather than complain.
+    orbState('thinking');
+    const found = await lookUp(stripQuestion(q), true);
+    orbState(Voice.isAwake() ? 'listening' : 'idle');
+    if (found) return;
+
+    // 6. Nothing matched anywhere. Say so plainly.
+    bubble(`I could not find an answer for that on my own. Type \`help\` to see everything I do without a model, ` +
+           `or connect one in Settings for open-ended conversation.`, 'zero');
+  }
+
+  const COMMAND_WORDS = ['help','task','tasks','note','price','chart','news','update','time',
+    'remember','memories','forget','open','scaffold','slug','uuid','password','hash'];
+
+  const stripQuestion = q => q.replace(
+    /^(what|who|where|when|why|how)\s+(is|are|was|were|does|do|did)\s+/i, '')
+    .replace(/^(tell me about|explain|define|search for|look up|google)\s+/i, '')
+    .replace(/\?+$/, '').trim();
+
+  function userName() {
+    const m = memories.find(x => /^The user is called /.test(x.text));
+    return m ? m.text.replace('The user is called ', '') : '';
   }
 
   // Returned when a command handled itself and has nothing to say back —
@@ -1321,8 +1449,10 @@ const Zero = (() => {
     setInterval(() => { if (document.getElementById('view-overview')?.classList.contains('active')) renderOverview(); }, 30000);
     log('Zero started. All capabilities on. Press STOP anytime.');
     loadMarkets(); loadStocks(); startTimers();
-    bubble("I'm Zero, running on your machine. Type `help` for what I do without any model at all, " +
-           "or point me at a local engine in Settings to talk properly. Nothing you type here leaves this device.", 'zero');
+    bubble(Converse.reply('hello', {
+      tasks: tasks.filter(t => !t.done).length, memories: memories.length,
+      hasEngine: !!store.raw(LS.engineModel), name: userName(),
+    }) + "\n\nAsk me anything — I look things up live. Type `help` for the full list.", 'zero');
   }
 
   return {

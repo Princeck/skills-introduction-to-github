@@ -602,3 +602,133 @@ const Sec = (() => {
 
   return { strength, breachCount, CHECKLIST };
 })();
+
+
+/* ------------------------------------------------------------
+   CONVERSE — talking, with no model involved
+
+   A person opening Zero types "hello" before they type anything
+   else. Falling through to a connection error at that moment
+   makes the whole thing feel broken, so the ordinary human
+   openings are answered here, instantly and offline.
+   ------------------------------------------------------------ */
+const Converse = (() => {
+
+  const pick = a => a[Math.floor(Math.random() * a.length)];
+
+  function partOfDay(d = new Date()) {
+    const h = d.getHours();
+    return h < 5 ? 'night' : h < 12 ? 'morning' : h < 18 ? 'afternoon' : h < 22 ? 'evening' : 'night';
+  }
+
+  function greeting(ctx) {
+    const part = partOfDay();
+    const hi = pick(['Hey', 'Hello', 'Hi']);
+    const who = ctx.name ? `, ${ctx.name}` : '';
+    const open = part === 'night'
+      ? `${hi}${who}. Late one.`
+      : `Good ${part}${who}.`;
+    const open_ = ctx.tasks > 0
+      ? ` You have ${ctx.tasks} open task${ctx.tasks === 1 ? '' : 's'}.`
+      : '';
+    return open + open_ + ' ' + pick([
+      'What are we doing?',
+      'What do you need?',
+      'Where do you want to start?',
+    ]);
+  }
+
+  /* Each rule: [test, responder]. First match wins. */
+  const RULES = [
+    [/^(hi|hey|hello|yo|hiya|sup|howdy|heya)\b/i, ctx => greeting(ctx)],
+    [/^good\s*(morning|afternoon|evening|day)\b/i, ctx => greeting(ctx)],
+    [/^good\s*(night|nite)\b/i, () => pick(['Night. I will be here.', 'Goodnight — everything is saved.'])],
+
+    [/\b(how are you|how'?s it going|how you doing|you (ok|good|alright))\b/i, ctx =>
+      `Running fine. ${ctx.hasEngine ? 'Core is connected' : 'No model connected, so I am on built-in skills'}, ` +
+      `${ctx.memories} memor${ctx.memories === 1 ? 'y' : 'ies'} carried, ${ctx.tasks} open task${ctx.tasks === 1 ? '' : 's'}. You?`],
+
+    [/\b(who are you|what are you|your name|introduce yourself)\b/i, () =>
+      "I am Zero. I run entirely on this machine — no account, no company behind me, nothing sent anywhere you " +
+      "did not point me at. I handle maths, conversions, markets, charts, news, tasks, notes, passwords and " +
+      "lookups on my own. Connect a local model in Settings and I can hold an open conversation too."],
+
+    [/\b(what can you do|what do you do|your (features|abilities|skills)|capabilities|how do (i|you) (use|work))\b/i, () =>
+      "Ask me things like:\n" +
+      "  what is quantum tunnelling      look it up\n" +
+      "  = 12*(3+4)^2                    maths\n" +
+      "  20 km to miles                  conversions\n" +
+      "  100 usd to eur                  live rates\n" +
+      "  chart btc 90                    price chart + indicators\n" +
+      "  news                            what is happening\n" +
+      "  remember I ship on Fridays      I keep it forever\n" +
+      "  task fix the checkout bug       add a task\n" +
+      "  scaffold game                   starter code\n" +
+      "  open figma                      launch an app\n" +
+      "Type help for the full list."],
+
+    [/^(thanks|thank you|ty|cheers|nice one|appreciate it|thx)\b/i, () =>
+      pick(['Any time.', 'Sure thing.', 'No problem.'])],
+
+    [/^(bye|goodbye|see ya|see you|later|cya)\b/i, () =>
+      pick(['See you.', 'Later. Everything is saved.'])],
+
+    [/^(ok|okay|cool|nice|great|awesome|sweet|got it|k)\b\.?$/i, () =>
+      pick(['👍', 'Right.', 'What next?'])],
+
+    [/^(yes|yeah|yep|no|nope|nah)\b\.?$/i, () =>
+      'What would you like me to do?'],
+
+    [/\b(are you (an? )?(ai|robot|human|real|conscious|alive))\b/i, () =>
+      "I am a program running in your browser — no more, no less. When a model is connected I pass your words " +
+      "to it; otherwise everything I say comes from code you can read. I would rather you know that than " +
+      "wonder."],
+
+    [/\b(i love you|marry me|you'?re (amazing|the best|great))\b/i, () =>
+      "Appreciated. Let us get something built."],
+
+    [/\b(you'?re (useless|stupid|rubbish|trash|dumb)|you suck|hate you)\b/i, () =>
+      "Fair enough — tell me what failed and I will look at it. If something is genuinely broken, that is worth fixing."],
+
+    [/\b(what time|the time)\b/i, () => new Date().toLocaleTimeString()],
+    [/\b(what|which) (day|date)\b/i, () => new Date().toLocaleDateString(undefined,
+      { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })],
+
+    [/\b(are you (there|awake|listening)|you there)\b/i, () => "Here. Go ahead."],
+  ];
+
+  function reply(text, ctx) {
+    const t = text.trim();
+    if (!t) return null;
+    for (const [re, fn] of RULES) if (re.test(t)) return fn(ctx);
+    return null;
+  }
+
+  /* Nearest known command, for "did you mean". */
+  function suggest(text, commands) {
+    const first = text.trim().toLowerCase().split(/\s+/)[0];
+    if (!first) return null;
+    let best = null, bestD = Infinity;
+    for (const c of commands) {
+      const d = distance(first, c);
+      if (d < bestD) { bestD = d; best = c; }
+    }
+    // Only offer it when it is genuinely close, or a suggestion becomes noise.
+    return bestD <= Math.max(1, Math.floor(first.length / 3)) ? best : null;
+  }
+
+  function distance(a, b) {
+    const m = a.length, n = b.length;
+    let prev = Array.from({ length: n + 1 }, (_, j) => j);
+    for (let i = 1; i <= m; i++) {
+      const cur = [i];
+      for (let j = 1; j <= n; j++) {
+        cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+      }
+      prev = cur;
+    }
+    return prev[n];
+  }
+
+  return { reply, suggest, partOfDay };
+})();

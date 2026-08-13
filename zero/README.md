@@ -58,6 +58,8 @@ these switches — only a direct click from you.
 Zero opens straight into the assistant — there is no dashboard. Talking to it is
 the home screen; everything else is a side panel you visit when you need it.
 
+- **Just talk to it** — greetings, questions and small talk are answered instantly, with no model and no network
+- **Live lookup** — ask "what is X" and Zero fetches a real answer from open sources, no key and no AI company
 - **Overview** — a live command screen: reactive orb, markets, headlines, system state
 - **Wake word** — say “Zero, …” and it acts on what follows (read the warning below)
 - **Security** — password strength, breach exposure, and a hardening checklist for your own sites
@@ -71,6 +73,32 @@ the home screen; everything else is a side panel you visit when you need it.
 - **Assistant** — built-in commands (`help`, `task …`, `note …`, `price btc`, `tasks`, `time`) that need no model at all, plus open conversation through a local engine
 - **Tasks / Notes** — saved locally, export to JSON anytime
 - **Settings** — local engine, vault passphrase, data export, full wipe
+
+---
+
+## Knowledge
+
+Zero does not contain the world's knowledge; that takes a trained model of many
+gigabytes, and no honest 130 KB file claims otherwise. What it does instead is
+**look things up live**:
+
+```
+what is quantum tunnelling
+who was Ada Lovelace
+define entropy
+```
+
+Answers come from Wikipedia first, then DuckDuckGo's instant answers — both open,
+both keyless, neither owned by an AI company — and every answer is shown with its
+source link so you can check it. When nothing solid turns up, Zero says so rather
+than inventing something.
+
+Ordinary conversation needs neither: greetings, "how are you", "who are you",
+"what can you do", thanks and goodbyes are answered from code, instantly, offline.
+Tell Zero `my name is …` and it remembers.
+
+If your input is a near-miss for a command, Zero offers the correction rather than
+guessing — `chrt btc` gets you *"Did you mean `chart`?"*.
 
 ---
 
