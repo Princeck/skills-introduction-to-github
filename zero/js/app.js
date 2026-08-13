@@ -226,6 +226,7 @@ const Zero = (() => {
     markets:   ['Markets', 'Live readings — information, not advice.'],
     overview:  ['Overview', 'Everything at a glance, live.'],
     security:  ['Security', 'Harden what is yours.'],
+    files:     ['Files', 'Your disk, connected on your terms.'],
     news:      ['News', 'What is happening right now.'],
     apps:      ['Apps', 'Your things, one keystroke away.'],
     memory:    ['Memory', 'What Zero carries between conversations.'],
@@ -246,7 +247,8 @@ const Zero = (() => {
     if (view === 'markets') { loadMarkets(); loadStocks(); loadRates(); }
     if (view === 'news') loadNews();
     if (view === 'overview') renderOverview();
-    if (view === 'security') renderChecklist();
+    if (view === 'security') { renderChecklist(); showPayloads(); }
+    if (view === 'files') { filesUi(); listFolder(); }
   }
 
   /* ---------------- Clock ---------------- */
@@ -408,12 +410,130 @@ const Zero = (() => {
     }
   }
 
+  async function cryptoTool() {
+    const inp = document.getElementById('cryptoIn').value;
+    const key = document.getElementById('cryptoKey').value;
+    const op = document.getElementById('cryptoOp').value;
+    const out = document.getElementById('cryptoOut');
+    if (!inp) { out.textContent = ''; return; }
+    try {
+      let r;
+      switch (op) {
+        case 'sha256': r = await Sec.digest('SHA-256', inp); break;
+        case 'sha512': r = await Sec.digest('SHA-512', inp); break;
+        case 'sha1':   r = await Sec.digest('SHA-1', inp); break;
+        case 'hmac':   r = key ? await Sec.hmac(inp, key) : 'Enter a key for HMAC.'; break;
+        case 'b64enc': r = Sec.b64.enc(inp); break;
+        case 'b64dec': r = Sec.b64.dec(inp); break;
+        case 'jwt':    r = JSON.stringify(Sec.jwtDecode(inp), null, 2); break;
+        case 'idhash': r = Sec.idHash(inp); break;
+        case 'entropy': {
+          const h = Sec.shannon(inp);
+          r = `${h.toFixed(3)} bits/char · ${(h * inp.length).toFixed(1)} bits total over ${inp.length} chars`;
+          break;
+        }
+      }
+      out.textContent = r;
+    } catch (e) { out.textContent = '⚠ ' + e.message; }
+  }
+
+  function showPayloads() {
+    const kind = document.getElementById('payloadKind').value;
+    const out = document.getElementById('payloadOut');
+    const list = Sec.PAYLOADS[kind] || [];
+    out.innerHTML = list.map(pl =>
+      `<div class="payload-row"><code>${esc(pl)}</code>` +
+      `<button class="btn ghost" onclick="Zero.copyText(this.previousElementSibling.textContent, this)">copy</button></div>`).join('');
+  }
+  function copyText(text, btn) {
+    navigator.clipboard?.writeText(text).then(() => {
+      const old = btn.textContent; btn.textContent = '✓'; setTimeout(() => btn.textContent = old, 1200);
+    });
+  }
+
+  async function reconDomain() {
+    const name = document.getElementById('reconIn').value.trim();
+    const out = document.getElementById('reconOut');
+    if (!name) return;
+    out.innerHTML = '<div class="spinner">Querying DNS</div>';
+    try {
+      const { records } = await Recon.dns(name, (u, o) => guardedFetch(u, o, 'network'));
+      const keys = Object.keys(records);
+      if (!keys.length) { out.innerHTML = '<p class="hint">No records returned. Check the domain name.</p>'; return; }
+      const notes = Recon.notes(records);
+      out.innerHTML = keys.map(t =>
+        `<div class="recon-row"><b>${t}</b><div>${records[t].map(v => esc(v)).join('<br>')}</div></div>`).join('') +
+        (notes.length ? '<div class="notice">' + notes.map(esc).join('<br>') + '</div>' : '');
+    } catch (e) { out.innerHTML = `<p class="hint">DNS lookup failed: ${esc(e.message)}</p>`; }
+  }
+
   function renderChecklist() {
     const el = document.getElementById('secChecklist');
     if (!el) return;
     el.innerHTML = Sec.CHECKLIST.map(([t, d]) =>
       `<div class="sec-item"><b>${esc(t)}</b><span>${esc(d)}</span></div>`).join('');
   }
+
+  /* ---------------- Files ---------------- */
+  let openHandle = null;
+
+  function filesUi() {
+    const el = document.getElementById('fsSupport');
+    if (el) el.textContent = Files.supported()
+      ? 'This browser can read and write real files on your disk.'
+      : 'This browser can open and download files, but not write back in place. Chrome, Edge, Brave or Arc can.';
+    const fn = Files.folderName();
+    setText('folderName', fn ? 'Connected: ' + fn : 'No folder connected.');
+    const fl = document.getElementById('folderList');
+    if (fl && !fn) fl.innerHTML = '';
+  }
+
+  async function openAFile() {
+    try {
+      const f = await Files.openFile();
+      openHandle = f.handle;
+      document.getElementById('fileEditor').value = f.text;
+      setText('fileName', f.name + ' · ' + Files.fmtSize(f.size));
+      document.getElementById('fileSaveBack').style.display = openHandle ? '' : 'none';
+      log('Opened ' + f.name + ' from disk (' + Files.fmtSize(f.size) + ').');
+    } catch (e) { if (e.name !== 'AbortError') bubble('Could not open the file: ' + e.message, 'zero'); }
+  }
+  async function saveBack() {
+    if (!openHandle) return;
+    try { await Files.writeFile(openHandle, document.getElementById('fileEditor').value); log('Saved changes back to disk.'); alert('Saved.'); }
+    catch (e) { alert('Could not save: ' + e.message); }
+  }
+  async function saveNew() {
+    try { const n = await Files.saveAs('zero-note.txt', document.getElementById('fileEditor').value); log('Wrote ' + n + ' to disk.'); }
+    catch (e) { if (e.name !== 'AbortError') alert('Could not save: ' + e.message); }
+  }
+  async function connectFolder() {
+    try { const n = await Files.connectFolder(); log('Connected folder "' + n + '" — Zero can read and write inside it.'); filesUi(); listFolder(); }
+    catch (e) { if (e.name !== 'AbortError') bubble('Could not connect a folder: ' + e.message, 'zero'); }
+  }
+  async function listFolder() {
+    const el = document.getElementById('folderList');
+    if (!el || !Files.folderName()) return;
+    try {
+      const items = await Files.list();
+      el.innerHTML = items.length
+        ? items.map(it => it.kind === 'directory'
+            ? `<div class="fs-item"><span>📁 ${esc(it.name)}</span></div>`
+            : `<div class="fs-item" onclick="Zero.openFromFolder('${esc(it.name).replace(/'/g, "\\'")}')">
+                 <span>📄 ${esc(it.name)}</span><span class="fs-size">${Files.fmtSize(it.size)}</span></div>`).join('')
+        : '<p class="hint">Folder is empty.</p>';
+    } catch (e) { el.innerHTML = `<p class="hint">${esc(e.message)}</p>`; }
+  }
+  async function openFromFolder(name) {
+    try {
+      const f = await Files.readFrom(name);
+      openHandle = f.handle;
+      document.getElementById('fileEditor').value = f.text;
+      setText('fileName', f.name + ' · ' + Files.fmtSize(f.size));
+      document.getElementById('fileSaveBack').style.display = '';
+    } catch (e) { bubble('Could not read ' + name + ': ' + e.message, 'zero'); }
+  }
+  function disconnectFolder() { Files.disconnectFolder(); filesUi(); }
 
   /* ---------------- Wake word ---------------- */
   function orbState(st) { if (typeof Orb !== 'undefined') Orb.set(st); }
@@ -1459,7 +1579,8 @@ const Zero = (() => {
     nav, loadMarkets, addTask, toggleTask, delTask, addNote, delNote,
     send, saveEngine, testEngine, saveStockKey, setThink, updateNow, loadStocks,
     loadRates, loadNews, setSpeak, micToggle, stopSpeaking: () => Voice.stop(),
-    toggleWake, renderOverview, checkPassword,
+    toggleWake, renderOverview, checkPassword, cryptoTool, showPayloads, copyText, reconDomain,
+    openAFile, saveBack, saveNew, connectFolder, listFolder, openFromFolder, disconnectFolder,
     addApp, removeApp, launchApp, forgetMemory, storageInfo,
     exportData, wipeData, init,
     toggleHalt, killNetwork, panic, setCap, clearLog,

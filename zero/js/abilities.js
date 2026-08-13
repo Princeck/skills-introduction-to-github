@@ -600,8 +600,135 @@ const Sec = (() => {
     ['Turn on 2FA everywhere you can', 'It defeats credential stuffing even when a password is already leaked.'],
   ];
 
-  return { strength, breachCount, CHECKLIST };
+  /* ---- Crypto & encoding toolkit (all local) ---- */
+  const te = new TextEncoder();
+  const hex = buf => [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, '0')).join('');
+
+  async function digest(algo, text) { return hex(await crypto.subtle.digest(algo, te.encode(text))); }
+
+  async function hmac(text, key) {
+    const k = await crypto.subtle.importKey('raw', te.encode(key), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+    return hex(await crypto.subtle.sign('HMAC', k, te.encode(text)));
+  }
+
+  const b64 = {
+    enc: t => btoa(unescape(encodeURIComponent(t))),
+    dec: t => decodeURIComponent(escape(atob(t.replace(/-/g, '+').replace(/_/g, '/')))),
+  };
+
+  /* Decode a JWT without verifying it — useful for reading what a token
+     claims. Verifying the signature needs the server's secret, which is
+     the whole point of a signature and not something a client should hold. */
+  function jwtDecode(token) {
+    const parts = token.trim().split('.');
+    if (parts.length !== 3) throw new Error('A JWT has three dot-separated parts.');
+    const head = JSON.parse(b64.dec(parts[0]));
+    const body = JSON.parse(b64.dec(parts[1]));
+    const out = { header: head, payload: body };
+    if (body.exp) out.expires = new Date(body.exp * 1000).toLocaleString() +
+      (body.exp * 1000 < Date.now() ? ' (EXPIRED)' : '');
+    return out;
+  }
+
+  /* Guess what a hash is from its shape. */
+  function idHash(h) {
+    h = h.trim();
+    const byLen = { 32: 'MD5 or NTLM', 40: 'SHA-1', 56: 'SHA-224', 64: 'SHA-256', 96: 'SHA-384', 128: 'SHA-512' };
+    if (/^[a-f0-9]+$/i.test(h) && byLen[h.length]) return byLen[h.length];
+    if (/^\$2[aby]\$/.test(h)) return 'bcrypt';
+    if (/^\$argon2/.test(h)) return 'argon2';
+    if (/^\$6\$/.test(h)) return 'sha512crypt';
+    if (/^[A-Za-z0-9+/]+={0,2}$/.test(h) && h.length % 4 === 0) return 'possibly base64-encoded';
+    return 'unrecognised';
+  }
+
+  /* Shannon entropy — how random a string is, in bits per character.
+     A secret should be high; a "random" token that scores low isn't. */
+  function shannon(str) {
+    if (!str) return 0;
+    const freq = {};
+    for (const c of str) freq[c] = (freq[c] || 0) + 1;
+    let h = 0;
+    for (const c in freq) { const pr = freq[c] / str.length; h -= pr * Math.log2(pr); }
+    return h;
+  }
+
+  /* ---- Test payloads, for probing YOUR OWN input handling ----
+     These are the exact strings attackers try. You paste them into your
+     own forms to confirm they are escaped, parameterised and rejected —
+     the standard way to verify a fix actually holds. */
+  const PAYLOADS = {
+    xss: [
+      `<script>alert(1)</scr` + `ipt>`,
+      `"><img src=x onerror=alert(1)>`,
+      `javascript:alert(document.domain)`,
+      `<svg/onload=alert(1)>`,
+      `'"><body onload=alert(1)>`,
+    ],
+    sqli: [
+      `' OR '1'='1`,
+      `'; DROP TABLE users;--`,
+      `" OR 1=1--`,
+      `admin'--`,
+      `1' UNION SELECT null,version()--`,
+    ],
+    traversal: [
+      `../../../../etc/passwd`,
+      `..\\..\\..\\windows\\win.ini`,
+      `%2e%2e%2f%2e%2e%2fetc%2fpasswd`,
+    ],
+    cmdi: [
+      `; ls -la`,
+      `| whoami`,
+      `$(id)`,
+      '`id`',
+    ],
+  };
+
+  return { strength, breachCount, CHECKLIST, digest, hmac, b64, jwtDecode, idHash, shannon, PAYLOADS };
 })();
+
+
+/* ------------------------------------------------------------
+   RECON — for domains you control
+
+   DNS lookups over DNS-over-HTTPS (Cloudflare's JSON endpoint).
+   This reads public records that anyone can query; it is how you
+   map your own attack surface before an audit. It does not touch
+   the target host directly and carries no exploit.
+   ------------------------------------------------------------ */
+const Recon = (() => {
+  const TYPES = ['A', 'AAAA', 'MX', 'NS', 'TXT', 'CNAME', 'SOA', 'CAA'];
+
+  async function dns(name, fetcher) {
+    const clean = name.trim().replace(/^https?:\/\//, '').replace(/\/.*$/, '');
+    const out = {};
+    for (const type of TYPES) {
+      try {
+        const r = await fetcher(`https://cloudflare-dns.com/dns-query?name=${encodeURIComponent(clean)}&type=${type}`,
+          { headers: { accept: 'application/dns-json' } });
+        if (!r.ok) continue;
+        const d = await r.json();
+        if (d.Answer?.length) out[type] = d.Answer.map(a => a.data);
+      } catch { /* one record type failing should not sink the rest */ }
+    }
+    return { name: clean, records: out };
+  }
+
+  /* Notable findings a checklist would flag. */
+  function notes(records) {
+    const n = [];
+    const txt = (records.TXT || []).join(' ');
+    if (!/v=spf1/i.test(txt)) n.push('No SPF record found — email spoofing is easier without one.');
+    if (!(records.CAA)) n.push('No CAA record — any CA may issue certificates for this domain.');
+    if ((records.NS || []).length < 2) n.push('Fewer than two nameservers — a single point of failure.');
+    if (/dmarc/i.test(txt) === false) n.push('No DMARC seen at this level (check _dmarc subdomain).');
+    return n;
+  }
+
+  return { dns, notes };
+})();
+
 
 
 /* ------------------------------------------------------------

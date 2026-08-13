@@ -186,11 +186,30 @@ Zero's security tooling is **defensive**. It hardens what you own.
 - **Password strength** — entropy from the character space actually used, with penalties for the patterns that make a long password weak anyway, and an offline-guessing estimate at a pessimistic 100 billion tries/second.
 - **Breach exposure** — checks whether a password appears in public breach data. It is hashed on your device and **only the first five characters of that hash are sent**; the service returns every suffix sharing that prefix and the match happens locally. The service never learns which password you asked about.
 - **Hardening checklist** — the controls that matter for the sites and games you ship, ordered by how often each one is what actually went wrong.
+- **Crypto toolkit** — SHA-1/256/512, HMAC, base64, JWT decode, hash identification, Shannon entropy. All local. The bread-and-butter of CTF and security work.
+- **Test payloads** — the exact XSS, SQLi, path-traversal and command-injection strings attackers use, to paste into *your own* forms and confirm they're handled safely.
+- **DNS recon** — public records over DNS-over-HTTPS for domains you control, the way you map your own attack surface before an audit, with notes on missing SPF/CAA/DMARC.
 
 There is no scanner, no exploit and no payload, and I won't add them. A tool
 built to break into other people's systems is a liability to whoever owns it
 first, and legitimate security work happens inside written authorisation with a
 toolchain that does not live in a browser tab.
+
+---
+
+## Files — your real disk
+
+The honest answer to "connect Zero to my files" and "use my PC's storage". Via
+the File System Access API, Zero can **open a real file off your disk, edit it,
+and save it back in place**, or **connect a whole folder** it can then list, read
+and write inside for the session.
+
+You pick what it touches, every time — the browser never lets a page roam your
+drive on its own, and that limit is exactly what makes opening one safe. This is
+your actual filesystem, gigabytes not megabytes, so it is also where "big
+storage" really lives. Needs a Chromium browser (Chrome, Edge, Brave, Arc);
+elsewhere Zero falls back to open/download, which works everywhere but can't
+write back in place.
 
 ---
 

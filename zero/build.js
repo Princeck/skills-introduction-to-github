@@ -11,7 +11,7 @@ const dir = __dirname;
 const html = fs.readFileSync(path.join(dir, 'index.html'), 'utf8');
 const css = fs.readFileSync(path.join(dir, 'css/styles.css'), 'utf8');
 // Vault first: app.js reads Vault.isEnabled() while initialising.
-const js = ['js/vault.js', 'js/hud.js', 'js/storage.js', 'js/abilities.js', 'js/app.js']
+const js = ['js/vault.js', 'js/hud.js', 'js/storage.js', 'js/files.js', 'js/abilities.js', 'js/app.js']
   .map(f => fs.readFileSync(path.join(dir, f), 'utf8')).join('\n');
 
 // NOTE: the replacement MUST be a function, not a string. In a replacement
@@ -19,9 +19,9 @@ const js = ['js/vault.js', 'js/hud.js', 'js/storage.js', 'js/abilities.js', 'js/
 // and our CSS/JS contain both. A function's return value is used verbatim.
 const out = html
   .replace('<link rel="stylesheet" href="css/styles.css" />', () => `<style>\n${css}\n  </style>`)
-  .replace('<script src="js/vault.js"></script>\n  <script src="js/hud.js"></script>\n  <script src="js/storage.js"></script>\n  <script src="js/abilities.js"></script>\n  <script src="js/app.js"></script>', () => `<script>\n${js}\n  </script>`);
+  .replace('<script src="js/vault.js"></script>\n  <script src="js/hud.js"></script>\n  <script src="js/storage.js"></script>\n  <script src="js/files.js"></script>\n  <script src="js/abilities.js"></script>\n  <script src="js/app.js"></script>', () => `<script>\n${js}\n  </script>`);
 
-if (out.includes('css/styles.css') || out.includes('js/app.js') || out.includes('js/vault.js') || out.includes('js/abilities.js') || out.includes('js/storage.js') || out.includes('js/hud.js')) {
+if (out.includes('css/styles.css') || out.includes('js/app.js') || out.includes('js/vault.js') || out.includes('js/abilities.js') || out.includes('js/storage.js') || out.includes('js/hud.js') || out.includes('js/files.js')) {
   console.error('✗ Inlining failed — a reference was left behind.');
   process.exit(1);
 }

@@ -54,6 +54,7 @@
         <li data-view="apps"><span class="ic">◱</span> Apps</li>
         <li data-view="memory"><span class="ic">❖</span> Memory</li>
         <li data-view="security"><span class="ic">⛨</span> Security</li>
+        <li data-view="files"><span class="ic">▢</span> Files</li>
         <li data-view="tasks"><span class="ic">✓</span> Tasks</li>
         <li data-view="notes"><span class="ic">✎</span> Notes</li>
         <li data-view="settings"><span class="ic">⚙</span> Settings</li>
@@ -223,9 +224,80 @@
             <div id="secChecklist" style="margin-top:14px"></div>
           </div>
         </div>
+        <div class="grid cols-2" style="margin-top:16px">
+          <div class="card">
+            <h2>Crypto Toolkit</h2>
+            <p class="hint">Hashes, HMAC, base64, JWT decode, hash ID, entropy — all computed on your machine.</p>
+            <select id="cryptoOp" style="margin-top:12px" onchange="Zero.cryptoTool()">
+              <option value="sha256">SHA-256</option>
+              <option value="sha512">SHA-512</option>
+              <option value="sha1">SHA-1</option>
+              <option value="hmac">HMAC-SHA256 (needs key)</option>
+              <option value="b64enc">Base64 encode</option>
+              <option value="b64dec">Base64 decode</option>
+              <option value="jwt">Decode JWT</option>
+              <option value="idhash">Identify hash type</option>
+              <option value="entropy">Shannon entropy</option>
+            </select>
+            <textarea id="cryptoIn" rows="3" placeholder="Input" style="margin-top:10px" oninput="Zero.cryptoTool()"></textarea>
+            <input id="cryptoKey" placeholder="Key (HMAC only)" style="margin-top:10px" oninput="Zero.cryptoTool()" />
+            <pre id="cryptoOut" class="crypto-out"></pre>
+          </div>
+          <div class="card">
+            <h2>Test Payloads <span class="pill red">your own sites</span></h2>
+            <p class="hint">The exact strings attackers use. Paste them into <b>your own</b> forms to confirm they are handled safely.</p>
+            <select id="payloadKind" style="margin-top:12px" onchange="Zero.showPayloads()">
+              <option value="xss">Cross-site scripting (XSS)</option>
+              <option value="sqli">SQL injection</option>
+              <option value="traversal">Path traversal</option>
+              <option value="cmdi">Command injection</option>
+            </select>
+            <div id="payloadOut" style="margin-top:12px"></div>
+          </div>
+        </div>
+
+        <div class="card" style="margin-top:16px">
+          <h2>DNS Recon <span class="pill">domains you control</span></h2>
+          <p class="hint">Public DNS records over DNS-over-HTTPS — the way you map your own attack surface before an audit.</p>
+          <div class="chat-input" style="margin-top:12px">
+            <input id="reconIn" placeholder="example.com" onkeydown="if(event.key==='Enter')Zero.reconDomain()" />
+            <button class="btn" onclick="Zero.reconDomain()">Look up</button>
+          </div>
+          <div id="reconOut" style="margin-top:14px"></div>
+        </div>
+
         <div class="card" style="margin-top:16px">
           <h2>Scope</h2>
           <p class="hint">Zero's security tooling is defensive: it hardens things you own and control. It contains no scanner, no exploit and no payload, and I won't add them — a tool built to break into other people's systems is a liability to whoever owns it first, and every serious security professional works inside written authorisation. If you're doing authorised testing, the real toolchain lives outside a browser tab anyway.</p>
+        </div>
+      </section>
+
+      <!-- FILES -->
+      <section class="view" id="view-files">
+        <div class="grid cols-2">
+          <div class="card">
+            <h2>Open a File</h2>
+            <p class="hint" id="fsSupport"></p>
+            <div style="margin-top:12px;display:flex;gap:10px;flex-wrap:wrap">
+              <button class="btn" onclick="Zero.openAFile()">Open from disk</button>
+              <button class="btn ghost" id="fileSaveBack" style="display:none" onclick="Zero.saveBack()">Save back</button>
+              <button class="btn ghost" onclick="Zero.saveNew()">Save as…</button>
+            </div>
+            <div class="hint" id="fileName" style="margin-top:10px;font-family:var(--mono)"></div>
+            <textarea id="fileEditor" rows="12" placeholder="File contents appear here — edit and save back in place." style="margin-top:10px;font-family:var(--mono);font-size:12.5px"></textarea>
+          </div>
+          <div class="card">
+            <h2>Connect a Folder</h2>
+            <p class="hint">Give Zero read/write access to one folder. It can list, open and save files inside it — and only it — for this session.</p>
+            <div style="margin-top:12px;display:flex;gap:10px;flex-wrap:wrap">
+              <button class="btn" onclick="Zero.connectFolder()">Connect folder</button>
+              <button class="btn ghost" onclick="Zero.listFolder()">↻ Refresh</button>
+              <button class="btn ghost" onclick="Zero.disconnectFolder()">Disconnect</button>
+            </div>
+            <div class="hint" id="folderName" style="margin-top:10px;font-family:var(--mono)"></div>
+            <div id="folderList" style="margin-top:12px"></div>
+            <div class="notice"><b>Your disk, on your terms.</b> The browser only ever gives Zero what you explicitly pick — a page cannot roam your drive on its own, and that limit is exactly what makes it safe to open. This is your real filesystem, not the browser's small box, so it is also where "big storage" actually lives.</div>
+          </div>
         </div>
       </section>
 
@@ -382,6 +454,7 @@
   <script src="js/vault.js"></script>
   <script src="js/hud.js"></script>
   <script src="js/storage.js"></script>
+  <script src="js/files.js"></script>
   <script src="js/abilities.js"></script>
   <script src="js/app.js"></script>
 </body>

@@ -329,6 +329,30 @@ details.think > div {
 .sec-item b { display: block; font-size: 13px; }
 .sec-item span { display: block; color: var(--dim); font-size: 11.5px; margin-top: 3px; line-height: 1.5; }
 
+.crypto-out {
+  margin: 12px 0 0; background: rgba(4,6,13,.75); border: 1px solid var(--edge);
+  border-radius: 10px; padding: 12px; font-family: var(--mono); font-size: 12px;
+  color: var(--cyan); white-space: pre-wrap; word-break: break-all; min-height: 20px;
+}
+.payload-row { display: flex; align-items: center; gap: 8px; margin-bottom: 7px; }
+.payload-row code {
+  flex: 1; background: rgba(4,6,13,.7); border: 1px solid var(--edge); border-radius: 7px;
+  padding: 7px 10px; font-family: var(--mono); font-size: 11.5px; color: #ffb020;
+  overflow-x: auto; white-space: nowrap;
+}
+.payload-row .btn { padding: 6px 12px; font-size: 11px; }
+.recon-row { display: flex; gap: 14px; padding: 9px 0; border-bottom: 1px solid rgba(120,165,255,.1); font-family: var(--mono); font-size: 12.5px; }
+.recon-row:last-child { border: none; }
+.recon-row b { color: var(--cyan); min-width: 48px; }
+.recon-row > div { word-break: break-all; }
+.fs-item {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 9px 11px; border-radius: 8px; cursor: pointer; font-size: 13px;
+  transition: background .15s;
+}
+.fs-item:hover { background: rgba(92,225,255,.07); }
+.fs-size { font-family: var(--mono); font-size: 11px; color: var(--dim); }
+
 /* ============ Boot ============ */
 #boot {
   position: fixed; inset: 0; z-index: 100001; background: var(--void);
@@ -727,6 +751,7 @@ input:focus, textarea:focus, select:focus {
         <li data-view="apps"><span class="ic">◱</span> Apps</li>
         <li data-view="memory"><span class="ic">❖</span> Memory</li>
         <li data-view="security"><span class="ic">⛨</span> Security</li>
+        <li data-view="files"><span class="ic">▢</span> Files</li>
         <li data-view="tasks"><span class="ic">✓</span> Tasks</li>
         <li data-view="notes"><span class="ic">✎</span> Notes</li>
         <li data-view="settings"><span class="ic">⚙</span> Settings</li>
@@ -896,9 +921,80 @@ input:focus, textarea:focus, select:focus {
             <div id="secChecklist" style="margin-top:14px"></div>
           </div>
         </div>
+        <div class="grid cols-2" style="margin-top:16px">
+          <div class="card">
+            <h2>Crypto Toolkit</h2>
+            <p class="hint">Hashes, HMAC, base64, JWT decode, hash ID, entropy — all computed on your machine.</p>
+            <select id="cryptoOp" style="margin-top:12px" onchange="Zero.cryptoTool()">
+              <option value="sha256">SHA-256</option>
+              <option value="sha512">SHA-512</option>
+              <option value="sha1">SHA-1</option>
+              <option value="hmac">HMAC-SHA256 (needs key)</option>
+              <option value="b64enc">Base64 encode</option>
+              <option value="b64dec">Base64 decode</option>
+              <option value="jwt">Decode JWT</option>
+              <option value="idhash">Identify hash type</option>
+              <option value="entropy">Shannon entropy</option>
+            </select>
+            <textarea id="cryptoIn" rows="3" placeholder="Input" style="margin-top:10px" oninput="Zero.cryptoTool()"></textarea>
+            <input id="cryptoKey" placeholder="Key (HMAC only)" style="margin-top:10px" oninput="Zero.cryptoTool()" />
+            <pre id="cryptoOut" class="crypto-out"></pre>
+          </div>
+          <div class="card">
+            <h2>Test Payloads <span class="pill red">your own sites</span></h2>
+            <p class="hint">The exact strings attackers use. Paste them into <b>your own</b> forms to confirm they are handled safely.</p>
+            <select id="payloadKind" style="margin-top:12px" onchange="Zero.showPayloads()">
+              <option value="xss">Cross-site scripting (XSS)</option>
+              <option value="sqli">SQL injection</option>
+              <option value="traversal">Path traversal</option>
+              <option value="cmdi">Command injection</option>
+            </select>
+            <div id="payloadOut" style="margin-top:12px"></div>
+          </div>
+        </div>
+
+        <div class="card" style="margin-top:16px">
+          <h2>DNS Recon <span class="pill">domains you control</span></h2>
+          <p class="hint">Public DNS records over DNS-over-HTTPS — the way you map your own attack surface before an audit.</p>
+          <div class="chat-input" style="margin-top:12px">
+            <input id="reconIn" placeholder="example.com" onkeydown="if(event.key==='Enter')Zero.reconDomain()" />
+            <button class="btn" onclick="Zero.reconDomain()">Look up</button>
+          </div>
+          <div id="reconOut" style="margin-top:14px"></div>
+        </div>
+
         <div class="card" style="margin-top:16px">
           <h2>Scope</h2>
           <p class="hint">Zero's security tooling is defensive: it hardens things you own and control. It contains no scanner, no exploit and no payload, and I won't add them — a tool built to break into other people's systems is a liability to whoever owns it first, and every serious security professional works inside written authorisation. If you're doing authorised testing, the real toolchain lives outside a browser tab anyway.</p>
+        </div>
+      </section>
+
+      <!-- FILES -->
+      <section class="view" id="view-files">
+        <div class="grid cols-2">
+          <div class="card">
+            <h2>Open a File</h2>
+            <p class="hint" id="fsSupport"></p>
+            <div style="margin-top:12px;display:flex;gap:10px;flex-wrap:wrap">
+              <button class="btn" onclick="Zero.openAFile()">Open from disk</button>
+              <button class="btn ghost" id="fileSaveBack" style="display:none" onclick="Zero.saveBack()">Save back</button>
+              <button class="btn ghost" onclick="Zero.saveNew()">Save as…</button>
+            </div>
+            <div class="hint" id="fileName" style="margin-top:10px;font-family:var(--mono)"></div>
+            <textarea id="fileEditor" rows="12" placeholder="File contents appear here — edit and save back in place." style="margin-top:10px;font-family:var(--mono);font-size:12.5px"></textarea>
+          </div>
+          <div class="card">
+            <h2>Connect a Folder</h2>
+            <p class="hint">Give Zero read/write access to one folder. It can list, open and save files inside it — and only it — for this session.</p>
+            <div style="margin-top:12px;display:flex;gap:10px;flex-wrap:wrap">
+              <button class="btn" onclick="Zero.connectFolder()">Connect folder</button>
+              <button class="btn ghost" onclick="Zero.listFolder()">↻ Refresh</button>
+              <button class="btn ghost" onclick="Zero.disconnectFolder()">Disconnect</button>
+            </div>
+            <div class="hint" id="folderName" style="margin-top:10px;font-family:var(--mono)"></div>
+            <div id="folderList" style="margin-top:12px"></div>
+            <div class="notice"><b>Your disk, on your terms.</b> The browser only ever gives Zero what you explicitly pick — a page cannot roam your drive on its own, and that limit is exactly what makes it safe to open. This is your real filesystem, not the browser's small box, so it is also where "big storage" actually lives.</div>
+          </div>
         </div>
       </section>
 
@@ -1408,6 +1504,128 @@ const Store = (() => {
   };
 
   return { get, set, del, keys, clear, quota, persistRequest, migrate, fmtBytes };
+})();
+
+/* ============================================================
+   ZERO — FILES
+
+   The real answer to "connect Zero to my files" and "use my PC's
+   storage". The File System Access API lets a page — with your
+   explicit pick each time — read a file off your disk, write one
+   back, and hold a handle to a whole folder it can then work
+   inside. This is your actual filesystem, not a 5 MB browser box.
+
+   Two honest limits:
+   • You choose what it can touch. The browser will not let a page
+     roam your disk on its own, and that restriction is a feature,
+     not a bug — it is what keeps a web page safe to open.
+   • It needs a Chromium browser (Chrome, Edge, Brave, Arc). Where
+     it is missing, Zero falls back to download/upload, which works
+     everywhere but cannot write back in place.
+   ============================================================ */
+
+const Files = (() => {
+  const supported = () => 'showOpenFilePicker' in window;
+  const dirSupported = () => 'showDirectoryPicker' in window;
+
+  let folder = null;              // a connected directory handle, if any
+
+  async function openFile() {
+    if (!supported()) return fallbackOpen();
+    const [handle] = await window.showOpenFilePicker();
+    const file = await handle.getFile();
+    return { name: file.name, size: file.size, text: await file.text(), handle };
+  }
+
+  /* Save text back to the same file the handle points at. */
+  async function writeFile(handle, text) {
+    const w = await handle.createWritable();
+    await w.write(text);
+    await w.close();
+  }
+
+  async function saveAs(suggestedName, text) {
+    if (!supported()) return fallbackSave(suggestedName, text);
+    const handle = await window.showSaveFilePicker({ suggestedName });
+    await writeFile(handle, text);
+    return handle.name;
+  }
+
+  /* Connect a folder. Zero can then list, read and write inside it —
+     and only it — for the rest of the session. */
+  async function connectFolder() {
+    if (!dirSupported()) throw new Error('This browser cannot connect a folder. Chrome, Edge, Brave or Arc can.');
+    folder = await window.showDirectoryPicker({ mode: 'readwrite' });
+    return folder.name;
+  }
+
+  function folderName() { return folder ? folder.name : null; }
+  function disconnectFolder() { folder = null; }
+
+  async function list() {
+    if (!folder) throw new Error('No folder connected.');
+    const out = [];
+    for await (const [name, handle] of folder.entries()) {
+      let size = null;
+      if (handle.kind === 'file') { try { size = (await handle.getFile()).size; } catch {} }
+      out.push({ name, kind: handle.kind, size });
+    }
+    return out.sort((a, b) => (a.kind === b.kind ? a.name.localeCompare(b.name) : a.kind === 'directory' ? -1 : 1));
+  }
+
+  async function readFrom(name) {
+    if (!folder) throw new Error('No folder connected.');
+    const handle = await folder.getFileHandle(name);
+    const file = await handle.getFile();
+    return { name, size: file.size, text: await file.text(), handle };
+  }
+
+  async function writeTo(name, text) {
+    if (!folder) throw new Error('No folder connected.');
+    const handle = await folder.getFileHandle(name, { create: true });
+    await writeFile(handle, text);
+    return name;
+  }
+
+  /* ---- Fallbacks for non-Chromium browsers ---- */
+  function fallbackOpen() {
+    return new Promise((resolve, reject) => {
+      const inp = document.createElement('input');
+      inp.type = 'file';
+      inp.onchange = () => {
+        const file = inp.files[0];
+        if (!file) { reject(new Error('No file chosen.')); return; }
+        const rd = new FileReader();
+        rd.onload = () => resolve({ name: file.name, size: file.size, text: rd.result, handle: null });
+        rd.onerror = () => reject(rd.error);
+        rd.readAsText(file);
+      };
+      inp.click();
+    });
+  }
+
+  function fallbackSave(name, text) {
+    // A normal download: works everywhere, but cannot write back in place.
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([text], { type: 'text/plain' }));
+    a.download = name;
+    a.click();
+    URL.revokeObjectURL(a.href);
+    return name;
+  }
+
+  const fmtSize = n => {
+    if (n == null) return '';
+    const u = ['B', 'KB', 'MB', 'GB'];
+    let i = 0;
+    while (n >= 1024 && i < u.length - 1) { n /= 1024; i++; }
+    return n.toFixed(n < 10 && i ? 1 : 0) + ' ' + u[i];
+  };
+
+  return {
+    supported, dirSupported, openFile, saveAs, writeFile,
+    connectFolder, disconnectFolder, folderName, list, readFrom, writeTo, fmtSize,
+  };
 })();
 
 /* ============================================================
@@ -2012,8 +2230,135 @@ const Sec = (() => {
     ['Turn on 2FA everywhere you can', 'It defeats credential stuffing even when a password is already leaked.'],
   ];
 
-  return { strength, breachCount, CHECKLIST };
+  /* ---- Crypto & encoding toolkit (all local) ---- */
+  const te = new TextEncoder();
+  const hex = buf => [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, '0')).join('');
+
+  async function digest(algo, text) { return hex(await crypto.subtle.digest(algo, te.encode(text))); }
+
+  async function hmac(text, key) {
+    const k = await crypto.subtle.importKey('raw', te.encode(key), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+    return hex(await crypto.subtle.sign('HMAC', k, te.encode(text)));
+  }
+
+  const b64 = {
+    enc: t => btoa(unescape(encodeURIComponent(t))),
+    dec: t => decodeURIComponent(escape(atob(t.replace(/-/g, '+').replace(/_/g, '/')))),
+  };
+
+  /* Decode a JWT without verifying it — useful for reading what a token
+     claims. Verifying the signature needs the server's secret, which is
+     the whole point of a signature and not something a client should hold. */
+  function jwtDecode(token) {
+    const parts = token.trim().split('.');
+    if (parts.length !== 3) throw new Error('A JWT has three dot-separated parts.');
+    const head = JSON.parse(b64.dec(parts[0]));
+    const body = JSON.parse(b64.dec(parts[1]));
+    const out = { header: head, payload: body };
+    if (body.exp) out.expires = new Date(body.exp * 1000).toLocaleString() +
+      (body.exp * 1000 < Date.now() ? ' (EXPIRED)' : '');
+    return out;
+  }
+
+  /* Guess what a hash is from its shape. */
+  function idHash(h) {
+    h = h.trim();
+    const byLen = { 32: 'MD5 or NTLM', 40: 'SHA-1', 56: 'SHA-224', 64: 'SHA-256', 96: 'SHA-384', 128: 'SHA-512' };
+    if (/^[a-f0-9]+$/i.test(h) && byLen[h.length]) return byLen[h.length];
+    if (/^\$2[aby]\$/.test(h)) return 'bcrypt';
+    if (/^\$argon2/.test(h)) return 'argon2';
+    if (/^\$6\$/.test(h)) return 'sha512crypt';
+    if (/^[A-Za-z0-9+/]+={0,2}$/.test(h) && h.length % 4 === 0) return 'possibly base64-encoded';
+    return 'unrecognised';
+  }
+
+  /* Shannon entropy — how random a string is, in bits per character.
+     A secret should be high; a "random" token that scores low isn't. */
+  function shannon(str) {
+    if (!str) return 0;
+    const freq = {};
+    for (const c of str) freq[c] = (freq[c] || 0) + 1;
+    let h = 0;
+    for (const c in freq) { const pr = freq[c] / str.length; h -= pr * Math.log2(pr); }
+    return h;
+  }
+
+  /* ---- Test payloads, for probing YOUR OWN input handling ----
+     These are the exact strings attackers try. You paste them into your
+     own forms to confirm they are escaped, parameterised and rejected —
+     the standard way to verify a fix actually holds. */
+  const PAYLOADS = {
+    xss: [
+      `<script>alert(1)</scr` + `ipt>`,
+      `"><img src=x onerror=alert(1)>`,
+      `javascript:alert(document.domain)`,
+      `<svg/onload=alert(1)>`,
+      `'"><body onload=alert(1)>`,
+    ],
+    sqli: [
+      `' OR '1'='1`,
+      `'; DROP TABLE users;--`,
+      `" OR 1=1--`,
+      `admin'--`,
+      `1' UNION SELECT null,version()--`,
+    ],
+    traversal: [
+      `../../../../etc/passwd`,
+      `..\\..\\..\\windows\\win.ini`,
+      `%2e%2e%2f%2e%2e%2fetc%2fpasswd`,
+    ],
+    cmdi: [
+      `; ls -la`,
+      `| whoami`,
+      `$(id)`,
+      '`id`',
+    ],
+  };
+
+  return { strength, breachCount, CHECKLIST, digest, hmac, b64, jwtDecode, idHash, shannon, PAYLOADS };
 })();
+
+
+/* ------------------------------------------------------------
+   RECON — for domains you control
+
+   DNS lookups over DNS-over-HTTPS (Cloudflare's JSON endpoint).
+   This reads public records that anyone can query; it is how you
+   map your own attack surface before an audit. It does not touch
+   the target host directly and carries no exploit.
+   ------------------------------------------------------------ */
+const Recon = (() => {
+  const TYPES = ['A', 'AAAA', 'MX', 'NS', 'TXT', 'CNAME', 'SOA', 'CAA'];
+
+  async function dns(name, fetcher) {
+    const clean = name.trim().replace(/^https?:\/\//, '').replace(/\/.*$/, '');
+    const out = {};
+    for (const type of TYPES) {
+      try {
+        const r = await fetcher(`https://cloudflare-dns.com/dns-query?name=${encodeURIComponent(clean)}&type=${type}`,
+          { headers: { accept: 'application/dns-json' } });
+        if (!r.ok) continue;
+        const d = await r.json();
+        if (d.Answer?.length) out[type] = d.Answer.map(a => a.data);
+      } catch { /* one record type failing should not sink the rest */ }
+    }
+    return { name: clean, records: out };
+  }
+
+  /* Notable findings a checklist would flag. */
+  function notes(records) {
+    const n = [];
+    const txt = (records.TXT || []).join(' ');
+    if (!/v=spf1/i.test(txt)) n.push('No SPF record found — email spoofing is easier without one.');
+    if (!(records.CAA)) n.push('No CAA record — any CA may issue certificates for this domain.');
+    if ((records.NS || []).length < 2) n.push('Fewer than two nameservers — a single point of failure.');
+    if (/dmarc/i.test(txt) === false) n.push('No DMARC seen at this level (check _dmarc subdomain).');
+    return n;
+  }
+
+  return { dns, notes };
+})();
+
 
 
 /* ------------------------------------------------------------
@@ -2373,6 +2718,7 @@ const Zero = (() => {
     markets:   ['Markets', 'Live readings — information, not advice.'],
     overview:  ['Overview', 'Everything at a glance, live.'],
     security:  ['Security', 'Harden what is yours.'],
+    files:     ['Files', 'Your disk, connected on your terms.'],
     news:      ['News', 'What is happening right now.'],
     apps:      ['Apps', 'Your things, one keystroke away.'],
     memory:    ['Memory', 'What Zero carries between conversations.'],
@@ -2393,7 +2739,8 @@ const Zero = (() => {
     if (view === 'markets') { loadMarkets(); loadStocks(); loadRates(); }
     if (view === 'news') loadNews();
     if (view === 'overview') renderOverview();
-    if (view === 'security') renderChecklist();
+    if (view === 'security') { renderChecklist(); showPayloads(); }
+    if (view === 'files') { filesUi(); listFolder(); }
   }
 
   /* ---------------- Clock ---------------- */
@@ -2555,12 +2902,130 @@ const Zero = (() => {
     }
   }
 
+  async function cryptoTool() {
+    const inp = document.getElementById('cryptoIn').value;
+    const key = document.getElementById('cryptoKey').value;
+    const op = document.getElementById('cryptoOp').value;
+    const out = document.getElementById('cryptoOut');
+    if (!inp) { out.textContent = ''; return; }
+    try {
+      let r;
+      switch (op) {
+        case 'sha256': r = await Sec.digest('SHA-256', inp); break;
+        case 'sha512': r = await Sec.digest('SHA-512', inp); break;
+        case 'sha1':   r = await Sec.digest('SHA-1', inp); break;
+        case 'hmac':   r = key ? await Sec.hmac(inp, key) : 'Enter a key for HMAC.'; break;
+        case 'b64enc': r = Sec.b64.enc(inp); break;
+        case 'b64dec': r = Sec.b64.dec(inp); break;
+        case 'jwt':    r = JSON.stringify(Sec.jwtDecode(inp), null, 2); break;
+        case 'idhash': r = Sec.idHash(inp); break;
+        case 'entropy': {
+          const h = Sec.shannon(inp);
+          r = `${h.toFixed(3)} bits/char · ${(h * inp.length).toFixed(1)} bits total over ${inp.length} chars`;
+          break;
+        }
+      }
+      out.textContent = r;
+    } catch (e) { out.textContent = '⚠ ' + e.message; }
+  }
+
+  function showPayloads() {
+    const kind = document.getElementById('payloadKind').value;
+    const out = document.getElementById('payloadOut');
+    const list = Sec.PAYLOADS[kind] || [];
+    out.innerHTML = list.map(pl =>
+      `<div class="payload-row"><code>${esc(pl)}</code>` +
+      `<button class="btn ghost" onclick="Zero.copyText(this.previousElementSibling.textContent, this)">copy</button></div>`).join('');
+  }
+  function copyText(text, btn) {
+    navigator.clipboard?.writeText(text).then(() => {
+      const old = btn.textContent; btn.textContent = '✓'; setTimeout(() => btn.textContent = old, 1200);
+    });
+  }
+
+  async function reconDomain() {
+    const name = document.getElementById('reconIn').value.trim();
+    const out = document.getElementById('reconOut');
+    if (!name) return;
+    out.innerHTML = '<div class="spinner">Querying DNS</div>';
+    try {
+      const { records } = await Recon.dns(name, (u, o) => guardedFetch(u, o, 'network'));
+      const keys = Object.keys(records);
+      if (!keys.length) { out.innerHTML = '<p class="hint">No records returned. Check the domain name.</p>'; return; }
+      const notes = Recon.notes(records);
+      out.innerHTML = keys.map(t =>
+        `<div class="recon-row"><b>${t}</b><div>${records[t].map(v => esc(v)).join('<br>')}</div></div>`).join('') +
+        (notes.length ? '<div class="notice">' + notes.map(esc).join('<br>') + '</div>' : '');
+    } catch (e) { out.innerHTML = `<p class="hint">DNS lookup failed: ${esc(e.message)}</p>`; }
+  }
+
   function renderChecklist() {
     const el = document.getElementById('secChecklist');
     if (!el) return;
     el.innerHTML = Sec.CHECKLIST.map(([t, d]) =>
       `<div class="sec-item"><b>${esc(t)}</b><span>${esc(d)}</span></div>`).join('');
   }
+
+  /* ---------------- Files ---------------- */
+  let openHandle = null;
+
+  function filesUi() {
+    const el = document.getElementById('fsSupport');
+    if (el) el.textContent = Files.supported()
+      ? 'This browser can read and write real files on your disk.'
+      : 'This browser can open and download files, but not write back in place. Chrome, Edge, Brave or Arc can.';
+    const fn = Files.folderName();
+    setText('folderName', fn ? 'Connected: ' + fn : 'No folder connected.');
+    const fl = document.getElementById('folderList');
+    if (fl && !fn) fl.innerHTML = '';
+  }
+
+  async function openAFile() {
+    try {
+      const f = await Files.openFile();
+      openHandle = f.handle;
+      document.getElementById('fileEditor').value = f.text;
+      setText('fileName', f.name + ' · ' + Files.fmtSize(f.size));
+      document.getElementById('fileSaveBack').style.display = openHandle ? '' : 'none';
+      log('Opened ' + f.name + ' from disk (' + Files.fmtSize(f.size) + ').');
+    } catch (e) { if (e.name !== 'AbortError') bubble('Could not open the file: ' + e.message, 'zero'); }
+  }
+  async function saveBack() {
+    if (!openHandle) return;
+    try { await Files.writeFile(openHandle, document.getElementById('fileEditor').value); log('Saved changes back to disk.'); alert('Saved.'); }
+    catch (e) { alert('Could not save: ' + e.message); }
+  }
+  async function saveNew() {
+    try { const n = await Files.saveAs('zero-note.txt', document.getElementById('fileEditor').value); log('Wrote ' + n + ' to disk.'); }
+    catch (e) { if (e.name !== 'AbortError') alert('Could not save: ' + e.message); }
+  }
+  async function connectFolder() {
+    try { const n = await Files.connectFolder(); log('Connected folder "' + n + '" — Zero can read and write inside it.'); filesUi(); listFolder(); }
+    catch (e) { if (e.name !== 'AbortError') bubble('Could not connect a folder: ' + e.message, 'zero'); }
+  }
+  async function listFolder() {
+    const el = document.getElementById('folderList');
+    if (!el || !Files.folderName()) return;
+    try {
+      const items = await Files.list();
+      el.innerHTML = items.length
+        ? items.map(it => it.kind === 'directory'
+            ? `<div class="fs-item"><span>📁 ${esc(it.name)}</span></div>`
+            : `<div class="fs-item" onclick="Zero.openFromFolder('${esc(it.name).replace(/'/g, "\\'")}')">
+                 <span>📄 ${esc(it.name)}</span><span class="fs-size">${Files.fmtSize(it.size)}</span></div>`).join('')
+        : '<p class="hint">Folder is empty.</p>';
+    } catch (e) { el.innerHTML = `<p class="hint">${esc(e.message)}</p>`; }
+  }
+  async function openFromFolder(name) {
+    try {
+      const f = await Files.readFrom(name);
+      openHandle = f.handle;
+      document.getElementById('fileEditor').value = f.text;
+      setText('fileName', f.name + ' · ' + Files.fmtSize(f.size));
+      document.getElementById('fileSaveBack').style.display = '';
+    } catch (e) { bubble('Could not read ' + name + ': ' + e.message, 'zero'); }
+  }
+  function disconnectFolder() { Files.disconnectFolder(); filesUi(); }
 
   /* ---------------- Wake word ---------------- */
   function orbState(st) { if (typeof Orb !== 'undefined') Orb.set(st); }
@@ -3606,7 +4071,8 @@ const Zero = (() => {
     nav, loadMarkets, addTask, toggleTask, delTask, addNote, delNote,
     send, saveEngine, testEngine, saveStockKey, setThink, updateNow, loadStocks,
     loadRates, loadNews, setSpeak, micToggle, stopSpeaking: () => Voice.stop(),
-    toggleWake, renderOverview, checkPassword,
+    toggleWake, renderOverview, checkPassword, cryptoTool, showPayloads, copyText, reconDomain,
+    openAFile, saveBack, saveNew, connectFolder, listFolder, openFromFolder, disconnectFolder,
     addApp, removeApp, launchApp, forgetMemory, storageInfo,
     exportData, wipeData, init,
     toggleHalt, killNetwork, panic, setCap, clearLog,
