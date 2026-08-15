@@ -65,7 +65,7 @@ the home screen; everything else is a side panel you visit when you need it.
 - **Security** — password strength, breach exposure, and a hardening checklist for your own sites
 - **Memory** — say `remember …` and Zero carries it into every future conversation
 - **Apps** — launch your tools by name: `open figma`
-- **Voice** — Zero speaks replies aloud and takes dictation from the mic
+- **Voice** — Zero speaks in a composed, deliberate cadence, with a picker to choose the exact voice; also takes dictation
 - **Built-in skills** — maths, unit and currency conversion, code scaffolds, hashes, slugs, passwords: all with no model
 - **Charts** — real price history drawn on canvas, with indicators computed from it
 - **News** — live top stories, no key
@@ -157,6 +157,25 @@ tasks and notes: encrypted when the vault is on, gone from memory when it locks.
 
 Working context also grew — Zero now carries 24 recent messages into each turn
 rather than 8.
+
+---
+
+## Zero's voice
+
+Zero speaks in a deliberate, slightly-lowered register — calm rather than chirpy.
+That cadence (rate 0.96, pitch 0.88) is the part of the identity that carries
+across every machine, whatever voices happen to be installed.
+
+Browser speech uses voices already on your device, so Zero cannot mint a wholly
+new one — but it does **rank toward the best available**: neural / "Online" /
+"Natural" / premium engines win over the default robotic fallback, and a British
+register is nudged up as it reads as more composed. A picker in the assistant bar
+lists every English voice on your system; pick one and **▶ Test** previews it, and
+your choice is remembered.
+
+For a genuinely one-of-a-kind synthetic voice you would need a local voice model
+(e.g. Piper) wired through the engine — the honest ceiling of what a browser's own
+speech can do is choosing well among what is installed and shaping the delivery.
 
 ---
 

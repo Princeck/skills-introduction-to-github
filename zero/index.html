@@ -346,6 +346,8 @@
               <input type="checkbox" id="speakToggle" onchange="Zero.setSpeak(this.checked)" />
               <span>Speak replies</span>
             </label>
+            <select id="voiceSel" class="voice-sel" title="Zero's voice" onchange="Zero.setVoice(this.value)"></select>
+            <button class="btn ghost" onclick="Zero.previewVoice()" title="Hear it">▶ Test</button>
             <button class="btn ghost" id="micBtn" onclick="Zero.micToggle()" title="Dictate — uses the browser speech service">🎤</button>
             <button class="btn ghost" onclick="Zero.stopSpeaking()" title="Stop talking">◼ Quiet</button>
             <button class="btn ghost" onclick="Zero.updateNow(true)">↻ Update now</button>

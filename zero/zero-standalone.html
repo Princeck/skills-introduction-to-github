@@ -277,6 +277,10 @@ body::after {
   margin-bottom: 12px; padding-bottom: 12px;
   border-bottom: 1px solid rgba(120,165,255,.1);
 }
+.voice-sel {
+  width: auto; max-width: 150px; padding: 7px 10px; font-size: 12px;
+  font-family: var(--mono); background: rgba(4,6,13,.7);
+}
 .think-opt { display: flex; align-items: center; gap: 8px; cursor: pointer; }
 .think-opt input { width: 16px; height: 16px; accent-color: var(--cyan); cursor: pointer; }
 .think-opt span { font-size: 12.5px; color: var(--muted); font-family: var(--mono); letter-spacing: .4px; }
@@ -1043,6 +1047,8 @@ input:focus, textarea:focus, select:focus {
               <input type="checkbox" id="speakToggle" onchange="Zero.setSpeak(this.checked)" />
               <span>Speak replies</span>
             </label>
+            <select id="voiceSel" class="voice-sel" title="Zero's voice" onchange="Zero.setVoice(this.value)"></select>
+            <button class="btn ghost" onclick="Zero.previewVoice()" title="Hear it">▶ Test</button>
             <button class="btn ghost" id="micBtn" onclick="Zero.micToggle()" title="Dictate — uses the browser speech service">🎤</button>
             <button class="btn ghost" onclick="Zero.stopSpeaking()" title="Stop talking">◼ Quiet</button>
             <button class="btn ghost" onclick="Zero.updateNow(true)">↻ Update now</button>
@@ -1648,25 +1654,65 @@ const Files = (() => {
    ------------------------------------------------------------ */
 const Voice = (() => {
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-  let recog = null, listening = false, voice = null;
+  let recog = null, listening = false, voice = null, chosenName = null;
 
   const canSpeak = () => 'speechSynthesis' in window;
   const canHear = () => !!SR;
 
+  /* ---- Voice character ----
+     Zero's delivery: measured, a touch below neutral pitch, a hair
+     slower than default. Calm and deliberate rather than chirpy — the
+     cadence is as much of the identity as the voice itself, and it is
+     the part that carries across every machine regardless of which
+     voices happen to be installed. */
+  const PROSODY = { rate: 0.96, pitch: 0.88 };
+
+  /* Curated shortlist, best first. These are the higher-fidelity or
+     more characterful voices that ship with common systems; the browser
+     installs decide which actually exist, so this only ranks — it never
+     assumes. Neural/"Online"/"Premium"/"Enhanced" voices sound markedly
+     better than the default robotic fallback, so they win. */
+  const PREFERRED = [
+    'Google UK English Male', 'Microsoft Guy Online', 'Microsoft Ryan Online',
+    'Daniel', 'Arthur', 'Oliver', 'Microsoft George',
+    'Google US English', 'Alex', 'Microsoft David',
+    'Rishi', 'Microsoft Mark',
+  ];
+  const NICE_HINT = /(neural|online|natural|premium|enhanced|siri|eloquence)/i;
+
+  function score(v) {
+    let s = 0;
+    const idx = PREFERRED.findIndex(n => v.name === n || v.name.startsWith(n));
+    if (idx >= 0) s += 1000 - idx * 10;         // exact curated rank
+    if (NICE_HINT.test(v.name)) s += 400;        // premium engine markers
+    if (/^en[-_]?GB/i.test(v.lang)) s += 60;     // a British cadence reads as composed
+    else if (/^en[-_]/i.test(v.lang)) s += 40;
+    if (v.localService) s += 20;                 // on-device keeps speech offline
+    if (/\b(male|guy|david|george|mark|daniel|arthur|oliver|alex)\b/i.test(v.name)) s += 15;
+    return s;
+  }
+
+  function catalogue() {
+    if (!canSpeak()) return [];
+    return speechSynthesis.getVoices().filter(v => /^en[-_]/i.test(v.lang) || !/[-_]/.test(v.lang));
+  }
+
   function pickVoice() {
-    if (!canSpeak()) return null;
     const all = speechSynthesis.getVoices();
     if (!all.length) return null;
-    // Prefer a local (on-device) voice so speech stays offline.
-    return all.find(v => v.localService && /en[-_]/i.test(v.lang))
-        || all.find(v => v.localService)
-        || all.find(v => /en[-_]/i.test(v.lang))
-        || all[0];
+    if (chosenName) { const c = all.find(v => v.name === chosenName); if (c) return c; }
+    const en = all.filter(v => /^en[-_]/i.test(v.lang));
+    const pool = en.length ? en : all;
+    return pool.slice().sort((a, b) => score(b) - score(a))[0];
   }
   if (canSpeak()) {
     speechSynthesis.onvoiceschanged = () => { voice = pickVoice(); };
     voice = pickVoice();
   }
+
+  function setVoice(name) { chosenName = name || null; voice = pickVoice(); }
+  function currentVoiceName() { return (voice || pickVoice())?.name || null; }
+  function listVoices() { return catalogue().map(v => ({ name: v.name, lang: v.lang, local: v.localService })); }
 
   function speak(text, opts = {}) {
     if (!canSpeak() || !text) return false;
@@ -1681,8 +1727,8 @@ const Voice = (() => {
     const u = new SpeechSynthesisUtterance(clean.slice(0, 600));
     if (!voice) voice = pickVoice();
     if (voice) u.voice = voice;
-    u.rate = opts.rate ?? 1.02;
-    u.pitch = opts.pitch ?? 0.95;
+    u.rate = opts.rate ?? PROSODY.rate;
+    u.pitch = opts.pitch ?? PROSODY.pitch;
     u.onend = opts.onend || null;
     speechSynthesis.speak(u);
     return true;
@@ -1780,7 +1826,8 @@ const Voice = (() => {
   function stopListening() { try { recog?.stop(); } catch {} listening = false; }
   const isListening = () => listening;
 
-  return { canSpeak, canHear, speak, stop, listen, stopListening, isListening, startWake, stopWake, isAwake };
+  return { canSpeak, canHear, speak, stop, listen, stopListening, isListening, startWake, stopWake, isAwake,
+           setVoice, currentVoiceName, listVoices };
 })();
 
 
@@ -2512,6 +2559,7 @@ const Zero = (() => {
     micOk: 'zero.micOk',
     wakeOk: 'zero.wakeOk',
     speak: 'zero.speak',
+    voice: 'zero.voice',
   };
 
   // Short rolling context so the assistant remembers the current thread.
@@ -3895,6 +3943,30 @@ const Zero = (() => {
 
   function setSpeak(on) { store.rawSet(LS.speak, on ? '1' : ''); toggleSpeak(on); }
 
+  /* Fill the voice picker once the browser has loaded its catalogue. */
+  function populateVoices() {
+    const sel = document.getElementById('voiceSel');
+    if (!sel || !Voice.canSpeak()) return;
+    const list = Voice.listVoices();
+    if (!list.length) return;                 // catalogue not ready yet
+    const saved = store.raw(LS.voice);
+    if (saved) Voice.setVoice(saved);
+    const current = Voice.currentVoiceName();
+    sel.innerHTML = list.map(v =>
+      `<option value="${esc(v.name)}"${v.name === current ? ' selected' : ''}>${esc(v.name.replace(/^(Microsoft|Google)\s+/, ''))}</option>`
+    ).join('');
+  }
+  function setVoice(name) {
+    Voice.setVoice(name);
+    store.rawSet(LS.voice, name);
+    log('Voice set to ' + name + '.');
+    previewVoice();
+  }
+  function previewVoice() {
+    Voice.stop();
+    Voice.speak("Zero online. Systems nominal. I'm listening.");
+  }
+
   function setThink(on) {
     store.rawSet(LS.think, on ? '1' : '');
     log('Reasoning mode turned ' + (on ? 'ON' : 'OFF') + ' by user.');
@@ -3949,13 +4021,7 @@ const Zero = (() => {
       document.getElementById('vaultPass').value = '';
       document.getElementById('vaultPass2').value = '';
       log('Vault enabled — stored data is now encrypted.');
-      const speakEl = document.getElementById('speakToggle');
-    if (speakEl) { speakEl.checked = store.raw(LS.speak) === '1'; speakReplies = speakEl.checked; }
-    if (!Voice.canSpeak()) document.getElementById('speakOpt')?.style.setProperty('display', 'none');
-    if (!Voice.canHear()) document.getElementById('micBtn')?.style.setProperty('display', 'none');
-    const thinkEl = document.getElementById('thinkToggle');
-    if (thinkEl) thinkEl.checked = engineCfg().think;
-    vaultUi();
+      vaultUi();
       alert('Vault on. Your data is encrypted on this device.');
     } catch (e) { alert(e.message); }
   }
@@ -4037,6 +4103,17 @@ const Zero = (() => {
     document.getElementById('lockPass')?.addEventListener('keydown', e => {
       if (e.key === 'Enter') unlockVault();
     });
+
+    const speakEl = document.getElementById('speakToggle');
+    if (speakEl) { speakEl.checked = store.raw(LS.speak) === '1'; speakReplies = speakEl.checked; }
+    if (store.raw(LS.voice)) Voice.setVoice(store.raw(LS.voice));
+    populateVoices();
+    // Chrome loads its voice catalogue asynchronously; refill when it lands.
+    if (Voice.canSpeak()) window.speechSynthesis.addEventListener('voiceschanged', populateVoices);
+    if (!Voice.canSpeak()) document.getElementById('speakOpt')?.style.setProperty('display', 'none');
+    if (!Voice.canHear()) document.getElementById('micBtn')?.style.setProperty('display', 'none');
+    const thinkEl = document.getElementById('thinkToggle');
+    if (thinkEl) thinkEl.checked = engineCfg().think;
     vaultUi();
 
     // Keyboard kill switch: Esc twice, or Ctrl/Cmd + . — works from anywhere.
@@ -4070,7 +4147,7 @@ const Zero = (() => {
   return {
     nav, loadMarkets, addTask, toggleTask, delTask, addNote, delNote,
     send, saveEngine, testEngine, saveStockKey, setThink, updateNow, loadStocks,
-    loadRates, loadNews, setSpeak, micToggle, stopSpeaking: () => Voice.stop(),
+    loadRates, loadNews, setSpeak, setVoice, previewVoice, micToggle, stopSpeaking: () => Voice.stop(),
     toggleWake, renderOverview, checkPassword, cryptoTool, showPayloads, copyText, reconDomain,
     openAFile, saveBack, saveNew, connectFolder, listFolder, openFromFolder, disconnectFolder,
     addApp, removeApp, launchApp, forgetMemory, storageInfo,

@@ -20,6 +20,7 @@ const Zero = (() => {
     micOk: 'zero.micOk',
     wakeOk: 'zero.wakeOk',
     speak: 'zero.speak',
+    voice: 'zero.voice',
   };
 
   // Short rolling context so the assistant remembers the current thread.
@@ -1403,6 +1404,30 @@ const Zero = (() => {
 
   function setSpeak(on) { store.rawSet(LS.speak, on ? '1' : ''); toggleSpeak(on); }
 
+  /* Fill the voice picker once the browser has loaded its catalogue. */
+  function populateVoices() {
+    const sel = document.getElementById('voiceSel');
+    if (!sel || !Voice.canSpeak()) return;
+    const list = Voice.listVoices();
+    if (!list.length) return;                 // catalogue not ready yet
+    const saved = store.raw(LS.voice);
+    if (saved) Voice.setVoice(saved);
+    const current = Voice.currentVoiceName();
+    sel.innerHTML = list.map(v =>
+      `<option value="${esc(v.name)}"${v.name === current ? ' selected' : ''}>${esc(v.name.replace(/^(Microsoft|Google)\s+/, ''))}</option>`
+    ).join('');
+  }
+  function setVoice(name) {
+    Voice.setVoice(name);
+    store.rawSet(LS.voice, name);
+    log('Voice set to ' + name + '.');
+    previewVoice();
+  }
+  function previewVoice() {
+    Voice.stop();
+    Voice.speak("Zero online. Systems nominal. I'm listening.");
+  }
+
   function setThink(on) {
     store.rawSet(LS.think, on ? '1' : '');
     log('Reasoning mode turned ' + (on ? 'ON' : 'OFF') + ' by user.');
@@ -1457,13 +1482,7 @@ const Zero = (() => {
       document.getElementById('vaultPass').value = '';
       document.getElementById('vaultPass2').value = '';
       log('Vault enabled — stored data is now encrypted.');
-      const speakEl = document.getElementById('speakToggle');
-    if (speakEl) { speakEl.checked = store.raw(LS.speak) === '1'; speakReplies = speakEl.checked; }
-    if (!Voice.canSpeak()) document.getElementById('speakOpt')?.style.setProperty('display', 'none');
-    if (!Voice.canHear()) document.getElementById('micBtn')?.style.setProperty('display', 'none');
-    const thinkEl = document.getElementById('thinkToggle');
-    if (thinkEl) thinkEl.checked = engineCfg().think;
-    vaultUi();
+      vaultUi();
       alert('Vault on. Your data is encrypted on this device.');
     } catch (e) { alert(e.message); }
   }
@@ -1545,6 +1564,17 @@ const Zero = (() => {
     document.getElementById('lockPass')?.addEventListener('keydown', e => {
       if (e.key === 'Enter') unlockVault();
     });
+
+    const speakEl = document.getElementById('speakToggle');
+    if (speakEl) { speakEl.checked = store.raw(LS.speak) === '1'; speakReplies = speakEl.checked; }
+    if (store.raw(LS.voice)) Voice.setVoice(store.raw(LS.voice));
+    populateVoices();
+    // Chrome loads its voice catalogue asynchronously; refill when it lands.
+    if (Voice.canSpeak()) window.speechSynthesis.addEventListener('voiceschanged', populateVoices);
+    if (!Voice.canSpeak()) document.getElementById('speakOpt')?.style.setProperty('display', 'none');
+    if (!Voice.canHear()) document.getElementById('micBtn')?.style.setProperty('display', 'none');
+    const thinkEl = document.getElementById('thinkToggle');
+    if (thinkEl) thinkEl.checked = engineCfg().think;
     vaultUi();
 
     // Keyboard kill switch: Esc twice, or Ctrl/Cmd + . — works from anywhere.
@@ -1578,7 +1608,7 @@ const Zero = (() => {
   return {
     nav, loadMarkets, addTask, toggleTask, delTask, addNote, delNote,
     send, saveEngine, testEngine, saveStockKey, setThink, updateNow, loadStocks,
-    loadRates, loadNews, setSpeak, micToggle, stopSpeaking: () => Voice.stop(),
+    loadRates, loadNews, setSpeak, setVoice, previewVoice, micToggle, stopSpeaking: () => Voice.stop(),
     toggleWake, renderOverview, checkPassword, cryptoTool, showPayloads, copyText, reconDomain,
     openAFile, saveBack, saveNew, connectFolder, listFolder, openFromFolder, disconnectFolder,
     addApp, removeApp, launchApp, forgetMemory, storageInfo,

@@ -18,25 +18,65 @@
    ------------------------------------------------------------ */
 const Voice = (() => {
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-  let recog = null, listening = false, voice = null;
+  let recog = null, listening = false, voice = null, chosenName = null;
 
   const canSpeak = () => 'speechSynthesis' in window;
   const canHear = () => !!SR;
 
+  /* ---- Voice character ----
+     Zero's delivery: measured, a touch below neutral pitch, a hair
+     slower than default. Calm and deliberate rather than chirpy — the
+     cadence is as much of the identity as the voice itself, and it is
+     the part that carries across every machine regardless of which
+     voices happen to be installed. */
+  const PROSODY = { rate: 0.96, pitch: 0.88 };
+
+  /* Curated shortlist, best first. These are the higher-fidelity or
+     more characterful voices that ship with common systems; the browser
+     installs decide which actually exist, so this only ranks — it never
+     assumes. Neural/"Online"/"Premium"/"Enhanced" voices sound markedly
+     better than the default robotic fallback, so they win. */
+  const PREFERRED = [
+    'Google UK English Male', 'Microsoft Guy Online', 'Microsoft Ryan Online',
+    'Daniel', 'Arthur', 'Oliver', 'Microsoft George',
+    'Google US English', 'Alex', 'Microsoft David',
+    'Rishi', 'Microsoft Mark',
+  ];
+  const NICE_HINT = /(neural|online|natural|premium|enhanced|siri|eloquence)/i;
+
+  function score(v) {
+    let s = 0;
+    const idx = PREFERRED.findIndex(n => v.name === n || v.name.startsWith(n));
+    if (idx >= 0) s += 1000 - idx * 10;         // exact curated rank
+    if (NICE_HINT.test(v.name)) s += 400;        // premium engine markers
+    if (/^en[-_]?GB/i.test(v.lang)) s += 60;     // a British cadence reads as composed
+    else if (/^en[-_]/i.test(v.lang)) s += 40;
+    if (v.localService) s += 20;                 // on-device keeps speech offline
+    if (/\b(male|guy|david|george|mark|daniel|arthur|oliver|alex)\b/i.test(v.name)) s += 15;
+    return s;
+  }
+
+  function catalogue() {
+    if (!canSpeak()) return [];
+    return speechSynthesis.getVoices().filter(v => /^en[-_]/i.test(v.lang) || !/[-_]/.test(v.lang));
+  }
+
   function pickVoice() {
-    if (!canSpeak()) return null;
     const all = speechSynthesis.getVoices();
     if (!all.length) return null;
-    // Prefer a local (on-device) voice so speech stays offline.
-    return all.find(v => v.localService && /en[-_]/i.test(v.lang))
-        || all.find(v => v.localService)
-        || all.find(v => /en[-_]/i.test(v.lang))
-        || all[0];
+    if (chosenName) { const c = all.find(v => v.name === chosenName); if (c) return c; }
+    const en = all.filter(v => /^en[-_]/i.test(v.lang));
+    const pool = en.length ? en : all;
+    return pool.slice().sort((a, b) => score(b) - score(a))[0];
   }
   if (canSpeak()) {
     speechSynthesis.onvoiceschanged = () => { voice = pickVoice(); };
     voice = pickVoice();
   }
+
+  function setVoice(name) { chosenName = name || null; voice = pickVoice(); }
+  function currentVoiceName() { return (voice || pickVoice())?.name || null; }
+  function listVoices() { return catalogue().map(v => ({ name: v.name, lang: v.lang, local: v.localService })); }
 
   function speak(text, opts = {}) {
     if (!canSpeak() || !text) return false;
@@ -51,8 +91,8 @@ const Voice = (() => {
     const u = new SpeechSynthesisUtterance(clean.slice(0, 600));
     if (!voice) voice = pickVoice();
     if (voice) u.voice = voice;
-    u.rate = opts.rate ?? 1.02;
-    u.pitch = opts.pitch ?? 0.95;
+    u.rate = opts.rate ?? PROSODY.rate;
+    u.pitch = opts.pitch ?? PROSODY.pitch;
     u.onend = opts.onend || null;
     speechSynthesis.speak(u);
     return true;
@@ -150,7 +190,8 @@ const Voice = (() => {
   function stopListening() { try { recog?.stop(); } catch {} listening = false; }
   const isListening = () => listening;
 
-  return { canSpeak, canHear, speak, stop, listen, stopListening, isListening, startWake, stopWake, isAwake };
+  return { canSpeak, canHear, speak, stop, listen, stopListening, isListening, startWake, stopWake, isAwake,
+           setVoice, currentVoiceName, listVoices };
 })();
 
 
