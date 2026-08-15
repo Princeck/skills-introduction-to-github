@@ -69,6 +69,7 @@ the home screen; everything else is a side panel you visit when you need it.
 - **Built-in skills** — maths, unit and currency conversion, code scaffolds, hashes, slugs, passwords: all with no model
 - **Charts** — real price history drawn on canvas, with indicators computed from it
 - **News** — live top stories, no key
+- **Trading** — real TradingView charts for every market (stocks, forex, crypto, indices, commodities) — the one opt-in third-party feature
 - **Markets** — live crypto prices (BTC, ETH, SOL, BNB, XRP, DOGE), auto-refresh every 60s
 - **Assistant** — built-in commands (`help`, `task …`, `note …`, `price btc`, `tasks`, `time`) that need no model at all, plus open conversation through a local engine
 - **Tasks / Notes** — saved locally, export to JSON anytime
@@ -237,6 +238,13 @@ write back in place.
 Add a name and a link, then say `open figma`. Anything the operating system can
 open works: `https://…`, `vscode://`, `figma://`, `spotify:`.
 
+Quick-add presets cover the common platforms (GitHub, Figma, Gmail, Notion,
+YouTube, Spotify, TradingView and more); anything else you add by URL.
+
+No app can "connect to every platform in the world" — each one needs its own API,
+login and permission, and most forbid browser access outright. What Zero does is
+the honest, useful version: **launch** any of them in one keystroke.
+
 Being precise about what this is: **a web page cannot reach inside other
 programs.** That boundary is exactly why opening a browser is safe. What Zero
 can do is hand a link to your OS and let it pick the app — which is how every
@@ -299,6 +307,23 @@ Where a feed returns no value, Zero prints **—**. It will not render a missing
 24h change as `0.00%`, and it will not print `$0.00` for a symbol the feed
 doesn't recognise — both are numbers nobody reported. When a fetch fails the
 table empties rather than leaving stale prices on screen looking current.
+
+---
+
+## Trading — real TradingView charts
+
+The Trading tab embeds TradingView's official chart widget, so you get genuine
+professional charts for **every market they cover**: stocks (`NASDAQ:AAPL`),
+forex (`FX:EURUSD`), crypto (`BINANCE:BTCUSDT`), indices (`SP:SPX`), commodities
+(`OANDA:XAUUSD`), futures. Type a symbol or tap a preset.
+
+**This is the one part of Zero that reaches a third party, and it says so.**
+TradingView's script loads from their servers and they see that you use it. So it
+is gated: nothing loads until you open the Trading tab *and* click through a
+one-time consent, and the network switch and STOP both cut it like anything else.
+If you never open Trading, no third-party script ever loads and Zero stays
+fully first-party. That is why it is a separate, labelled feature rather than
+switched on by default.
 
 ---
 

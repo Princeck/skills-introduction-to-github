@@ -115,7 +115,7 @@
     <div class="mark">0</div>
     <h1>ZER<b>0</b> — source</h1>
   </header>
-  <p class="meta">zero-standalone.html · 179.8 KB · 4165 lines · self-contained</p>
+  <p class="meta">zero-standalone.html · 186.7 KB · 4303 lines · self-contained</p>
 
   <div class="actions">
     <button id="copy">Copy all code</button>
@@ -557,6 +557,24 @@ details.think > div {
 .ov-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
 @media (max-width: 1100px) { .ov-grid { grid-template-columns: 1fr; } }
 
+/* ============ Chips ============ */
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip {
+  background: rgba(120,165,255,.07); border: 1px solid var(--edge);
+  color: var(--muted); border-radius: 999px; padding: 7px 14px;
+  font-size: 12.5px; cursor: pointer; font-family: var(--sans);
+  transition: color .15s, border-color .15s, background .15s;
+}
+.chip:hover { color: var(--white); border-color: rgba(92,225,255,.5); background: rgba(92,225,255,.1); }
+
+.tv-gate {
+  margin-top: 16px; border: 1px solid var(--edge); border-left: 2px solid var(--red);
+  background: rgba(255,45,85,.05); border-radius: 0 12px 12px 0; padding: 16px 20px;
+  font-size: 13px; line-height: 1.6; color: var(--muted);
+}
+.tv-gate b { color: var(--white); }
+.tv-gate code { font-family: var(--mono); font-size: 12px; color: var(--cyan); }
+
 /* ============ App launcher ============ */
 #appList { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 12px; }
 .app-tile {
@@ -899,6 +917,7 @@ input:focus, textarea:focus, select:focus {
         &lt;li data-view="control">&lt;span class="ic">⏻&lt;/span> Control Panel&lt;/li>
         &lt;li data-view="markets">&lt;span class="ic">▲&lt;/span> Markets&lt;/li>
         &lt;li data-view="news">&lt;span class="ic">◉&lt;/span> News&lt;/li>
+        &lt;li data-view="trading">&lt;span class="ic">▤&lt;/span> Trading&lt;/li>
         &lt;li data-view="apps">&lt;span class="ic">◱&lt;/span> Apps&lt;/li>
         &lt;li data-view="memory">&lt;span class="ic">❖&lt;/span> Memory&lt;/li>
         &lt;li data-view="security">&lt;span class="ic">⛨&lt;/span> Security&lt;/li>
@@ -1010,6 +1029,28 @@ input:focus, textarea:focus, select:focus {
             &lt;button class="btn blue" onclick="Zero.loadStocks()">↻ Refresh&lt;/button>
             &lt;span class="hint" id="stockUpdated">&lt;/span>
           &lt;/div>
+        &lt;/div>
+      &lt;/section>
+
+      &lt;!-- TRADING -->
+      &lt;section class="view" id="view-trading">
+        &lt;div class="card">
+          &lt;h2>Trading &lt;span class="pill">TradingView · live&lt;/span>&lt;/h2>
+          &lt;p class="hint">Real professional charts for every market TradingView covers — stocks, forex, crypto, indices, commodities, futures. Try &lt;code>OANDA:XAUUSD&lt;/code>, &lt;code>NASDAQ:AAPL&lt;/code>, &lt;code>BINANCE:BTCUSDT&lt;/code>.&lt;/p>
+          &lt;div class="chat-input" style="margin-top:12px">
+            &lt;input id="tvInput" placeholder="Symbol — e.g. NASDAQ:AAPL or XAUUSD" onkeydown="if(event.key==='Enter')Zero.tvSearch()" />
+            &lt;button class="btn" onclick="Zero.tvSearch()">Load&lt;/button>
+          &lt;/div>
+          &lt;div id="tvChips" class="chips" style="margin-top:12px">&lt;/div>
+          &lt;div class="hint" style="margin-top:8px;font-family:var(--mono)">Showing: &lt;span id="tvNow">—&lt;/span>&lt;/div>
+
+          &lt;div id="tvGate" class="tv-gate" style="display:none">
+            &lt;p>&lt;b>This is the one part of Zero that reaches a third party.&lt;/b>&lt;/p>
+            &lt;p>TradingView's chart loads their script from &lt;code>s3.tradingview.com&lt;/code>, and their servers see that you are using it, subject to TradingView's own terms and privacy policy. Everything else in Zero stays on your machine — this is the deliberate exception, because live pro charts cannot be drawn without their data.&lt;/p>
+            &lt;p style="margin-top:12px">&lt;button class="btn" onclick="Zero.allowTradingView()">Load TradingView charts&lt;/button>&lt;/p>
+          &lt;/div>
+          &lt;div id="tvContainer" style="margin-top:14px;min-height:200px">&lt;/div>
+          &lt;div class="notice">Charts are information, not advice. The network switch and STOP both cut this like anything else.&lt;/div>
         &lt;/div>
       &lt;/section>
 
@@ -1155,6 +1196,8 @@ input:focus, textarea:focus, select:focus {
           &lt;h2>Your Apps&lt;/h2>
           &lt;p class="hint">Add anything the operating system can open — a website, or an app link like &lt;code>vscode://&lt;/code>, &lt;code>figma://&lt;/code>, &lt;code>spotify:&lt;/code>. Then say &lt;b>open figma&lt;/b> in chat and Zero launches it.&lt;/p>
           &lt;div id="appList" style="margin-top:16px">&lt;/div>
+          &lt;p class="hint" style="margin-top:16px">Quick add:&lt;/p>
+          &lt;div id="appPresets" class="chips" style="margin-top:8px">&lt;/div>
           &lt;div class="chat-input" style="margin-top:16px">
             &lt;input id="appName" placeholder="Name — e.g. Figma" style="max-width:220px" />
             &lt;input id="appUrl" placeholder="https://figma.com  or  vscode://" />
@@ -2703,6 +2746,8 @@ const Zero = (() => {
     stockSymbols: 'zero.stockSymbols',
     memories: 'zero.memories',
     apps: 'zero.apps',
+    tvOk: 'zero.tvOk',
+    tvSymbol: 'zero.tvSymbol',
     micOk: 'zero.micOk',
     wakeOk: 'zero.wakeOk',
     speak: 'zero.speak',
@@ -2915,6 +2960,7 @@ const Zero = (() => {
     security:  ['Security', 'Harden what is yours.'],
     files:     ['Files', 'Your disk, connected on your terms.'],
     news:      ['News', 'What is happening right now.'],
+    trading:   ['Trading', 'Live professional charts — every market.'],
     apps:      ['Apps', 'Your things, one keystroke away.'],
     memory:    ['Memory', 'What Zero carries between conversations.'],
     assistant: ['Assistant', 'Ask Zero anything. Nothing leaves this device.'],
@@ -2933,9 +2979,11 @@ const Zero = (() => {
     document.getElementById('viewSub').textContent = s;
     if (view === 'markets') { loadMarkets(); loadStocks(); loadRates(); }
     if (view === 'news') loadNews();
+    if (view === 'trading') { renderTvChips(); openTradingView(); }
     if (view === 'overview') renderOverview();
     if (view === 'security') { renderChecklist(); showPayloads(); }
     if (view === 'files') { filesUi(); listFolder(); }
+    if (view === 'apps') renderPresets();
   }
 
   /* ---------------- Clock ---------------- */
@@ -3333,6 +3381,24 @@ const Zero = (() => {
      the whole reason a web page is safe to open. What it CAN do is hand
      the operating system a link and let it decide, which is how
      vscode://, spotify:, figma:// and every https:// app open. */
+  const APP_PRESETS = [
+    ['GitHub', 'https://github.com'], ['Figma', 'https://figma.com'],
+    ['VS Code', 'vscode://'], ['Gmail', 'https://mail.google.com'],
+    ['Drive', 'https://drive.google.com'], ['Notion', 'https://notion.so'],
+    ['YouTube', 'https://youtube.com'], ['ChatGPT', 'https://chat.openai.com'],
+    ['Spotify', 'https://open.spotify.com'], ['Discord', 'https://discord.com/app'],
+    ['TradingView', 'https://tradingview.com'], ['Vercel', 'https://vercel.com'],
+    ['Itch.io', 'https://itch.io'], ['Steam', 'steam://open/main'],
+  ];
+  function renderPresets() {
+    const el = document.getElementById('appPresets');
+    if (!el) return;
+    el.innerHTML = APP_PRESETS
+      .filter(([n]) => !apps.some(a => a.name.toLowerCase() === n.toLowerCase()))
+      .map(([n, u]) => `&lt;button class="chip" onclick="Zero.addPreset('${esc(n)}','${esc(u)}')">+ ${esc(n)}&lt;/button>`).join('');
+  }
+  function addPreset(name, url) { apps.push({ name, url }); store.set(LS.apps, apps); persistPlain(); renderApps(); renderPresets(); }
+
   function renderApps() {
     const list = document.getElementById('appList');
     if (!list) return;
@@ -3353,12 +3419,83 @@ const Zero = (() => {
     n.value = ''; u.value = '';
     renderApps();
   }
-  function removeApp(i) { apps.splice(i, 1); store.set(LS.apps, apps); persistPlain(); renderApps(); }
+  function removeApp(i) { apps.splice(i, 1); store.set(LS.apps, apps); persistPlain(); renderApps(); renderPresets(); }
   function launchApp(i) {
     const a = apps[i];
     if (!a) return;
     log('Opening ' + a.name + ' (' + a.url + ') — handed to the operating system.');
     window.open(a.url, '_blank', 'noopener,noreferrer');
+  }
+
+  /* ---------------- TradingView ----------------
+     The one feature that reaches a third party. TradingView's official
+     widget script is loaded from their servers, so it is gated: it loads
+     only after you open this view AND consent once, and never if the
+     network is halted or switched off. Everything else in Zero stays
+     first-party; this is the deliberate, labelled exception. */
+  let tvLoaded = false;
+
+  function tvSymbols() {
+    return [
+      ['OANDA:XAUUSD', 'Gold / USD'], ['NASDAQ:AAPL', 'Apple'], ['NASDAQ:TSLA', 'Tesla'],
+      ['BINANCE:BTCUSDT', 'Bitcoin'], ['BINANCE:ETHUSDT', 'Ethereum'], ['FX:EURUSD', 'EUR / USD'],
+      ['NASDAQ:NVDA', 'Nvidia'], ['SP:SPX', 'S&amp;P 500'], ['TVC:USOIL', 'Crude Oil'],
+    ];
+  }
+
+  function openTradingView(symbol) {
+    const host = document.getElementById('tvContainer');
+    const gate = document.getElementById('tvGate');
+    if (!host) return;
+
+    if (Control.halted || !Control.caps.network) {
+      host.innerHTML = '&lt;div class="spinner">Charts need the network, and Zero is blocking it right now.&lt;/div>';
+      return;
+    }
+    if (!store.raw(LS.tvOk)) { if (gate) gate.style.display = ''; return; }
+    if (gate) gate.style.display = 'none';
+
+    const sym = symbol || store.raw(LS.tvSymbol) || 'OANDA:XAUUSD';
+    store.rawSet(LS.tvSymbol, sym);
+    setText('tvNow', sym);
+
+    const build = () => {
+      host.innerHTML = '&lt;div id="tvWidget" style="height:520px">&lt;/div>';
+      /* eslint-disable no-undef */
+      new TradingView.widget({
+        container_id: 'tvWidget', symbol: sym, autosize: true,
+        interval: 'D', timezone: 'Etc/UTC', theme: 'dark', style: '1',
+        locale: 'en', enable_publishing: false, hide_side_toolbar: false,
+        allow_symbol_change: true, studies: ['RSI@tv-basicstudies'],
+      });
+    };
+
+    if (tvLoaded &amp;&amp; window.TradingView) { build(); return; }
+    host.innerHTML = '&lt;div class="spinner">Loading TradingView&lt;/div>';
+    log('Loading TradingView widget from s3.tradingview.com (third-party) — user opened Trading.', true);
+    const sc = document.createElement('script');
+    sc.src = 'https://s3.tradingview.com/tv.js';
+    sc.onload = () => { tvLoaded = true; build(); };
+    sc.onerror = () => { host.innerHTML = '&lt;div class="spinner">Could not reach TradingView. Check your connection.&lt;/div>'; };
+    document.head.appendChild(sc);
+  }
+
+  function allowTradingView() {
+    store.rawSet(LS.tvOk, '1');
+    log('TradingView enabled by user.');
+    openTradingView();
+  }
+
+  function tvSearch() {
+    const raw = document.getElementById('tvInput').value.trim();
+    if (raw) openTradingView(raw.toUpperCase());
+  }
+
+  function renderTvChips() {
+    const el = document.getElementById('tvChips');
+    if (!el) return;
+    el.innerHTML = tvSymbols().map(([sym, name]) =>
+      `&lt;button class="chip" onclick="Zero.openTradingView('${sym}')">${esc(name)}&lt;/button>`).join('');
   }
 
   /* ---------------- Charts &amp; analysis ---------------- */
@@ -4274,7 +4411,7 @@ const Zero = (() => {
     });
 
     tick(); setInterval(tick, 1000);
-    renderTasks(); renderNotes(); renderMemories(); renderApps(); refreshAiStatus(); updateStatus();
+    renderTasks(); renderNotes(); renderMemories(); renderApps(); renderPresets(); refreshAiStatus(); updateStatus();
     // Move any records left behind by the localStorage era.
     Store.migrate([LS.tasks, LS.notes, LS.memories, LS.apps])
       .then(n => { if (n) log(`Moved ${n} record(s) into the larger local database.`); })
@@ -4297,7 +4434,8 @@ const Zero = (() => {
     loadRates, loadNews, setSpeak, setVoice, previewVoice, micToggle, stopSpeaking: () => Voice.stop(),
     toggleWake, renderOverview, checkPassword, cryptoTool, showPayloads, copyText, reconDomain,
     openAFile, saveBack, saveNew, connectFolder, listFolder, openFromFolder, disconnectFolder,
-    addApp, removeApp, launchApp, forgetMemory, storageInfo,
+    addApp, removeApp, launchApp, forgetMemory, storageInfo, addPreset,
+    openTradingView, allowTradingView, tvSearch,
     exportData, wipeData, init,
     toggleHalt, killNetwork, panic, setCap, clearLog,
     enableVault, unlockVault, lockVault, disableVault,

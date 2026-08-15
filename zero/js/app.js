@@ -17,6 +17,8 @@ const Zero = (() => {
     stockSymbols: 'zero.stockSymbols',
     memories: 'zero.memories',
     apps: 'zero.apps',
+    tvOk: 'zero.tvOk',
+    tvSymbol: 'zero.tvSymbol',
     micOk: 'zero.micOk',
     wakeOk: 'zero.wakeOk',
     speak: 'zero.speak',
@@ -229,6 +231,7 @@ const Zero = (() => {
     security:  ['Security', 'Harden what is yours.'],
     files:     ['Files', 'Your disk, connected on your terms.'],
     news:      ['News', 'What is happening right now.'],
+    trading:   ['Trading', 'Live professional charts — every market.'],
     apps:      ['Apps', 'Your things, one keystroke away.'],
     memory:    ['Memory', 'What Zero carries between conversations.'],
     assistant: ['Assistant', 'Ask Zero anything. Nothing leaves this device.'],
@@ -247,9 +250,11 @@ const Zero = (() => {
     document.getElementById('viewSub').textContent = s;
     if (view === 'markets') { loadMarkets(); loadStocks(); loadRates(); }
     if (view === 'news') loadNews();
+    if (view === 'trading') { renderTvChips(); openTradingView(); }
     if (view === 'overview') renderOverview();
     if (view === 'security') { renderChecklist(); showPayloads(); }
     if (view === 'files') { filesUi(); listFolder(); }
+    if (view === 'apps') renderPresets();
   }
 
   /* ---------------- Clock ---------------- */
@@ -647,6 +652,24 @@ const Zero = (() => {
      the whole reason a web page is safe to open. What it CAN do is hand
      the operating system a link and let it decide, which is how
      vscode://, spotify:, figma:// and every https:// app open. */
+  const APP_PRESETS = [
+    ['GitHub', 'https://github.com'], ['Figma', 'https://figma.com'],
+    ['VS Code', 'vscode://'], ['Gmail', 'https://mail.google.com'],
+    ['Drive', 'https://drive.google.com'], ['Notion', 'https://notion.so'],
+    ['YouTube', 'https://youtube.com'], ['ChatGPT', 'https://chat.openai.com'],
+    ['Spotify', 'https://open.spotify.com'], ['Discord', 'https://discord.com/app'],
+    ['TradingView', 'https://tradingview.com'], ['Vercel', 'https://vercel.com'],
+    ['Itch.io', 'https://itch.io'], ['Steam', 'steam://open/main'],
+  ];
+  function renderPresets() {
+    const el = document.getElementById('appPresets');
+    if (!el) return;
+    el.innerHTML = APP_PRESETS
+      .filter(([n]) => !apps.some(a => a.name.toLowerCase() === n.toLowerCase()))
+      .map(([n, u]) => `<button class="chip" onclick="Zero.addPreset('${esc(n)}','${esc(u)}')">+ ${esc(n)}</button>`).join('');
+  }
+  function addPreset(name, url) { apps.push({ name, url }); store.set(LS.apps, apps); persistPlain(); renderApps(); renderPresets(); }
+
   function renderApps() {
     const list = document.getElementById('appList');
     if (!list) return;
@@ -667,12 +690,83 @@ const Zero = (() => {
     n.value = ''; u.value = '';
     renderApps();
   }
-  function removeApp(i) { apps.splice(i, 1); store.set(LS.apps, apps); persistPlain(); renderApps(); }
+  function removeApp(i) { apps.splice(i, 1); store.set(LS.apps, apps); persistPlain(); renderApps(); renderPresets(); }
   function launchApp(i) {
     const a = apps[i];
     if (!a) return;
     log('Opening ' + a.name + ' (' + a.url + ') — handed to the operating system.');
     window.open(a.url, '_blank', 'noopener,noreferrer');
+  }
+
+  /* ---------------- TradingView ----------------
+     The one feature that reaches a third party. TradingView's official
+     widget script is loaded from their servers, so it is gated: it loads
+     only after you open this view AND consent once, and never if the
+     network is halted or switched off. Everything else in Zero stays
+     first-party; this is the deliberate, labelled exception. */
+  let tvLoaded = false;
+
+  function tvSymbols() {
+    return [
+      ['OANDA:XAUUSD', 'Gold / USD'], ['NASDAQ:AAPL', 'Apple'], ['NASDAQ:TSLA', 'Tesla'],
+      ['BINANCE:BTCUSDT', 'Bitcoin'], ['BINANCE:ETHUSDT', 'Ethereum'], ['FX:EURUSD', 'EUR / USD'],
+      ['NASDAQ:NVDA', 'Nvidia'], ['SP:SPX', 'S&P 500'], ['TVC:USOIL', 'Crude Oil'],
+    ];
+  }
+
+  function openTradingView(symbol) {
+    const host = document.getElementById('tvContainer');
+    const gate = document.getElementById('tvGate');
+    if (!host) return;
+
+    if (Control.halted || !Control.caps.network) {
+      host.innerHTML = '<div class="spinner">Charts need the network, and Zero is blocking it right now.</div>';
+      return;
+    }
+    if (!store.raw(LS.tvOk)) { if (gate) gate.style.display = ''; return; }
+    if (gate) gate.style.display = 'none';
+
+    const sym = symbol || store.raw(LS.tvSymbol) || 'OANDA:XAUUSD';
+    store.rawSet(LS.tvSymbol, sym);
+    setText('tvNow', sym);
+
+    const build = () => {
+      host.innerHTML = '<div id="tvWidget" style="height:520px"></div>';
+      /* eslint-disable no-undef */
+      new TradingView.widget({
+        container_id: 'tvWidget', symbol: sym, autosize: true,
+        interval: 'D', timezone: 'Etc/UTC', theme: 'dark', style: '1',
+        locale: 'en', enable_publishing: false, hide_side_toolbar: false,
+        allow_symbol_change: true, studies: ['RSI@tv-basicstudies'],
+      });
+    };
+
+    if (tvLoaded && window.TradingView) { build(); return; }
+    host.innerHTML = '<div class="spinner">Loading TradingView</div>';
+    log('Loading TradingView widget from s3.tradingview.com (third-party) — user opened Trading.', true);
+    const sc = document.createElement('script');
+    sc.src = 'https://s3.tradingview.com/tv.js';
+    sc.onload = () => { tvLoaded = true; build(); };
+    sc.onerror = () => { host.innerHTML = '<div class="spinner">Could not reach TradingView. Check your connection.</div>'; };
+    document.head.appendChild(sc);
+  }
+
+  function allowTradingView() {
+    store.rawSet(LS.tvOk, '1');
+    log('TradingView enabled by user.');
+    openTradingView();
+  }
+
+  function tvSearch() {
+    const raw = document.getElementById('tvInput').value.trim();
+    if (raw) openTradingView(raw.toUpperCase());
+  }
+
+  function renderTvChips() {
+    const el = document.getElementById('tvChips');
+    if (!el) return;
+    el.innerHTML = tvSymbols().map(([sym, name]) =>
+      `<button class="chip" onclick="Zero.openTradingView('${sym}')">${esc(name)}</button>`).join('');
   }
 
   /* ---------------- Charts & analysis ---------------- */
@@ -1588,7 +1682,7 @@ const Zero = (() => {
     });
 
     tick(); setInterval(tick, 1000);
-    renderTasks(); renderNotes(); renderMemories(); renderApps(); refreshAiStatus(); updateStatus();
+    renderTasks(); renderNotes(); renderMemories(); renderApps(); renderPresets(); refreshAiStatus(); updateStatus();
     // Move any records left behind by the localStorage era.
     Store.migrate([LS.tasks, LS.notes, LS.memories, LS.apps])
       .then(n => { if (n) log(`Moved ${n} record(s) into the larger local database.`); })
@@ -1611,7 +1705,8 @@ const Zero = (() => {
     loadRates, loadNews, setSpeak, setVoice, previewVoice, micToggle, stopSpeaking: () => Voice.stop(),
     toggleWake, renderOverview, checkPassword, cryptoTool, showPayloads, copyText, reconDomain,
     openAFile, saveBack, saveNew, connectFolder, listFolder, openFromFolder, disconnectFolder,
-    addApp, removeApp, launchApp, forgetMemory, storageInfo,
+    addApp, removeApp, launchApp, forgetMemory, storageInfo, addPreset,
+    openTradingView, allowTradingView, tvSearch,
     exportData, wipeData, init,
     toggleHalt, killNetwork, panic, setCap, clearLog,
     enableVault, unlockVault, lockVault, disableVault,

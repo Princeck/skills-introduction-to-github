@@ -51,6 +51,7 @@
         <li data-view="control"><span class="ic">⏻</span> Control Panel</li>
         <li data-view="markets"><span class="ic">▲</span> Markets</li>
         <li data-view="news"><span class="ic">◉</span> News</li>
+        <li data-view="trading"><span class="ic">▤</span> Trading</li>
         <li data-view="apps"><span class="ic">◱</span> Apps</li>
         <li data-view="memory"><span class="ic">❖</span> Memory</li>
         <li data-view="security"><span class="ic">⛨</span> Security</li>
@@ -162,6 +163,28 @@
             <button class="btn blue" onclick="Zero.loadStocks()">↻ Refresh</button>
             <span class="hint" id="stockUpdated"></span>
           </div>
+        </div>
+      </section>
+
+      <!-- TRADING -->
+      <section class="view" id="view-trading">
+        <div class="card">
+          <h2>Trading <span class="pill">TradingView · live</span></h2>
+          <p class="hint">Real professional charts for every market TradingView covers — stocks, forex, crypto, indices, commodities, futures. Try <code>OANDA:XAUUSD</code>, <code>NASDAQ:AAPL</code>, <code>BINANCE:BTCUSDT</code>.</p>
+          <div class="chat-input" style="margin-top:12px">
+            <input id="tvInput" placeholder="Symbol — e.g. NASDAQ:AAPL or XAUUSD" onkeydown="if(event.key==='Enter')Zero.tvSearch()" />
+            <button class="btn" onclick="Zero.tvSearch()">Load</button>
+          </div>
+          <div id="tvChips" class="chips" style="margin-top:12px"></div>
+          <div class="hint" style="margin-top:8px;font-family:var(--mono)">Showing: <span id="tvNow">—</span></div>
+
+          <div id="tvGate" class="tv-gate" style="display:none">
+            <p><b>This is the one part of Zero that reaches a third party.</b></p>
+            <p>TradingView's chart loads their script from <code>s3.tradingview.com</code>, and their servers see that you are using it, subject to TradingView's own terms and privacy policy. Everything else in Zero stays on your machine — this is the deliberate exception, because live pro charts cannot be drawn without their data.</p>
+            <p style="margin-top:12px"><button class="btn" onclick="Zero.allowTradingView()">Load TradingView charts</button></p>
+          </div>
+          <div id="tvContainer" style="margin-top:14px;min-height:200px"></div>
+          <div class="notice">Charts are information, not advice. The network switch and STOP both cut this like anything else.</div>
         </div>
       </section>
 
@@ -307,6 +330,8 @@
           <h2>Your Apps</h2>
           <p class="hint">Add anything the operating system can open — a website, or an app link like <code>vscode://</code>, <code>figma://</code>, <code>spotify:</code>. Then say <b>open figma</b> in chat and Zero launches it.</p>
           <div id="appList" style="margin-top:16px"></div>
+          <p class="hint" style="margin-top:16px">Quick add:</p>
+          <div id="appPresets" class="chips" style="margin-top:8px"></div>
           <div class="chat-input" style="margin-top:16px">
             <input id="appName" placeholder="Name — e.g. Figma" style="max-width:220px" />
             <input id="appUrl" placeholder="https://figma.com  or  vscode://" />

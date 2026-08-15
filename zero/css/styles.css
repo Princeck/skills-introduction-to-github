@@ -402,6 +402,24 @@ details.think > div {
 .ov-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
 @media (max-width: 1100px) { .ov-grid { grid-template-columns: 1fr; } }
 
+/* ============ Chips ============ */
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip {
+  background: rgba(120,165,255,.07); border: 1px solid var(--edge);
+  color: var(--muted); border-radius: 999px; padding: 7px 14px;
+  font-size: 12.5px; cursor: pointer; font-family: var(--sans);
+  transition: color .15s, border-color .15s, background .15s;
+}
+.chip:hover { color: var(--white); border-color: rgba(92,225,255,.5); background: rgba(92,225,255,.1); }
+
+.tv-gate {
+  margin-top: 16px; border: 1px solid var(--edge); border-left: 2px solid var(--red);
+  background: rgba(255,45,85,.05); border-radius: 0 12px 12px 0; padding: 16px 20px;
+  font-size: 13px; line-height: 1.6; color: var(--muted);
+}
+.tv-gate b { color: var(--white); }
+.tv-gate code { font-family: var(--mono); font-size: 12px; color: var(--cyan); }
+
 /* ============ App launcher ============ */
 #appList { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 12px; }
 .app-tile {
