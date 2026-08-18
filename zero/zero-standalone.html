@@ -926,6 +926,7 @@ input:focus, textarea:focus, select:focus {
           <div class="card ov-orb">
             <canvas id="orb"></canvas>
             <button class="btn ghost" id="wakeBtn" onclick="Zero.toggleWake()">◎ Wake word off</button>
+            <button class="btn blue" style="margin-top:10px" onclick="Zero.nav('assistant');Zero.dailyBriefing(false)">📈 Daily market briefing</button>
             <p class="hint" style="text-align:center;margin-top:10px">Say <b>“Zero, …”</b> and it acts on what follows.</p>
           </div>
           <div class="card">
@@ -3412,6 +3413,58 @@ const Zero = (() => {
     }
   }
 
+  /* ---------------- Daily briefing ----------------
+     A factual digest of live conditions across a basket. It reports what
+     the market DID — moves, RSI, volatility, position in range — and
+     deliberately issues no buy/sell call, because an honest one does not
+     exist. The reader decides; Zero informs. */
+  const BRIEF_BASKET = [['bitcoin', 'BTC'], ['ethereum', 'ETH'], ['solana', 'SOL']];
+
+  function rsiWord(r) {
+    if (r == null) return '';
+    if (r >= 70) return `RSI ${r.toFixed(0)} (in the band conventionally called overbought — a note on recent momentum, not a sell signal)`;
+    if (r <= 30) return `RSI ${r.toFixed(0)} (conventionally called oversold — not a buy signal)`;
+    return `RSI ${r.toFixed(0)} (mid-range)`;
+  }
+
+  async function dailyBriefing(speak) {
+    const holder = bubble('Reading the market…', 'zero');
+    const lines = [];
+    const f = n => n >= 1000 ? n.toLocaleString(undefined, { maximumFractionDigits: 0 }) : n.toPrecision(5);
+    for (const [id, sym] of BRIEF_BASKET) {
+      try {
+        const r = await guardedFetch(
+          `https://api.coingecko.com/api/v3/coins/${id}/market_chart?vs_currency=usd&days=30`, {}, 'market');
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        const values = (await r.json()).prices?.map(p => p[1]).filter(v => typeof v === 'number') || [];
+        if (values.length < 5) { lines.push(`${sym}: not enough data returned.`); continue; }
+        const a = Chart.describe(values);
+        const trend = a.ma7 != null && a.ma30 != null
+          ? (a.ma7 > a.ma30 ? 'short-term average above the longer one' : 'short-term average below the longer one')
+          : '';
+        lines.push(
+          `${sym}  $${f(a.last)}\n` +
+          `   30d ${a.change >= 0 ? '+' : ''}${a.change.toFixed(1)}% · ${a.pos.toFixed(0)}% of its 30d range · ` +
+          `${a.vol != null ? a.vol.toFixed(0) + '% annualised vol' : ''}\n` +
+          `   ${rsiWord(a.rsi)}${trend ? ' · ' + trend : ''}`);
+      } catch (e) {
+        if (/halted|switched off/i.test(e.message)) { holder.textContent = e.message; return; }
+        lines.push(`${sym}: could not read (${e.message}).`);
+      }
+    }
+    const now = new Date().toLocaleString(undefined, { weekday: 'long', hour: '2-digit', minute: '2-digit' });
+    const body =
+      `MARKET BRIEFING · ${now}\n\n` +
+      lines.join('\n\n') +
+      `\n\nThese are readings of what has already happened, not forecasts. ` +
+      `Zero does not tell you what to trade — no tool reliably predicts the next move. ` +
+      `What you control is position size and risk. Gold, stocks and forex charts are in the Trading tab.`;
+    holder.textContent = body;
+    if (speak && speakReplies) Voice.speak('Market briefing ready. ' +
+      lines.map(l => l.split('\n')[0]).join('. '));
+    log('Daily briefing generated.');
+  }
+
   /* ---------------- Currency (live ECB rates, keyless) ---------------- */
   const CURRENCIES = new Set(('USD EUR GBP JPY CHF CAD AUD NZD CNY HKD SGD SEK NOK DKK PLN ' +
     'CZK HUF RON BGN TRY ILS INR KRW MXN BRL ZAR THB MYR PHP IDR ISK').split(' '));
@@ -3743,6 +3796,7 @@ const Zero = (() => {
         'MARKETS & NEWS',
         '  price btc           live crypto price',
         '  chart btc 90        price chart + indicators',
+        '  briefing            daily read of live market conditions',
         '  news                top stories right now',
         '  update              refresh everything',
         '',
@@ -3792,6 +3846,9 @@ const Zero = (() => {
     }
 
     if (low === 'news') { loadNews(true); return 'Pulling the latest stories…'; }
+    if (low === 'briefing' || low === 'daily' || low === 'brief' || low === 'market' || low === 'markets today') {
+      dailyBriefing(true); return HANDLED;
+    }
 
     if (low.startsWith('remember ')) {
       const text = s.slice(9).trim();
@@ -4288,7 +4345,7 @@ const Zero = (() => {
     toggleWake, renderOverview, checkPassword, cryptoTool, showPayloads, copyText, reconDomain,
     openAFile, saveBack, saveNew, connectFolder, listFolder, openFromFolder, disconnectFolder,
     addApp, removeApp, launchApp, forgetMemory, storageInfo, addPreset,
-    openTradingView, allowTradingView, tvSearch,
+    openTradingView, allowTradingView, tvSearch, dailyBriefing,
     exportData, wipeData, init,
     toggleHalt, killNetwork, panic, setCap, clearLog,
     enableVault, unlockVault, lockVault, disableVault,

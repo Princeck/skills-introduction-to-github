@@ -310,6 +310,22 @@ table empties rather than leaving stale prices on screen looking current.
 
 ---
 
+## Daily briefing
+
+Type `briefing` (or `daily`, or tap the button on Overview) and Zero reads the
+live market across a basket and gives you a factual digest: 30-day move, position
+in range, annualised volatility, RSI, and moving-average relationship for each
+asset.
+
+It reports **conditions, not calls.** Every figure describes what already
+happened; Zero issues no buy or sell signal, because no honest one exists — no
+tool reliably predicts the next move, and a confident-looking "take this trade"
+with your money behind it is the most harmful thing this app could contain. What
+the briefing gives you is a clear read of the state of things so *you* decide.
+What you actually control is position size and risk.
+
+---
+
 ## Trading — real TradingView charts
 
 The Trading tab embeds TradingView's official chart widget, so you get genuine
