@@ -656,7 +656,7 @@ const Zero = (() => {
     ['GitHub', 'https://github.com'], ['Figma', 'https://figma.com'],
     ['VS Code', 'vscode://'], ['Gmail', 'https://mail.google.com'],
     ['Drive', 'https://drive.google.com'], ['Notion', 'https://notion.so'],
-    ['YouTube', 'https://youtube.com'], ['ChatGPT', 'https://chat.openai.com'],
+    ['YouTube', 'https://youtube.com'],
     ['Spotify', 'https://open.spotify.com'], ['Discord', 'https://discord.com/app'],
     ['TradingView', 'https://tradingview.com'], ['Vercel', 'https://vercel.com'],
     ['Itch.io', 'https://itch.io'], ['Steam', 'steam://open/main'],
@@ -923,43 +923,84 @@ const Zero = (() => {
   }
 
   /* ---------------- News (live, keyless) ---------------- */
+  let newsMode = 'world';   // world | tech
+
+  function setNewsMode(m) {
+    newsMode = m;
+    document.querySelectorAll('#newsTabs .chip').forEach(c =>
+      c.classList.toggle('on', c.dataset.mode === m));
+    document.getElementById('newsList').dataset.loaded = '';
+    loadNews();
+  }
+
   async function loadNews(alsoSay) {
     const box = document.getElementById('newsList');
     if (box) box.innerHTML = '<div class="spinner">Loading stories</div>';
     try {
-      const r = await guardedFetch('https://hacker-news.firebaseio.com/v0/topstories.json', {}, 'market');
-      if (!r.ok) throw new Error('HTTP ' + r.status);
-      const ids = (await r.json()).slice(0, 12);
-      const items = [];
-      for (const id of ids) {
-        try {
-          const ir = await guardedFetch(`https://hacker-news.firebaseio.com/v0/item/${id}.json`, {}, 'market');
-          const it = await ir.json();
-          if (it?.title) items.push(it);
-        } catch { /* one dud story shouldn't sink the feed */ }
-      }
+      const items = newsMode === 'tech' ? await fetchTechNews() : await fetchWorldNews();
       if (!items.length) throw new Error('no stories returned');
       if (box) {
-        box.innerHTML = items.map(it => {
-          const host = it.url ? (() => { try { return new URL(it.url).hostname.replace(/^www\./, ''); } catch { return ''; } })() : '';
-          const when = it.time ? new Date(it.time * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
-          return `<div class="news-item">
-            <a href="${esc(it.url || 'https://news.ycombinator.com/item?id=' + it.id)}" target="_blank" rel="noopener noreferrer">${esc(it.title)}</a>
-            <div class="news-meta">${esc(host)}${host && when ? ' · ' : ''}${esc(when)} · ${it.score ?? 0} points</div>
-          </div>`;
-        }).join('');
+        box.innerHTML = items.map(it =>
+          `<div class="news-item">
+             <a href="${esc(it.url)}" target="_blank" rel="noopener noreferrer">${esc(it.title)}</a>
+             <div class="news-meta">${esc(it.source || '')}${it.source && it.when ? ' · ' : ''}${esc(it.when || '')}</div>
+           </div>`).join('');
+        box.dataset.loaded = '1';
       }
-      setText('newsUpdated', 'Live · updated ' + new Date().toLocaleTimeString());
-      if (alsoSay) {
-        const top = items.slice(0, 5).map((it, i) => `${i + 1}. ${it.title}`).join('\n');
-        bubble('Top stories right now:\n\n' + top, 'zero');
-      }
+      setText('newsUpdated', 'Live · ' + (newsMode === 'tech' ? 'tech' : 'world') + ' · ' + new Date().toLocaleTimeString());
+      if (alsoSay) bubble(`Top ${newsMode} stories right now:\n\n` +
+        items.slice(0, 5).map((it, i) => `${i + 1}. ${it.title}`).join('\n'), 'zero');
       return items;
     } catch (e) {
       if (box) box.innerHTML = `<div class="spinner">No live news (${esc(e.message)}).</div>`;
       if (alsoSay) bubble('Could not reach the news feed: ' + e.message, 'zero');
       return [];
     }
+  }
+
+  /* World news: GDELT's global news database — keyless, worldwide, and
+     CORS-open. It monitors news in many languages from across the world. */
+  async function fetchWorldNews() {
+    const r = await guardedFetch(
+      'https://api.gdeltproject.org/api/v2/doc/doc?query=sourcelang:english&mode=artlist&maxrecords=15&sort=datedesc&format=json',
+      {}, 'market');
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const d = await r.json();
+    return (d.articles || []).filter(a => a.title).map(a => ({
+      title: a.title,
+      url: a.url,
+      source: a.domain || '',
+      when: a.seendate ? tidyGdeltDate(a.seendate) : '',
+    })).slice(0, 15);
+  }
+
+  function tidyGdeltDate(s) {
+    // GDELT stamps are like 20260812T143000Z
+    const m = /^(\d{4})(\d\d)(\d\d)T(\d\d)(\d\d)/.exec(s);
+    if (!m) return '';
+    const d = new Date(Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5]));
+    return d.toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+  }
+
+  /* Tech news: Hacker News. */
+  async function fetchTechNews() {
+    const r = await guardedFetch('https://hacker-news.firebaseio.com/v0/topstories.json', {}, 'market');
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const ids = (await r.json()).slice(0, 12);
+    const items = [];
+    for (const id of ids) {
+      try {
+        const ir = await guardedFetch(`https://hacker-news.firebaseio.com/v0/item/${id}.json`, {}, 'market');
+        const it = await ir.json();
+        if (it?.title) items.push({
+          title: it.title,
+          url: it.url || 'https://news.ycombinator.com/item?id=' + it.id,
+          source: it.url ? (() => { try { return new URL(it.url).hostname.replace(/^www\./, ''); } catch { return 'news.ycombinator.com'; } })() : 'news.ycombinator.com',
+          when: (it.score ?? 0) + ' points',
+        });
+      } catch { /* one dud story shouldn't sink the feed */ }
+    }
+    return items;
   }
 
   /* ---------------- Voice ---------------- */
@@ -1758,7 +1799,7 @@ const Zero = (() => {
   return {
     nav, loadMarkets, addTask, toggleTask, delTask, addNote, delNote,
     send, saveEngine, testEngine, saveStockKey, setThink, updateNow, loadStocks,
-    loadRates, loadNews, setSpeak, setVoice, previewVoice, micToggle, stopSpeaking: () => Voice.stop(),
+    loadRates, loadNews, setNewsMode, setSpeak, setVoice, previewVoice, micToggle, stopSpeaking: () => Voice.stop(),
     toggleWake, renderOverview, checkPassword, cryptoTool, showPayloads, copyText, reconDomain,
     openAFile, saveBack, saveNew, connectFolder, listFolder, openFromFolder, disconnectFolder,
     addApp, removeApp, launchApp, forgetMemory, storageInfo, addPreset,

@@ -410,6 +410,7 @@ details.think > div {
   font-size: 12.5px; cursor: pointer; font-family: var(--sans);
   transition: color .15s, border-color .15s, background .15s;
 }
+.chip.on { color: var(--white); border-color: var(--cyan); background: rgba(92,225,255,.12); }
 .chip:hover { color: var(--white); border-color: rgba(92,225,255,.5); background: rgba(92,225,255,.1); }
 
 .tv-gate {

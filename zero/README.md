@@ -68,7 +68,7 @@ the home screen; everything else is a side panel you visit when you need it.
 - **Voice** — Zero speaks in a composed, deliberate cadence, with a picker to choose the exact voice; also takes dictation
 - **Built-in skills** — maths, unit and currency conversion, code scaffolds, hashes, slugs, passwords: all with no model
 - **Charts** — real price history drawn on canvas, with indicators computed from it
-- **News** — live top stories, no key
+- **News** — live **world** news (GDELT global feed) and tech news, no key
 - **Trading** — real TradingView charts for every market (stocks, forex, crypto, indices, commodities) — the one opt-in third-party feature
 - **Markets** — live crypto prices (BTC, ETH, SOL, BNB, XRP, DOGE), auto-refresh every 60s
 - **Assistant** — built-in commands (`help`, `task …`, `note …`, `price btc`, `tasks`, `time`) that need no model at all, plus open conversation through a local engine

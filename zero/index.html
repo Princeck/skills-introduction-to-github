@@ -192,7 +192,11 @@
       <section class="view" id="view-news">
         <div class="card">
           <h2>Live News <span class="pill">no key</span></h2>
-          <p class="hint">Top stories, pulled live. Ask Zero <b>news</b> in chat and it will read them to you.</p>
+          <p class="hint">Real stories pulled live from open, worldwide sources. Ask Zero <b>news</b> in chat and it reads them to you.</p>
+          <div id="newsTabs" class="chips" style="margin-top:12px">
+            <button class="chip on" data-mode="world" onclick="Zero.setNewsMode('world')">🌍 World</button>
+            <button class="chip" data-mode="tech" onclick="Zero.setNewsMode('tech')">💻 Tech</button>
+          </div>
           <div id="newsList" style="margin-top:14px"></div>
           <div style="margin-top:14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
             <button class="btn blue" onclick="Zero.loadNews()">↻ Refresh</button>
