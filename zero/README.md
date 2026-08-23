@@ -4,7 +4,8 @@ A private, local-first personal assistant with live market readings, tasks, note
 and a master control panel with an always-visible kill switch. Its reasoning
 engine, Zero Core, runs on your own hardware — no vendor, no account, no key.
 
-**Theme:** holographic — red · blue · black · white
+**Theme:** holographic cockpit — deep-space backdrop, ZERO crest with counter-rotating
+blue/red arcs, Orbitron display + IBM Plex Mono type, on the red · blue · black · white palette.
 
 The interface is built as glass plates floating over a scanlined field. The
 hologram comes from the brand's own red and blue rather than the usual rainbow

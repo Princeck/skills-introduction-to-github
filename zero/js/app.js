@@ -241,6 +241,7 @@ const Zero = (() => {
   };
 
   function nav(view) {
+    document.body.classList.toggle('in-app', view !== 'assistant');
     document.querySelectorAll('.nav li').forEach(li =>
       li.classList.toggle('active', li.dataset.view === view));
     document.querySelectorAll('.view').forEach(v =>

@@ -32,6 +32,22 @@ if (out.includes('css/styles.css') || out.includes('js/app.js') || out.includes(
 if (!out.includes(js)) { console.error('✗ Embedded JS does not match its sources'); process.exit(1); }
 if (!out.includes(css)) { console.error('✗ Embedded CSS does not match css/styles.css'); process.exit(1); }
 
-fs.writeFileSync(path.join(dir, 'zero-standalone.html'), out);
-console.log(`✓ zero-standalone.html written (${(out.length / 1024).toFixed(1)} KB, self-contained)`);
+// Embed the design assets as data URIs so the standalone stays one file.
+// (The multi-file zero/ version references them by relative path instead.)
+const mime = { '.jpg': 'image/jpeg', '.png': 'image/png' };
+const dataUri = rel => {
+  const ext = path.extname(rel);
+  const b64 = fs.readFileSync(path.join(dir, rel)).toString('base64');
+  return `data:${mime[ext]};base64,${b64}`;
+};
+let out2 = out
+  .replace(/url\('assets\/backdrop\.jpg'\)/g, () => `url('${dataUri('assets/backdrop.jpg')}')`)
+  .replace(/src="assets\/zero-mark\.png"/g, () => `src="${dataUri('assets/zero-mark.png')}"`)
+  .replace(/src="assets\/zero-crest\.png"/g, () => `src="${dataUri('assets/zero-crest.png')}"`);
+if (/assets\/(backdrop\.jpg|zero-mark\.png|zero-crest\.png)/.test(out2)) {
+  console.error('✗ An asset reference was left un-embedded.'); process.exit(1);
+}
+
+fs.writeFileSync(path.join(dir, 'zero-standalone.html'), out2);
+console.log(`✓ zero-standalone.html written (${(out2.length / 1024).toFixed(1)} KB, self-contained)`);
 console.log('✓ verified: embedded CSS and JS match sources byte-for-byte');

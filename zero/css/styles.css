@@ -12,33 +12,36 @@
    ============================================================ */
 
 :root {
-  /* ground */
-  --void:      #04060d;
+  /* ground — deep space, per the ZERO handoff palette */
+  --void:      #03050b;
   --deep:      #070a14;
-  --glass:     rgba(11, 17, 34, .78);
-  --glass-2:   rgba(18, 27, 52, .82);
-  --edge:      rgba(120, 165, 255, .22);
+  --glass:     rgba(9, 15, 32, .74);
+  --glass-2:   rgba(14, 22, 44, .82);
+  --edge:      rgba(150, 200, 255, .24);
 
-  /* ink — cool-biased neutrals, never pure grey */
-  --white:     #f2f6ff;
-  --muted:     #8fa2c9;
-  --dim:       #64769c;
+  /* ink */
+  --white:     #ffffff;
+  --muted:     rgba(200, 222, 255, .62);
+  --dim:       rgba(180, 210, 250, .45);
 
-  /* spectrum */
-  --red:       #ff2d55;
+  /* spectrum — handoff accents */
+  --red:       #ff2b45;
+  --pink:      #ff8093;
   --magenta:   #d838c8;
   --violet:    #8b5cf6;
-  --blue:      #2f7bff;
+  --blue:      #3a8cff;
   --cyan:      #5ce1ff;
-  --green:     #23e7a0;
+  --green:     #3df5a0;
 
   --holo: linear-gradient(115deg,
     var(--red) 0%, var(--magenta) 22%, var(--violet) 42%,
     var(--blue) 62%, var(--cyan) 82%, var(--red) 100%);
 
   --radius: 16px;
-  --mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
-  --sans: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  /* Body/UI is IBM Plex Mono; display/headings are Orbitron. */
+  --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --sans: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --display: "Orbitron", "IBM Plex Mono", ui-monospace, sans-serif;
 }
 
 * { box-sizing: border-box; }
@@ -52,19 +55,36 @@ html, body {
   overflow-x: hidden;
 }
 
-/* ---- Ambient field: prismatic haze + fine grid + scanlines ---- */
+/* ---- Space backdrop: the ZERO artwork behind everything ---- */
+#backdrop {
+  position: fixed; inset: 0; z-index: -2; pointer-events: none;
+  background: url('assets/backdrop.jpg') center 34% / cover no-repeat, var(--void);
+  filter: saturate(1.12) brightness(1.06);
+  transition: opacity .6s ease, filter .6s ease;
+}
+/* Vignette + top/bottom scrims so chrome stays legible over the art. */
+#backdrop::after {
+  content: ''; position: absolute; inset: 0;
+  background:
+    linear-gradient(to bottom, rgba(3,5,11,.9), transparent 16%),
+    linear-gradient(to top, rgba(3,5,11,.92), transparent 20%),
+    radial-gradient(128% 106% at 50% 46%, transparent 40%, rgba(3,5,11,.5) 80%, rgba(3,5,11,.8) 100%);
+}
+/* Dim the art once you're deep in the app so text carries. */
+body.in-app #backdrop { opacity: .28; filter: saturate(1) brightness(.7) blur(2px); }
+
+/* ---- Ambient field: prismatic haze + fine grid ---- */
 body::before,
 body::after { content: ''; position: fixed; inset: 0; pointer-events: none; }
 
 body::before {
   z-index: 0;
   background:
-    radial-gradient(1000px 620px at 8% -10%,  rgba(255,45,85,.16),  transparent 62%),
-    radial-gradient(900px 560px at 96% 4%,    rgba(47,123,255,.18), transparent 60%),
-    radial-gradient(700px 500px at 50% 110%,  rgba(139,92,246,.13), transparent 62%),
-    linear-gradient(transparent 0 39px, rgba(120,165,255,.045) 39px 40px),
-    linear-gradient(90deg, transparent 0 39px, rgba(120,165,255,.045) 39px 40px);
-  background-size: auto, auto, auto, 40px 40px, 40px 40px;
+    radial-gradient(1000px 620px at 8% -10%,  rgba(255,43,69,.10),  transparent 62%),
+    radial-gradient(900px 560px at 96% 4%,    rgba(58,140,255,.12), transparent 60%),
+    linear-gradient(transparent 0 39px, rgba(150,200,255,.03) 39px 40px),
+    linear-gradient(90deg, transparent 0 39px, rgba(150,200,255,.03) 39px 40px);
+  background-size: auto, auto, 40px 40px, 40px 40px;
   animation: drift 22s ease-in-out infinite alternate;
 }
 @keyframes drift {
@@ -125,10 +145,10 @@ body::after {
 
 .card { padding: 20px; }
 .card h2, .card h3 {
-  margin: 0 0 14px; font-size: 14px; font-weight: 700;
-  letter-spacing: 1.6px; text-transform: uppercase;
-  font-family: var(--mono); color: var(--white);
-  text-shadow: -1px 0 rgba(255,45,85,.5), 1px 0 rgba(47,123,255,.5);
+  margin: 0 0 14px; font-size: 13px; font-weight: 700;
+  letter-spacing: 2.4px; text-transform: uppercase;
+  font-family: var(--display); color: var(--white);
+  text-shadow: 0 0 18px rgba(150,200,255,.45);
 }
 .card .hint { color: var(--muted); font-size: 12.5px; line-height: 1.6; }
 
@@ -151,21 +171,37 @@ body::after {
 @keyframes rail { from { background-position: 0 0; } to { background-position: 0 300%; } }
 
 .brand { display: flex; align-items: center; gap: 13px; margin-bottom: 30px; }
+/* Crest with counter-rotating blue/red arcs, per the handoff. */
 .brand .logo {
-  width: 44px; height: 44px; border-radius: 12px;
-  display: grid; place-items: center;
-  font-family: var(--mono); font-weight: 800; font-size: 21px; color: #fff;
-  background: var(--holo); background-size: 200% 200%;
-  animation: shift 7s ease infinite;
-  box-shadow: 0 0 26px rgba(255,45,85,.45), 0 0 46px rgba(47,123,255,.35);
+  position: relative; width: 46px; height: 46px; flex-shrink: 0;
+  display: grid; place-items: center; background: none; border-radius: 0;
+  font-family: var(--display); font-weight: 800; font-size: 0; color: #fff;
 }
+.brand .logo img { width: 34px; height: 34px; object-fit: contain;
+  filter: drop-shadow(0 0 12px rgba(90,150,255,.6)); }
+.brand .logo::before, .brand .logo::after {
+  content: ''; position: absolute; inset: 0; border-radius: 50%;
+  border: 1.5px solid transparent;
+}
+.brand .logo::before {
+  border-left-color: rgba(58,140,255,.95); border-top-color: rgba(58,140,255,.4);
+  animation: spinCW 9s linear infinite;
+  filter: drop-shadow(0 0 6px rgba(90,160,255,.5));
+}
+.brand .logo::after {
+  border-right-color: rgba(255,43,69,.95); border-bottom-color: rgba(255,43,69,.4);
+  animation: spinCCW 12s linear infinite;
+  filter: drop-shadow(0 0 6px rgba(255,60,100,.5));
+}
+@keyframes spinCW  { to { transform: rotate(360deg); } }
+@keyframes spinCCW { to { transform: rotate(-360deg); } }
 @keyframes shift {
   0%,100% { background-position: 0% 50%; }
   50%     { background-position: 100% 50%; }
 }
 .brand .name {
-  font-size: 23px; font-weight: 800; letter-spacing: 3px; font-family: var(--mono);
-  text-shadow: -1.5px 0 rgba(255,45,85,.65), 1.5px 0 rgba(47,123,255,.65);
+  font-size: 22px; font-weight: 800; letter-spacing: 7px; font-family: var(--display);
+  text-shadow: 0 0 20px rgba(150,200,255,.8);
 }
 .brand .name b { color: var(--cyan); }
 
@@ -207,9 +243,9 @@ body::after {
 
 .topbar { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 26px; gap: 20px; }
 .topbar h1 {
-  font-size: 27px; margin: 0; font-weight: 800; letter-spacing: 1px;
-  font-family: var(--mono); text-transform: uppercase;
-  text-shadow: -2px 0 rgba(255,45,85,.55), 2px 0 rgba(47,123,255,.55);
+  font-size: 26px; margin: 0; font-weight: 800; letter-spacing: 5px;
+  font-family: var(--display); text-transform: uppercase;
+  text-shadow: 0 0 22px rgba(150,200,255,.55);
 }
 .topbar .sub { color: var(--muted); font-size: 13px; margin-top: 5px; }
 .clock { font-family: var(--mono); font-size: 12px; color: var(--dim); text-align: right; flex-shrink: 0; }
