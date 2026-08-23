@@ -115,7 +115,7 @@
     <div class="mark">0</div>
     <h1>ZER<b>0</b> — source</h1>
   </header>
-  <p class="meta">zero-standalone.html · 483.0 KB · 4449 lines · self-contained</p>
+  <p class="meta">zero-standalone.html · 498.4 KB · 4703 lines · self-contained</p>
 
   <div class="actions">
     <button id="copy">Copy all code</button>
@@ -911,6 +911,25 @@ input:focus, textarea:focus, select:focus {
   .chat-wrap { height: auto; }
 }
 
+
+/* ============ Subtle kill switch (you asked to hide it) ============
+   Still one tap, still Esc-Esc, still the Control Panel button — just
+   not shouting. It fades to a small dim marker until you reach for it,
+   and lights up fully the instant it matters (hover, focus, halted). */
+#killSwitch {
+  opacity: .28;
+  transform: scale(.82);
+  transform-origin: top right;
+  filter: saturate(.7);
+  transition: opacity .25s ease, transform .18s ease, filter .25s ease, box-shadow .25s ease;
+}
+#killSwitch:hover, #killSwitch:focus-visible {
+  opacity: 1; transform: scale(1); filter: none;
+}
+/* When halted it must be unmissable regardless. */
+#killSwitch.halted { opacity: 1; transform: scale(1); filter: none; }
+@media (prefers-reduced-motion: reduce) { #killSwitch { transition: none; } }
+
   &lt;/style>
 &lt;/head>
 &lt;body>
@@ -1262,6 +1281,13 @@ input:focus, textarea:focus, select:focus {
           &lt;p class="hint">Facts Zero carries into every future conversation. Say &lt;b>remember &amp;lt;something&amp;gt;&lt;/b> in chat to add one, &lt;b>forget 2&lt;/b> to drop one.&lt;/p>
           &lt;div id="memoryList" style="margin-top:16px">&lt;/div>
           &lt;div class="notice">Memories are stored with your tasks and notes — encrypted when the vault is on, and dropped from memory the moment it locks.&lt;/div>
+        &lt;/div>
+
+        &lt;div class="card" style="margin-top:16px">
+          &lt;h2>What Zero has learned &lt;span class="pill">local&lt;/span>&lt;/h2>
+          &lt;p class="hint">Zero watches how you write — length, tone, recurring topics — and adapts. This lives on your device only and feeds into the local engine. Cleared by wipe, or reset below.&lt;/p>
+          &lt;div id="profileBody" style="margin-top:14px">&lt;/div>
+          &lt;div style="margin-top:14px">&lt;button class="btn ghost" onclick="Zero.forgetProfile()">Reset what Zero learned&lt;/button>&lt;/div>
         &lt;/div>
 
         &lt;div class="card" style="margin-top:16px">
@@ -2775,6 +2801,98 @@ const Converse = (() => {
   return { reply, suggest, partOfDay };
 })();
 
+
+/* ------------------------------------------------------------
+   COOK — a chef in Zero
+
+   Real technique, ratios and temperatures, offline. This is the
+   craft that separates good cooking from guesswork: why things
+   work, not just what to do.
+   ------------------------------------------------------------ */
+const Cook = (() => {
+
+  /* Load-bearing ratios — memorise these and you can cook without a recipe. */
+  const RATIOS = {
+    'vinaigrette': '3 parts oil : 1 part acid. Salt the acid first so it dissolves, then whisk the oil in slowly to emulsify.',
+    'rice': 'White rice 1 : 1.5 water by volume; simmer covered 18 min, then rest 10 off heat, lid on. Never stir.',
+    'pasta water': 'Salt pasta water to 1% — about 10 g salt per litre. It should taste of mild seawater.',
+    'bread': 'Baker\'s percentage: flour 100%, water 65–75%, salt 2%, yeast ~1%. Everything else is measured against flour weight.',
+    'roux': 'Equal weights fat and flour. Cook 2 min for blond, longer for darker; 30 g of each thickens ~250 ml.',
+    'brine': '6% salt by weight of water (60 g/L) for a quick brine; 1 hour per 500 g of meat.',
+    'cookies': 'Chewy: more brown sugar and an extra yolk. Crisp: more white sugar, melted butter. Cakey: more flour, a whole extra egg.',
+    'pancakes': 'Flour 200 g, milk 300 ml, 1 egg, 1 tsp baking powder, pinch salt. Rest the batter 10 min.',
+    'custard': 'Roughly 1 egg yolk per 100 ml of dairy for a pourable custard; whole eggs set firmer.',
+  };
+
+  /* Temperatures that actually matter — pull point, °C then °F. */
+  const TEMPS = {
+    'steak': 'Rare 52 / medium-rare 55 / medium 60 / well 68 °C. Pull 2–3° early and rest 5–10 min — it climbs while resting.',
+    'chicken': 'Safe at 74 °C (165 °F) in the thickest part. Breast dries past that; brine or pull right at temp.',
+    'pork': '63 °C (145 °F) then a 3-min rest — a faint blush is fine and juicy. 71 °C for shredding cuts.',
+    'fish': '52–55 °C for most fish — just-flaking. Salmon is lovely at 50 °C, translucent centre.',
+    'bread': 'Lean loaves are done at 96–99 °C internal; enriched doughs ~88–90 °C.',
+    'oil': 'Shallow-fry 175–185 °C. No thermometer: a cube of bread browns in ~40 s at 180 °C.',
+    'caramel': 'Amber caramel is 170–180 °C. It carries over, so pull it a touch light.',
+    'sugar': 'Soft-ball 115 °C, hard-crack 150 °C.',
+  };
+
+  /* Substitutions — real 1:1 or near-1:1 swaps. */
+  const SUBS = {
+    'buttermilk': '1 cup milk + 1 tbsp lemon juice or vinegar; rest 5 min until it curdles.',
+    'egg': 'Binding: 1 tbsp ground flax + 3 tbsp water, rested. Leavening: ¼ tsp baking soda + ½ tsp vinegar. Richness: ¼ cup yoghurt or aquafaba (3 tbsp) whips like whites.',
+    'baking powder': '¼ tsp baking soda + ½ tsp cream of tartar = 1 tsp baking powder.',
+    'butter': 'Neutral oil at ~80% of the butter weight for frying; in baking it changes texture (less structure).',
+    'cream': 'Evaporated milk 1:1 for cooking; for whipping there is no true substitute for the fat.',
+    'wine': 'Stock + a splash of vinegar or lemon, or a little verjus, for the acidity a recipe leans on.',
+    'cornstarch': 'Twice the weight of flour, or 1:1 with arrowroot (which stays clearer and sets glossier).',
+    'garlic': '⅛ tsp garlic powder ≈ 1 clove, but add it earlier so it hydrates.',
+    'self-raising flour': 'Plain flour + 2 tsp baking powder per 150 g.',
+  };
+
+  /* Techniques — the "why". */
+  const TECH = {
+    'sear': 'Dry the surface hard (pat + optionally salt and air-dry). Hot pan, then oil, then meat — and leave it alone. It releases from the pan when the crust forms; forcing it early tears it. That browning is the Maillard reaction and it is most of the flavour.',
+    'rest': 'Resting lets the muscle fibres relax and reabsorb juices that heat pushed to the centre. Cut too soon and it bleeds onto the board. 5 min for a steak, 15–20 for a roast, tented loosely.',
+    'salt': 'Salt early. On meat, salt 40+ min ahead (or the night before) so it dissolves, draws out moisture, then gets reabsorbed as a light brine — seasoning all the way through, not just the surface.',
+    'emulsion': 'Oil and water do not mix until an emulsifier (mustard, egg yolk, a little of the sauce already made) holds them. Add the oil slowly while whisking; if it breaks, start a new yolk/teaspoon of water and whisk the broken sauce into it drop by drop.',
+    'deglaze': 'After searing, the browned stuck bits (fond) are pure flavour. Pour in wine or stock, scrape while it bubbles, reduce, then finish off heat with a knob of cold butter for a glossy pan sauce.',
+    'blanch': 'Boil hard and salted, cook briefly, then plunge into ice water to lock colour and stop cooking. The shock keeps greens vivid.',
+    'bloom': 'Toast whole or ground spices in dry heat or oil for 30–60 s until fragrant — it wakes up the fat-soluble aromatics. Do not let them smoke.',
+    'reduce': 'Simmering evaporates water and concentrates flavour and body. Reducing by half roughly doubles intensity; taste before you salt, since salt concentrates too.',
+    'knead': 'Kneading develops gluten into an elastic web that traps gas. It is done when the dough passes the windowpane test — stretch a piece thin enough to see light through without tearing.',
+    'caramelise onions': 'Low and slow, 30–45 min, a pinch of salt to pull water, stirring occasionally. High heat browns fast but tastes of scorch, not sweetness. Deglaze the pan when it sticks.',
+  };
+
+  const norm = s => s.toLowerCase().replace(/[^a-z ]/g, '').trim();
+
+  function answer(q) {
+    const n = norm(q);
+    // direct table hits
+    for (const [k, v] of Object.entries(TECH))  if (n.includes(k) || n.includes(k.split(' ')[0])) return cap('Technique — ' + k, v);
+    for (const [k, v] of Object.entries(TEMPS)) if (n.includes(k)) return cap(k + ' — temperature', v);
+    for (const [k, v] of Object.entries(RATIOS)) if (n.includes(k)) return cap(k + ' — ratio', v);
+    for (const [k, v] of Object.entries(SUBS)) {
+      if (n.includes('substitut') || n.includes('instead of') || n.includes('replace')) {
+        for (const [k2, v2] of Object.entries(SUBS)) if (n.includes(k2)) return cap('Substitute for ' + k2, v2);
+      }
+      if (n.includes(k)) return cap(k, v);
+    }
+    return null;
+  }
+
+  function cap(title, body) { return `🍳 ${title}\n${body}`; }
+
+  function index() {
+    return 'I can talk technique, temperatures, ratios and substitutions. Try:\n' +
+      '  cook sear a steak · cook pan sauce · cook caramelise onions\n' +
+      '  temp for chicken · rice ratio · vinaigrette ratio\n' +
+      '  substitute for buttermilk · egg substitute\n' +
+      'Or just ask a cooking question in plain words.';
+  }
+
+  return { answer, index, RATIOS, TEMPS, SUBS, TECH };
+})();
+
 /* ============================================================
    ZERO — app logic
    Private by design: all state lives on THIS device, encrypted
@@ -2800,6 +2918,9 @@ const Zero = (() => {
     wakeOk: 'zero.wakeOk',
     speak: 'zero.speak',
     voice: 'zero.voice',
+    convo: 'zero.convo',       // remembered conversation transcript
+    profile: 'zero.profile',   // what Zero has learned about how you work
+    halted: 'zero.halted',     // pause state survives a reload
   };
 
   // Short rolling context so the assistant remembers the current thread.
@@ -2828,10 +2949,17 @@ const Zero = (() => {
   // Things Zero should still know next time you open it.
   let memories = Vault.isEnabled() ? [] : store.get(LS.memories, []);
   let apps = store.get(LS.apps, []);
+  // Remembered conversation (survives reload) and the learned profile.
+  let convo = Vault.isEnabled() ? [] : store.get(LS.convo, []);
+  let profile = Vault.isEnabled() ? blankProfile() : store.get(LS.profile, blankProfile());
+
+  function blankProfile() {
+    return { messages: 0, totalLen: 0, style: 'balanced', topics: {}, emoji: 0, updated: 0 };
+  }
 
   // Keys that hold user content and must never survive as plaintext
   // once the vault is on.
-  const PLAINTEXT_KEYS = ['zero.tasks', 'zero.notes', 'zero.memories'];
+  const PLAINTEXT_KEYS = ['zero.tasks', 'zero.notes', 'zero.memories', 'zero.convo', 'zero.profile'];
 
   /* Encrypt the in-memory model and write it. Fire-and-forget: callers
      stay synchronous, and a locked vault simply declines to write. */
@@ -2842,6 +2970,8 @@ const Zero = (() => {
       await Store.set(LS.tasks, await Vault.encrypt(JSON.stringify(tasks)));
       await Store.set(LS.notes, await Vault.encrypt(JSON.stringify(notes)));
       await Store.set(LS.memories, await Vault.encrypt(JSON.stringify(memories)));
+      await Store.set(LS.convo, await Vault.encrypt(JSON.stringify(convo.slice(-200))));
+      await Store.set(LS.profile, await Vault.encrypt(JSON.stringify(profile)));
       // Anything written before the vault existed is still readable where it
       // was left. Encrypting the new copy is only half the job; the old
       // plaintext has to go, or "encrypted" is a claim the disk contradicts.
@@ -2859,6 +2989,8 @@ const Zero = (() => {
       await Store.set(LS.notes, JSON.stringify(notes));
       await Store.set(LS.memories, JSON.stringify(memories));
       await Store.set(LS.apps, JSON.stringify(apps));
+      await Store.set(LS.convo, JSON.stringify(convo.slice(-200)));
+      await Store.set(LS.profile, JSON.stringify(profile));
     } catch (e) { log('Could not save: ' + e.message, true); }
   }
 
@@ -2909,7 +3041,7 @@ const Zero = (() => {
   const shortUrl = u => { try { return new URL(u).hostname; } catch { return String(u).slice(0, 40); } };
 
   /* Hard stop: abort in-flight requests, cancel timers, freeze UI. */
-  function toggleHalt() {
+  function toggleHalt(silent) {
     Control.halted = !Control.halted;
     const btn = document.getElementById('killSwitch');
     const banner = document.getElementById('haltBanner');
@@ -2919,18 +3051,18 @@ const Zero = (() => {
       Control.inflight.clear();
       Control.timers.forEach(id => clearInterval(id));
       Control.timers.clear();
-      btn.textContent = '▶ RESUME';
-      btn.classList.add('halted');
-      banner.classList.add('on');
-      log('EMERGENCY STOP — all activity halted by user.', true);
+      if (btn) { btn.textContent = '▶ RESUME'; btn.classList.add('halted'); }
+      if (banner) banner.classList.add('on');
+      if (!silent) log('Stopped — all activity paused by you. It resumes where it left off.', true);
     } else {
-      btn.textContent = '■ STOP';
-      btn.classList.remove('halted');
-      banner.classList.remove('on');
-      log('Resumed by user.');
+      if (btn) { btn.textContent = '■ STOP'; btn.classList.remove('halted'); }
+      if (banner) banner.classList.remove('on');
+      if (!silent) log('Resumed by you.');
       startTimers();
       loadMarkets();
     }
+    // The pause state survives a reload: off stays off until you turn it on.
+    localStorage.setItem(LS.halted, Control.halted ? '1' : '');
     updateStatus();
   }
 
@@ -3033,6 +3165,7 @@ const Zero = (() => {
     if (view === 'security') { renderChecklist(); showPayloads(); }
     if (view === 'files') { filesUi(); listFolder(); }
     if (view === 'apps') renderPresets();
+    if (view === 'memory') { renderMemories(); renderProfile(); }
   }
 
   /* ---------------- Clock ---------------- */
@@ -3406,6 +3539,68 @@ const Zero = (() => {
         } else nb.innerHTML = '&lt;div class="nodata" style="font-size:12px">no feed&lt;/div>';
       } catch { nb.innerHTML = '&lt;div class="nodata" style="font-size:12px">no feed&lt;/div>'; }
     }
+  }
+
+  /* ---------------- Learning (personalisation) ----------------
+     Zero watches HOW you write — length, tone, recurring subjects — and
+     adapts its replies. This runs entirely on your machine, feeds only
+     into the local engine's prompt, and is cleared by `wipe`. It reads
+     signals, not secrets. */
+  const STOPWORDS = new Set(('the a an and or of to in it is are be i you we my me for on with that this what how why can do does'
+    + ' zero please just want need make my your his').split(' '));
+
+  function learnFromMessage(text) {
+    profile.messages++;
+    profile.totalLen += text.length;
+    if (/[\u{1F300}-\u{1FAFF}☀-➿]/u.test(text)) profile.emoji++;
+    const avg = profile.totalLen / profile.messages;
+    profile.style = avg &lt; 55 ? 'terse' : avg > 160 ? 'detailed' : 'balanced';
+    // topic frequency from meaningful words
+    for (const w of text.toLowerCase().match(/[a-z]{4,}/g) || []) {
+      if (STOPWORDS.has(w)) continue;
+      profile.topics[w] = (profile.topics[w] || 0) + 1;
+    }
+    // keep the topic map from growing without bound
+    const entries = Object.entries(profile.topics);
+    if (entries.length > 120) {
+      profile.topics = Object.fromEntries(entries.sort((a, b) => b[1] - a[1]).slice(0, 80));
+    }
+    profile.updated = Date.now();
+    store.set(LS.profile, profile);
+  }
+
+  function topTopics(n) {
+    return Object.entries(profile.topics).sort((a, b) => b[1] - a[1]).slice(0, n).map(e => e[0]);
+  }
+
+  function profileSummary() {
+    if (profile.messages &lt; 3) return '';   // not enough to characterise yet
+    const bits = [];
+    bits.push(profile.style === 'terse' ? 'Writes briefly — keep replies short and direct.'
+      : profile.style === 'detailed' ? 'Writes at length — fuller answers are welcome.'
+      : 'Writes at a moderate length — match it.');
+    if (profile.emoji / profile.messages > 0.3) bits.push('Uses emoji — a warmer, informal tone fits.');
+    const t = topTopics(6);
+    if (t.length) bits.push('Recurring interests: ' + t.join(', ') + '.');
+    return bits.map(b => '- ' + b).join('\n');
+  }
+
+  function renderProfile() {
+    const el = document.getElementById('profileBody');
+    if (!el) return;
+    if (profile.messages &lt; 1) { el.innerHTML = '&lt;p class="hint">Nothing learned yet. Talk to Zero and it adapts to how you write.&lt;/p>'; return; }
+    const t = topTopics(10);
+    el.innerHTML =
+      `&lt;div class="ov-row">&lt;span>Messages seen&lt;/span>&lt;span>${profile.messages}&lt;/span>&lt;/div>` +
+      `&lt;div class="ov-row">&lt;span>Your style&lt;/span>&lt;span>${esc(profile.style)}&lt;/span>&lt;/div>` +
+      `&lt;div class="ov-row">&lt;span>Tone&lt;/span>&lt;span>${profile.emoji / Math.max(1, profile.messages) > 0.3 ? 'informal' : 'plain'}&lt;/span>&lt;/div>` +
+      (t.length ? `&lt;div style="margin-top:12px" class="hint">Interests Zero has noticed:&lt;/div>&lt;div class="chips" style="margin-top:8px">${t.map(x => `&lt;span class="chip">${esc(x)}&lt;/span>`).join('')}&lt;/div>` : '');
+  }
+
+  function forgetProfile() {
+    if (!confirm('Reset what Zero has learned about your style? Your notes, tasks and memories are kept.')) return;
+    profile = blankProfile(); store.set(LS.profile, profile); renderProfile();
+    log('Learned profile reset by user.');
   }
 
   /* ---------------- Memory ---------------- */
@@ -3917,9 +4112,15 @@ const Zero = (() => {
   /* ---------------- Quick capture ---------------- */
   /* ---------------- Assistant ---------------- */
   function bubble(text, who) {
-    if (who === 'zero' &amp;&amp; speakReplies &amp;&amp; text &amp;&amp; text !== '…') {
-      orbState('speaking');
-      Voice.speak(text, { onend: () => orbState(Voice.isAwake() ? 'listening' : 'idle') });
+    if (who === 'zero' &amp;&amp; text &amp;&amp; text !== '…') {
+      if (speakReplies) {
+        orbState('speaking');
+        Voice.speak(text, { onend: () => orbState(Voice.isAwake() ? 'listening' : 'idle') });
+      }
+      // Remember Zero's instant replies too (streamed engine replies are
+      // recorded at completion, where their final text is known).
+      convo.push({ who: 'zero', text, ts: Date.now() });
+      store.set(LS.convo, convo);
     }
     const log = document.getElementById('chatLog');
     const d = document.createElement('div');
@@ -3936,6 +4137,11 @@ const Zero = (() => {
     if (!q) return;
     inp.value = '';
     bubble(q, 'user');
+
+    // Learn from how the user writes, and remember what was said.
+    learnFromMessage(q);
+    convo.push({ who: 'user', text: q, ts: Date.now() });
+    store.set(LS.convo, convo);
 
     // Try built-in offline commands first — always works, no key, no network.
     // 1. Exact commands.
@@ -3968,6 +4174,7 @@ const Zero = (() => {
         renderReply(thinking, reply, true);
         if (speakReplies) Voice.speak(splitThinking(reply).answer || reply);
         chatHistory.push({ role: 'user', content: q }, { role: 'assistant', content: reply });
+        convo.push({ who: 'zero', text: reply, ts: Date.now() }); store.set(LS.convo, convo);
         if (chatHistory.length > 40) chatHistory = chatHistory.slice(-40);
         return;
       } catch (e) {
@@ -4033,6 +4240,7 @@ const Zero = (() => {
         '  price btc           live crypto price',
         '  chart btc 90        price chart + indicators',
         '  briefing            daily read of live market conditions',
+        '  cook sear a steak   technique, temps, ratios, substitutions',
         '  news                top stories right now',
         '  update              refresh everything',
         '',
@@ -4084,6 +4292,23 @@ const Zero = (() => {
     if (low === 'news') { loadNews(true); return 'Pulling the latest stories…'; }
     if (low === 'briefing' || low === 'daily' || low === 'brief' || low === 'market' || low === 'markets today') {
       dailyBriefing(true); return HANDLED;
+    }
+    if (low === 'cook' || low === 'recipe' || low === 'cooking') return Cook.index();
+    if (low.startsWith('cook ') || low.startsWith('recipe ')) {
+      const a = Cook.answer(s.replace(/^(cook|recipe)\s+/i, ''));
+      return a || Cook.index();
+    }
+    // plain cooking questions, before falling through to web lookup.
+    // No trailing \b on stems like "substitut" — it never matches "substitute".
+    if (/(cook|bake|fry|sear|roast|grill|recipe|substitut|instead of|marinat|caramel|knead|deglaze|simmer|\bbrine\b|\bratio\b|\bvinaigrette\b|temperature for|temp for|how long to (cook|boil|roast))/i.test(low)) {
+      const a = Cook.answer(s);
+      if (a) return a;
+    }
+    // Last resort before web lookup: if the words name a known dish/technique
+    // /ingredient Zero knows, answer from the kitchen.
+    {
+      const cookHit = Cook.answer(s);
+      if (cookHit) return cookHit;
     }
 
     if (low.startsWith('remember ')) {
@@ -4253,6 +4478,8 @@ const Zero = (() => {
       system += '\n\nThings the user has told you to remember:\n' +
         memories.map(m => '- ' + m.text).join('\n');
     }
+    const learned = profileSummary();
+    if (learned) system += '\n\nWhat you have learned about this user:\n' + learned;
     const messages = [{ role: 'system', content: system }, ...chatHistory.slice(-24), { role: 'user', content: q }];
 
     const [endpoint, body, pluck] = mode === 'compatible'
@@ -4467,14 +4694,17 @@ const Zero = (() => {
     el.value = '';
     try {
       const t = await Store.get(LS.tasks), n = await Store.get(LS.notes), m = await Store.get(LS.memories);
+      const c = await Store.get(LS.convo), pr = await Store.get(LS.profile);
       tasks = t ? JSON.parse(await Vault.decrypt(t)) : [];
       notes = n ? JSON.parse(await Vault.decrypt(n)) : [];
       memories = m ? JSON.parse(await Vault.decrypt(m)) : [];
+      convo = c ? JSON.parse(await Vault.decrypt(c)) : [];
+      profile = pr ? JSON.parse(await Vault.decrypt(pr)) : blankProfile();
     } catch (e) {
       err.textContent = 'Unlocked, but stored data could not be read: ' + e.message;
-      tasks = []; notes = []; memories = [];
+      tasks = []; notes = []; memories = []; convo = []; profile = blankProfile();
     }
-    renderTasks(); renderNotes(); renderMemories(); updateStatus();
+    renderTasks(); renderNotes(); renderMemories(); renderProfile(); updateStatus();
     log('Vault unlocked.');
     vaultUi();
   }
@@ -4507,9 +4737,11 @@ const Zero = (() => {
   function wipeData() {
     if (!confirm('Wipe ALL Zero data on this device? This cannot be undone.')) return;
     Object.values(LS).forEach(k => localStorage.removeItem(k));
+    Store.clear().catch(() => {});
     Vault.disable();                       // also clears the salt and check token
-    tasks = []; notes = []; chatHistory = [];
-    renderTasks(); renderNotes(); refreshAiStatus(); vaultUi();
+    tasks = []; notes = []; memories = []; apps = []; convo = []; profile = blankProfile(); chatHistory = [];
+    const cl = document.getElementById('chatLog'); if (cl) cl.innerHTML = '';
+    renderTasks(); renderNotes(); renderMemories(); renderApps(); renderProfile(); refreshAiStatus(); vaultUi();
     alert('All local data wiped.');
   }
 
@@ -4566,12 +4798,34 @@ const Zero = (() => {
     if (typeof Orb !== 'undefined') { Orb.attach(document.getElementById('orb')); Orb.set('idle'); }
     if (typeof Boot !== 'undefined') Boot.run(document.getElementById('boot'));
     setInterval(() => { if (document.getElementById('view-overview')?.classList.contains('active')) renderOverview(); }, 30000);
-    log('Zero started. All capabilities on. Press STOP anytime.');
+    log('Zero started.');
+    renderProfile();
+
+    // Restore the remembered conversation so Zero continues where it left off.
+    if (convo.length) {
+      const recent = convo.slice(-40);
+      for (const m of recent) {
+        const d = document.createElement('div');
+        d.className = 'msg ' + (m.who === 'user' ? 'user' : 'zero');
+        d.textContent = m.text;
+        document.getElementById('chatLog').appendChild(d);
+      }
+      // Seed the engine context from what was said before.
+      chatHistory = convo.slice(-24).map(m => ({ role: m.who === 'user' ? 'user' : 'assistant', content: m.text }));
+      const cl = document.getElementById('chatLog'); if (cl) cl.scrollTop = cl.scrollHeight;
+      const name = userName();
+      bubble(`Welcome back${name ? ', ' + name : ''}. We left off ${convo.length} message${convo.length === 1 ? '' : 's'} in — carry on.`, 'zero');
+    } else {
+      bubble(Converse.reply('hello', {
+        tasks: tasks.filter(t => !t.done).length, memories: memories.length,
+        hasEngine: !!store.raw(LS.engineModel), name: userName(),
+      }) + "\n\nAsk me anything — I look things up live, remember our chats, and learn your style. Type `help`.", 'zero');
+    }
+
+    // Restore the pause state: if you stopped Zero last time, it stays stopped.
+    if (localStorage.getItem(LS.halted) === '1' &amp;&amp; !Control.halted) toggleHalt(true);
+
     loadMarkets(); loadStocks(); startTimers();
-    bubble(Converse.reply('hello', {
-      tasks: tasks.filter(t => !t.done).length, memories: memories.length,
-      hasEngine: !!store.raw(LS.engineModel), name: userName(),
-    }) + "\n\nAsk me anything — I look things up live. Type `help` for the full list.", 'zero');
   }
 
   return {
@@ -4580,7 +4834,7 @@ const Zero = (() => {
     loadRates, loadNews, setNewsMode, setSpeak, setVoice, previewVoice, micToggle, stopSpeaking: () => Voice.stop(),
     toggleWake, renderOverview, checkPassword, cryptoTool, showPayloads, copyText, reconDomain,
     openAFile, saveBack, saveNew, connectFolder, listFolder, openFromFolder, disconnectFolder,
-    addApp, removeApp, launchApp, forgetMemory, storageInfo, addPreset,
+    addApp, removeApp, launchApp, forgetMemory, forgetProfile, renderProfile, storageInfo, addPreset,
     openTradingView, allowTradingView, tvSearch, dailyBriefing,
     exportData, wipeData, init,
     toggleHalt, killNetwork, panic, setCap, clearLog,

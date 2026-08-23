@@ -900,3 +900,95 @@ const Converse = (() => {
 
   return { reply, suggest, partOfDay };
 })();
+
+
+/* ------------------------------------------------------------
+   COOK — a chef in Zero
+
+   Real technique, ratios and temperatures, offline. This is the
+   craft that separates good cooking from guesswork: why things
+   work, not just what to do.
+   ------------------------------------------------------------ */
+const Cook = (() => {
+
+  /* Load-bearing ratios — memorise these and you can cook without a recipe. */
+  const RATIOS = {
+    'vinaigrette': '3 parts oil : 1 part acid. Salt the acid first so it dissolves, then whisk the oil in slowly to emulsify.',
+    'rice': 'White rice 1 : 1.5 water by volume; simmer covered 18 min, then rest 10 off heat, lid on. Never stir.',
+    'pasta water': 'Salt pasta water to 1% — about 10 g salt per litre. It should taste of mild seawater.',
+    'bread': 'Baker\'s percentage: flour 100%, water 65–75%, salt 2%, yeast ~1%. Everything else is measured against flour weight.',
+    'roux': 'Equal weights fat and flour. Cook 2 min for blond, longer for darker; 30 g of each thickens ~250 ml.',
+    'brine': '6% salt by weight of water (60 g/L) for a quick brine; 1 hour per 500 g of meat.',
+    'cookies': 'Chewy: more brown sugar and an extra yolk. Crisp: more white sugar, melted butter. Cakey: more flour, a whole extra egg.',
+    'pancakes': 'Flour 200 g, milk 300 ml, 1 egg, 1 tsp baking powder, pinch salt. Rest the batter 10 min.',
+    'custard': 'Roughly 1 egg yolk per 100 ml of dairy for a pourable custard; whole eggs set firmer.',
+  };
+
+  /* Temperatures that actually matter — pull point, °C then °F. */
+  const TEMPS = {
+    'steak': 'Rare 52 / medium-rare 55 / medium 60 / well 68 °C. Pull 2–3° early and rest 5–10 min — it climbs while resting.',
+    'chicken': 'Safe at 74 °C (165 °F) in the thickest part. Breast dries past that; brine or pull right at temp.',
+    'pork': '63 °C (145 °F) then a 3-min rest — a faint blush is fine and juicy. 71 °C for shredding cuts.',
+    'fish': '52–55 °C for most fish — just-flaking. Salmon is lovely at 50 °C, translucent centre.',
+    'bread': 'Lean loaves are done at 96–99 °C internal; enriched doughs ~88–90 °C.',
+    'oil': 'Shallow-fry 175–185 °C. No thermometer: a cube of bread browns in ~40 s at 180 °C.',
+    'caramel': 'Amber caramel is 170–180 °C. It carries over, so pull it a touch light.',
+    'sugar': 'Soft-ball 115 °C, hard-crack 150 °C.',
+  };
+
+  /* Substitutions — real 1:1 or near-1:1 swaps. */
+  const SUBS = {
+    'buttermilk': '1 cup milk + 1 tbsp lemon juice or vinegar; rest 5 min until it curdles.',
+    'egg': 'Binding: 1 tbsp ground flax + 3 tbsp water, rested. Leavening: ¼ tsp baking soda + ½ tsp vinegar. Richness: ¼ cup yoghurt or aquafaba (3 tbsp) whips like whites.',
+    'baking powder': '¼ tsp baking soda + ½ tsp cream of tartar = 1 tsp baking powder.',
+    'butter': 'Neutral oil at ~80% of the butter weight for frying; in baking it changes texture (less structure).',
+    'cream': 'Evaporated milk 1:1 for cooking; for whipping there is no true substitute for the fat.',
+    'wine': 'Stock + a splash of vinegar or lemon, or a little verjus, for the acidity a recipe leans on.',
+    'cornstarch': 'Twice the weight of flour, or 1:1 with arrowroot (which stays clearer and sets glossier).',
+    'garlic': '⅛ tsp garlic powder ≈ 1 clove, but add it earlier so it hydrates.',
+    'self-raising flour': 'Plain flour + 2 tsp baking powder per 150 g.',
+  };
+
+  /* Techniques — the "why". */
+  const TECH = {
+    'sear': 'Dry the surface hard (pat + optionally salt and air-dry). Hot pan, then oil, then meat — and leave it alone. It releases from the pan when the crust forms; forcing it early tears it. That browning is the Maillard reaction and it is most of the flavour.',
+    'rest': 'Resting lets the muscle fibres relax and reabsorb juices that heat pushed to the centre. Cut too soon and it bleeds onto the board. 5 min for a steak, 15–20 for a roast, tented loosely.',
+    'salt': 'Salt early. On meat, salt 40+ min ahead (or the night before) so it dissolves, draws out moisture, then gets reabsorbed as a light brine — seasoning all the way through, not just the surface.',
+    'emulsion': 'Oil and water do not mix until an emulsifier (mustard, egg yolk, a little of the sauce already made) holds them. Add the oil slowly while whisking; if it breaks, start a new yolk/teaspoon of water and whisk the broken sauce into it drop by drop.',
+    'deglaze': 'After searing, the browned stuck bits (fond) are pure flavour. Pour in wine or stock, scrape while it bubbles, reduce, then finish off heat with a knob of cold butter for a glossy pan sauce.',
+    'blanch': 'Boil hard and salted, cook briefly, then plunge into ice water to lock colour and stop cooking. The shock keeps greens vivid.',
+    'bloom': 'Toast whole or ground spices in dry heat or oil for 30–60 s until fragrant — it wakes up the fat-soluble aromatics. Do not let them smoke.',
+    'reduce': 'Simmering evaporates water and concentrates flavour and body. Reducing by half roughly doubles intensity; taste before you salt, since salt concentrates too.',
+    'knead': 'Kneading develops gluten into an elastic web that traps gas. It is done when the dough passes the windowpane test — stretch a piece thin enough to see light through without tearing.',
+    'caramelise onions': 'Low and slow, 30–45 min, a pinch of salt to pull water, stirring occasionally. High heat browns fast but tastes of scorch, not sweetness. Deglaze the pan when it sticks.',
+  };
+
+  const norm = s => s.toLowerCase().replace(/[^a-z ]/g, '').trim();
+
+  function answer(q) {
+    const n = norm(q);
+    // direct table hits
+    for (const [k, v] of Object.entries(TECH))  if (n.includes(k) || n.includes(k.split(' ')[0])) return cap('Technique — ' + k, v);
+    for (const [k, v] of Object.entries(TEMPS)) if (n.includes(k)) return cap(k + ' — temperature', v);
+    for (const [k, v] of Object.entries(RATIOS)) if (n.includes(k)) return cap(k + ' — ratio', v);
+    for (const [k, v] of Object.entries(SUBS)) {
+      if (n.includes('substitut') || n.includes('instead of') || n.includes('replace')) {
+        for (const [k2, v2] of Object.entries(SUBS)) if (n.includes(k2)) return cap('Substitute for ' + k2, v2);
+      }
+      if (n.includes(k)) return cap(k, v);
+    }
+    return null;
+  }
+
+  function cap(title, body) { return `🍳 ${title}\n${body}`; }
+
+  function index() {
+    return 'I can talk technique, temperatures, ratios and substitutions. Try:\n' +
+      '  cook sear a steak · cook pan sauce · cook caramelise onions\n' +
+      '  temp for chicken · rice ratio · vinaigrette ratio\n' +
+      '  substitute for buttermilk · egg substitute\n' +
+      'Or just ask a cooking question in plain words.';
+  }
+
+  return { answer, index, RATIOS, TEMPS, SUBS, TECH };
+})();

@@ -64,6 +64,9 @@ the home screen; everything else is a side panel you visit when you need it.
 - **Overview** — a live command screen: reactive orb, markets, headlines, system state
 - **Wake word** — say “Zero, …” and it acts on what follows (read the warning below)
 - **Security** — password strength, breach exposure, and a hardening checklist for your own sites
+- **Cooking** — real technique, ratios, temps and substitutions: `cook sear a steak`, `rice ratio`, `egg substitute`
+- **Remembers conversations** — the transcript is saved (encrypted in the vault) and Zero continues where you left off
+- **Learns your style** — it reads how you write and adapts; see and reset it in Memory
 - **Memory** — say `remember …` and Zero carries it into every future conversation
 - **Apps** — launch your tools by name: `open figma`
 - **Voice** — Zero speaks in a composed, deliberate cadence, with a picker to choose the exact voice; also takes dictation

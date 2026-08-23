@@ -23,6 +23,9 @@ const Zero = (() => {
     wakeOk: 'zero.wakeOk',
     speak: 'zero.speak',
     voice: 'zero.voice',
+    convo: 'zero.convo',       // remembered conversation transcript
+    profile: 'zero.profile',   // what Zero has learned about how you work
+    halted: 'zero.halted',     // pause state survives a reload
   };
 
   // Short rolling context so the assistant remembers the current thread.
@@ -51,10 +54,17 @@ const Zero = (() => {
   // Things Zero should still know next time you open it.
   let memories = Vault.isEnabled() ? [] : store.get(LS.memories, []);
   let apps = store.get(LS.apps, []);
+  // Remembered conversation (survives reload) and the learned profile.
+  let convo = Vault.isEnabled() ? [] : store.get(LS.convo, []);
+  let profile = Vault.isEnabled() ? blankProfile() : store.get(LS.profile, blankProfile());
+
+  function blankProfile() {
+    return { messages: 0, totalLen: 0, style: 'balanced', topics: {}, emoji: 0, updated: 0 };
+  }
 
   // Keys that hold user content and must never survive as plaintext
   // once the vault is on.
-  const PLAINTEXT_KEYS = ['zero.tasks', 'zero.notes', 'zero.memories'];
+  const PLAINTEXT_KEYS = ['zero.tasks', 'zero.notes', 'zero.memories', 'zero.convo', 'zero.profile'];
 
   /* Encrypt the in-memory model and write it. Fire-and-forget: callers
      stay synchronous, and a locked vault simply declines to write. */
@@ -65,6 +75,8 @@ const Zero = (() => {
       await Store.set(LS.tasks, await Vault.encrypt(JSON.stringify(tasks)));
       await Store.set(LS.notes, await Vault.encrypt(JSON.stringify(notes)));
       await Store.set(LS.memories, await Vault.encrypt(JSON.stringify(memories)));
+      await Store.set(LS.convo, await Vault.encrypt(JSON.stringify(convo.slice(-200))));
+      await Store.set(LS.profile, await Vault.encrypt(JSON.stringify(profile)));
       // Anything written before the vault existed is still readable where it
       // was left. Encrypting the new copy is only half the job; the old
       // plaintext has to go, or "encrypted" is a claim the disk contradicts.
@@ -82,6 +94,8 @@ const Zero = (() => {
       await Store.set(LS.notes, JSON.stringify(notes));
       await Store.set(LS.memories, JSON.stringify(memories));
       await Store.set(LS.apps, JSON.stringify(apps));
+      await Store.set(LS.convo, JSON.stringify(convo.slice(-200)));
+      await Store.set(LS.profile, JSON.stringify(profile));
     } catch (e) { log('Could not save: ' + e.message, true); }
   }
 
@@ -132,7 +146,7 @@ const Zero = (() => {
   const shortUrl = u => { try { return new URL(u).hostname; } catch { return String(u).slice(0, 40); } };
 
   /* Hard stop: abort in-flight requests, cancel timers, freeze UI. */
-  function toggleHalt() {
+  function toggleHalt(silent) {
     Control.halted = !Control.halted;
     const btn = document.getElementById('killSwitch');
     const banner = document.getElementById('haltBanner');
@@ -142,18 +156,18 @@ const Zero = (() => {
       Control.inflight.clear();
       Control.timers.forEach(id => clearInterval(id));
       Control.timers.clear();
-      btn.textContent = '▶ RESUME';
-      btn.classList.add('halted');
-      banner.classList.add('on');
-      log('EMERGENCY STOP — all activity halted by user.', true);
+      if (btn) { btn.textContent = '▶ RESUME'; btn.classList.add('halted'); }
+      if (banner) banner.classList.add('on');
+      if (!silent) log('Stopped — all activity paused by you. It resumes where it left off.', true);
     } else {
-      btn.textContent = '■ STOP';
-      btn.classList.remove('halted');
-      banner.classList.remove('on');
-      log('Resumed by user.');
+      if (btn) { btn.textContent = '■ STOP'; btn.classList.remove('halted'); }
+      if (banner) banner.classList.remove('on');
+      if (!silent) log('Resumed by you.');
       startTimers();
       loadMarkets();
     }
+    // The pause state survives a reload: off stays off until you turn it on.
+    localStorage.setItem(LS.halted, Control.halted ? '1' : '');
     updateStatus();
   }
 
@@ -256,6 +270,7 @@ const Zero = (() => {
     if (view === 'security') { renderChecklist(); showPayloads(); }
     if (view === 'files') { filesUi(); listFolder(); }
     if (view === 'apps') renderPresets();
+    if (view === 'memory') { renderMemories(); renderProfile(); }
   }
 
   /* ---------------- Clock ---------------- */
@@ -629,6 +644,68 @@ const Zero = (() => {
         } else nb.innerHTML = '<div class="nodata" style="font-size:12px">no feed</div>';
       } catch { nb.innerHTML = '<div class="nodata" style="font-size:12px">no feed</div>'; }
     }
+  }
+
+  /* ---------------- Learning (personalisation) ----------------
+     Zero watches HOW you write — length, tone, recurring subjects — and
+     adapts its replies. This runs entirely on your machine, feeds only
+     into the local engine's prompt, and is cleared by `wipe`. It reads
+     signals, not secrets. */
+  const STOPWORDS = new Set(('the a an and or of to in it is are be i you we my me for on with that this what how why can do does'
+    + ' zero please just want need make my your his').split(' '));
+
+  function learnFromMessage(text) {
+    profile.messages++;
+    profile.totalLen += text.length;
+    if (/[\u{1F300}-\u{1FAFF}☀-➿]/u.test(text)) profile.emoji++;
+    const avg = profile.totalLen / profile.messages;
+    profile.style = avg < 55 ? 'terse' : avg > 160 ? 'detailed' : 'balanced';
+    // topic frequency from meaningful words
+    for (const w of text.toLowerCase().match(/[a-z]{4,}/g) || []) {
+      if (STOPWORDS.has(w)) continue;
+      profile.topics[w] = (profile.topics[w] || 0) + 1;
+    }
+    // keep the topic map from growing without bound
+    const entries = Object.entries(profile.topics);
+    if (entries.length > 120) {
+      profile.topics = Object.fromEntries(entries.sort((a, b) => b[1] - a[1]).slice(0, 80));
+    }
+    profile.updated = Date.now();
+    store.set(LS.profile, profile);
+  }
+
+  function topTopics(n) {
+    return Object.entries(profile.topics).sort((a, b) => b[1] - a[1]).slice(0, n).map(e => e[0]);
+  }
+
+  function profileSummary() {
+    if (profile.messages < 3) return '';   // not enough to characterise yet
+    const bits = [];
+    bits.push(profile.style === 'terse' ? 'Writes briefly — keep replies short and direct.'
+      : profile.style === 'detailed' ? 'Writes at length — fuller answers are welcome.'
+      : 'Writes at a moderate length — match it.');
+    if (profile.emoji / profile.messages > 0.3) bits.push('Uses emoji — a warmer, informal tone fits.');
+    const t = topTopics(6);
+    if (t.length) bits.push('Recurring interests: ' + t.join(', ') + '.');
+    return bits.map(b => '- ' + b).join('\n');
+  }
+
+  function renderProfile() {
+    const el = document.getElementById('profileBody');
+    if (!el) return;
+    if (profile.messages < 1) { el.innerHTML = '<p class="hint">Nothing learned yet. Talk to Zero and it adapts to how you write.</p>'; return; }
+    const t = topTopics(10);
+    el.innerHTML =
+      `<div class="ov-row"><span>Messages seen</span><span>${profile.messages}</span></div>` +
+      `<div class="ov-row"><span>Your style</span><span>${esc(profile.style)}</span></div>` +
+      `<div class="ov-row"><span>Tone</span><span>${profile.emoji / Math.max(1, profile.messages) > 0.3 ? 'informal' : 'plain'}</span></div>` +
+      (t.length ? `<div style="margin-top:12px" class="hint">Interests Zero has noticed:</div><div class="chips" style="margin-top:8px">${t.map(x => `<span class="chip">${esc(x)}</span>`).join('')}</div>` : '');
+  }
+
+  function forgetProfile() {
+    if (!confirm('Reset what Zero has learned about your style? Your notes, tasks and memories are kept.')) return;
+    profile = blankProfile(); store.set(LS.profile, profile); renderProfile();
+    log('Learned profile reset by user.');
   }
 
   /* ---------------- Memory ---------------- */
@@ -1140,9 +1217,15 @@ const Zero = (() => {
   /* ---------------- Quick capture ---------------- */
   /* ---------------- Assistant ---------------- */
   function bubble(text, who) {
-    if (who === 'zero' && speakReplies && text && text !== '…') {
-      orbState('speaking');
-      Voice.speak(text, { onend: () => orbState(Voice.isAwake() ? 'listening' : 'idle') });
+    if (who === 'zero' && text && text !== '…') {
+      if (speakReplies) {
+        orbState('speaking');
+        Voice.speak(text, { onend: () => orbState(Voice.isAwake() ? 'listening' : 'idle') });
+      }
+      // Remember Zero's instant replies too (streamed engine replies are
+      // recorded at completion, where their final text is known).
+      convo.push({ who: 'zero', text, ts: Date.now() });
+      store.set(LS.convo, convo);
     }
     const log = document.getElementById('chatLog');
     const d = document.createElement('div');
@@ -1159,6 +1242,11 @@ const Zero = (() => {
     if (!q) return;
     inp.value = '';
     bubble(q, 'user');
+
+    // Learn from how the user writes, and remember what was said.
+    learnFromMessage(q);
+    convo.push({ who: 'user', text: q, ts: Date.now() });
+    store.set(LS.convo, convo);
 
     // Try built-in offline commands first — always works, no key, no network.
     // 1. Exact commands.
@@ -1191,6 +1279,7 @@ const Zero = (() => {
         renderReply(thinking, reply, true);
         if (speakReplies) Voice.speak(splitThinking(reply).answer || reply);
         chatHistory.push({ role: 'user', content: q }, { role: 'assistant', content: reply });
+        convo.push({ who: 'zero', text: reply, ts: Date.now() }); store.set(LS.convo, convo);
         if (chatHistory.length > 40) chatHistory = chatHistory.slice(-40);
         return;
       } catch (e) {
@@ -1256,6 +1345,7 @@ const Zero = (() => {
         '  price btc           live crypto price',
         '  chart btc 90        price chart + indicators',
         '  briefing            daily read of live market conditions',
+        '  cook sear a steak   technique, temps, ratios, substitutions',
         '  news                top stories right now',
         '  update              refresh everything',
         '',
@@ -1307,6 +1397,23 @@ const Zero = (() => {
     if (low === 'news') { loadNews(true); return 'Pulling the latest stories…'; }
     if (low === 'briefing' || low === 'daily' || low === 'brief' || low === 'market' || low === 'markets today') {
       dailyBriefing(true); return HANDLED;
+    }
+    if (low === 'cook' || low === 'recipe' || low === 'cooking') return Cook.index();
+    if (low.startsWith('cook ') || low.startsWith('recipe ')) {
+      const a = Cook.answer(s.replace(/^(cook|recipe)\s+/i, ''));
+      return a || Cook.index();
+    }
+    // plain cooking questions, before falling through to web lookup.
+    // No trailing \b on stems like "substitut" — it never matches "substitute".
+    if (/(cook|bake|fry|sear|roast|grill|recipe|substitut|instead of|marinat|caramel|knead|deglaze|simmer|\bbrine\b|\bratio\b|\bvinaigrette\b|temperature for|temp for|how long to (cook|boil|roast))/i.test(low)) {
+      const a = Cook.answer(s);
+      if (a) return a;
+    }
+    // Last resort before web lookup: if the words name a known dish/technique
+    // /ingredient Zero knows, answer from the kitchen.
+    {
+      const cookHit = Cook.answer(s);
+      if (cookHit) return cookHit;
     }
 
     if (low.startsWith('remember ')) {
@@ -1476,6 +1583,8 @@ const Zero = (() => {
       system += '\n\nThings the user has told you to remember:\n' +
         memories.map(m => '- ' + m.text).join('\n');
     }
+    const learned = profileSummary();
+    if (learned) system += '\n\nWhat you have learned about this user:\n' + learned;
     const messages = [{ role: 'system', content: system }, ...chatHistory.slice(-24), { role: 'user', content: q }];
 
     const [endpoint, body, pluck] = mode === 'compatible'
@@ -1690,14 +1799,17 @@ const Zero = (() => {
     el.value = '';
     try {
       const t = await Store.get(LS.tasks), n = await Store.get(LS.notes), m = await Store.get(LS.memories);
+      const c = await Store.get(LS.convo), pr = await Store.get(LS.profile);
       tasks = t ? JSON.parse(await Vault.decrypt(t)) : [];
       notes = n ? JSON.parse(await Vault.decrypt(n)) : [];
       memories = m ? JSON.parse(await Vault.decrypt(m)) : [];
+      convo = c ? JSON.parse(await Vault.decrypt(c)) : [];
+      profile = pr ? JSON.parse(await Vault.decrypt(pr)) : blankProfile();
     } catch (e) {
       err.textContent = 'Unlocked, but stored data could not be read: ' + e.message;
-      tasks = []; notes = []; memories = [];
+      tasks = []; notes = []; memories = []; convo = []; profile = blankProfile();
     }
-    renderTasks(); renderNotes(); renderMemories(); updateStatus();
+    renderTasks(); renderNotes(); renderMemories(); renderProfile(); updateStatus();
     log('Vault unlocked.');
     vaultUi();
   }
@@ -1730,9 +1842,11 @@ const Zero = (() => {
   function wipeData() {
     if (!confirm('Wipe ALL Zero data on this device? This cannot be undone.')) return;
     Object.values(LS).forEach(k => localStorage.removeItem(k));
+    Store.clear().catch(() => {});
     Vault.disable();                       // also clears the salt and check token
-    tasks = []; notes = []; chatHistory = [];
-    renderTasks(); renderNotes(); refreshAiStatus(); vaultUi();
+    tasks = []; notes = []; memories = []; apps = []; convo = []; profile = blankProfile(); chatHistory = [];
+    const cl = document.getElementById('chatLog'); if (cl) cl.innerHTML = '';
+    renderTasks(); renderNotes(); renderMemories(); renderApps(); renderProfile(); refreshAiStatus(); vaultUi();
     alert('All local data wiped.');
   }
 
@@ -1789,12 +1903,34 @@ const Zero = (() => {
     if (typeof Orb !== 'undefined') { Orb.attach(document.getElementById('orb')); Orb.set('idle'); }
     if (typeof Boot !== 'undefined') Boot.run(document.getElementById('boot'));
     setInterval(() => { if (document.getElementById('view-overview')?.classList.contains('active')) renderOverview(); }, 30000);
-    log('Zero started. All capabilities on. Press STOP anytime.');
+    log('Zero started.');
+    renderProfile();
+
+    // Restore the remembered conversation so Zero continues where it left off.
+    if (convo.length) {
+      const recent = convo.slice(-40);
+      for (const m of recent) {
+        const d = document.createElement('div');
+        d.className = 'msg ' + (m.who === 'user' ? 'user' : 'zero');
+        d.textContent = m.text;
+        document.getElementById('chatLog').appendChild(d);
+      }
+      // Seed the engine context from what was said before.
+      chatHistory = convo.slice(-24).map(m => ({ role: m.who === 'user' ? 'user' : 'assistant', content: m.text }));
+      const cl = document.getElementById('chatLog'); if (cl) cl.scrollTop = cl.scrollHeight;
+      const name = userName();
+      bubble(`Welcome back${name ? ', ' + name : ''}. We left off ${convo.length} message${convo.length === 1 ? '' : 's'} in — carry on.`, 'zero');
+    } else {
+      bubble(Converse.reply('hello', {
+        tasks: tasks.filter(t => !t.done).length, memories: memories.length,
+        hasEngine: !!store.raw(LS.engineModel), name: userName(),
+      }) + "\n\nAsk me anything — I look things up live, remember our chats, and learn your style. Type `help`.", 'zero');
+    }
+
+    // Restore the pause state: if you stopped Zero last time, it stays stopped.
+    if (localStorage.getItem(LS.halted) === '1' && !Control.halted) toggleHalt(true);
+
     loadMarkets(); loadStocks(); startTimers();
-    bubble(Converse.reply('hello', {
-      tasks: tasks.filter(t => !t.done).length, memories: memories.length,
-      hasEngine: !!store.raw(LS.engineModel), name: userName(),
-    }) + "\n\nAsk me anything — I look things up live. Type `help` for the full list.", 'zero');
   }
 
   return {
@@ -1803,7 +1939,7 @@ const Zero = (() => {
     loadRates, loadNews, setNewsMode, setSpeak, setVoice, previewVoice, micToggle, stopSpeaking: () => Voice.stop(),
     toggleWake, renderOverview, checkPassword, cryptoTool, showPayloads, copyText, reconDomain,
     openAFile, saveBack, saveNew, connectFolder, listFolder, openFromFolder, disconnectFolder,
-    addApp, removeApp, launchApp, forgetMemory, storageInfo, addPreset,
+    addApp, removeApp, launchApp, forgetMemory, forgetProfile, renderProfile, storageInfo, addPreset,
     openTradingView, allowTradingView, tvSearch, dailyBriefing,
     exportData, wipeData, init,
     toggleHalt, killNetwork, panic, setCap, clearLog,

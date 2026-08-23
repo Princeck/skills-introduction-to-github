@@ -752,3 +752,22 @@ input:focus, textarea:focus, select:focus {
   .topbar { flex-direction: column; }
   .chat-wrap { height: auto; }
 }
+
+
+/* ============ Subtle kill switch (you asked to hide it) ============
+   Still one tap, still Esc-Esc, still the Control Panel button — just
+   not shouting. It fades to a small dim marker until you reach for it,
+   and lights up fully the instant it matters (hover, focus, halted). */
+#killSwitch {
+  opacity: .28;
+  transform: scale(.82);
+  transform-origin: top right;
+  filter: saturate(.7);
+  transition: opacity .25s ease, transform .18s ease, filter .25s ease, box-shadow .25s ease;
+}
+#killSwitch:hover, #killSwitch:focus-visible {
+  opacity: 1; transform: scale(1); filter: none;
+}
+/* When halted it must be unmissable regardless. */
+#killSwitch.halted { opacity: 1; transform: scale(1); filter: none; }
+@media (prefers-reduced-motion: reduce) { #killSwitch { transition: none; } }
