@@ -21,6 +21,39 @@ All motion is disabled under `prefers-reduced-motion`.
 
 ---
 
+## Install it as an app
+
+Zero is a PWA (progressive web app), so it installs like a real app — its own
+window and icon, works offline, launches from your dock/start menu.
+
+1. **Serve it over http(s)** (service workers don't run from `file://`). Simplest:
+   ```bash
+   cd zero && python3 -m http.server 8080   # then open http://localhost:8080
+   ```
+   Or host the `zero/` folder on any static host (GitHub Pages, Netlify, Vercel).
+2. **Install**: Chrome/Edge desktop show an install icon in the address bar (or use
+   the **Install Zero** button in Settings). On phones: Share → **Add to Home Screen**.
+
+### Getting it into the stores
+
+A PWA can be wrapped for the app stores — no rewrite:
+
+- **Microsoft Store**: [PWABuilder](https://pwabuilder.com) takes the hosted URL and
+  produces a submittable Windows package.
+- **Google Play**: PWABuilder (or Bubblewrap) wraps it as a Trusted Web Activity `.aab`.
+- **iOS App Store**: needs a thin WKWebView wrapper (PWABuilder generates one); Apple
+  is stricter about pure-web apps, so this is the fussiest of the three.
+
+Each store needs a developer account and their review. The app itself is ready —
+manifest, service worker and icons are all in `zero/`.
+
+**On "launches when I open my laptop":** an installed PWA can be set to open at
+login through your OS (Windows Startup apps / macOS Login Items), and with the daily
+brief on it greets you with the market the moment it opens. A web page on its own
+can't auto-launch the machine — that's an OS setting on the installed app.
+
+---
+
 ## Run it
 
 No build step, no install, no server:

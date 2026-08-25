@@ -26,6 +26,7 @@ const Zero = (() => {
     convo: 'zero.convo',       // remembered conversation transcript
     profile: 'zero.profile',   // what Zero has learned about how you work
     halted: 'zero.halted',     // pause state survives a reload
+    autoBrief: 'zero.autoBrief',   // daily market analysis on every login
   };
 
   // Short rolling context so the assistant remembers the current thread.
@@ -156,11 +157,11 @@ const Zero = (() => {
       Control.inflight.clear();
       Control.timers.forEach(id => clearInterval(id));
       Control.timers.clear();
-      if (btn) { btn.textContent = '▶ RESUME'; btn.classList.add('halted'); }
+      if (btn) { btn.textContent = 'RESUME'; btn.classList.add('halted'); }
       if (banner) banner.classList.add('on');
       if (!silent) log('Stopped — all activity paused by you. It resumes where it left off.', true);
     } else {
-      if (btn) { btn.textContent = '■ STOP'; btn.classList.remove('halted'); }
+      if (btn) { btn.textContent = 'STOP'; btn.classList.remove('halted'); }
       if (banner) banner.classList.remove('on');
       if (!silent) log('Resumed by you.');
       startTimers();
@@ -1346,6 +1347,7 @@ const Zero = (() => {
         '  chart btc 90        price chart + indicators',
         '  briefing            daily read of live market conditions',
         '  cook sear a steak   technique, temps, ratios, substitutions',
+        '  recipe carbonara    full recipes with ingredients + method',
         '  news                top stories right now',
         '  update              refresh everything',
         '',
@@ -1398,10 +1400,15 @@ const Zero = (() => {
     if (low === 'briefing' || low === 'daily' || low === 'brief' || low === 'market' || low === 'markets today') {
       dailyBriefing(true); return HANDLED;
     }
-    if (low === 'cook' || low === 'recipe' || low === 'cooking') return Cook.index();
-    if (low.startsWith('cook ') || low.startsWith('recipe ')) {
-      const a = Cook.answer(s.replace(/^(cook|recipe)\s+/i, ''));
-      return a || Cook.index();
+    if (low === 'cook' || low === 'cooking') return Cook.index();
+    if (low === 'recipe' || low === 'recipes') return Cook.recipeList();
+    if (low.startsWith('recipe ')) {
+      const r = Cook.recipe(s.slice(7));
+      return r || ('I do not have that recipe yet.\n\n' + Cook.recipeList());
+    }
+    if (low.startsWith('cook ')) {
+      const arg = s.slice(5);
+      return Cook.recipe(arg) || Cook.answer(arg) || Cook.index();
     }
     // plain cooking questions, before falling through to web lookup.
     // No trailing \b on stems like "substitut" — it never matches "substitute".
@@ -1729,6 +1736,8 @@ const Zero = (() => {
     Voice.speak("Zero online. Systems nominal. I'm listening.");
   }
 
+  function setAutoBrief(on) { store.rawSet(LS.autoBrief, on ? '1' : '0'); log('Daily login briefing turned ' + (on ? 'ON' : 'OFF') + '.'); }
+
   function setThink(on) {
     store.rawSet(LS.think, on ? '1' : '');
     log('Reasoning mode turned ' + (on ? 'ON' : 'OFF') + ' by user.');
@@ -1881,6 +1890,8 @@ const Zero = (() => {
     if (!Voice.canHear()) document.getElementById('micBtn')?.style.setProperty('display', 'none');
     const thinkEl = document.getElementById('thinkToggle');
     if (thinkEl) thinkEl.checked = engineCfg().think;
+    const abEl = document.getElementById('autoBriefToggle');
+    if (abEl) abEl.checked = store.raw(LS.autoBrief) !== '0';
     vaultUi();
 
     // Keyboard kill switch: Esc twice, or Ctrl/Cmd + . — works from anywhere.
@@ -1931,6 +1942,12 @@ const Zero = (() => {
     if (localStorage.getItem(LS.halted) === '1' && !Control.halted) toggleHalt(true);
 
     loadMarkets(); loadStocks(); startTimers();
+
+    // Daily market analysis on every login (on by default; toggle in Settings).
+    // Waits for the greeting, respects halt and the network switch.
+    if (store.raw(LS.autoBrief) !== '0' && !Control.halted && Control.caps.network) {
+      setTimeout(() => { if (!Control.halted && Control.caps.network) dailyBriefing(false); }, 1400);
+    }
   }
 
   return {
@@ -1940,11 +1957,32 @@ const Zero = (() => {
     toggleWake, renderOverview, checkPassword, cryptoTool, showPayloads, copyText, reconDomain,
     openAFile, saveBack, saveNew, connectFolder, listFolder, openFromFolder, disconnectFolder,
     addApp, removeApp, launchApp, forgetMemory, forgetProfile, renderProfile, storageInfo, addPreset,
-    openTradingView, allowTradingView, tvSearch, dailyBriefing,
+    openTradingView, allowTradingView, tvSearch, dailyBriefing, setAutoBrief,
     exportData, wipeData, init,
     toggleHalt, killNetwork, panic, setCap, clearLog,
     enableVault, unlockVault, lockVault, disableVault,
   };
 })();
+
+/* ---- PWA: make Zero installable and offline-capable ----
+   Registers the service worker (only over http/https — not file://, where
+   service workers are blocked), and captures the install prompt so the
+   Settings "Install Zero" button can offer it. */
+let _deferredInstall = null;
+window.addEventListener('beforeinstallprompt', e => {
+  e.preventDefault();
+  _deferredInstall = e;
+  document.getElementById('installBtn')?.style.setProperty('display', '');
+});
+window.ZeroInstall = async () => {
+  if (!_deferredInstall) { alert('To install: use your browser menu — "Install app" (Chrome/Edge) or Share → Add to Home Screen (Safari/mobile).'); return; }
+  _deferredInstall.prompt();
+  await _deferredInstall.userChoice;
+  _deferredInstall = null;
+  document.getElementById('installBtn')?.style.setProperty('display', 'none');
+};
+if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
+  window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+}
 
 document.addEventListener('DOMContentLoaded', Zero.init);

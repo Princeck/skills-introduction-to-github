@@ -4,6 +4,13 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="robots" content="noindex, nofollow" />
+  <meta name="theme-color" content="#03050b" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="ZERO" />
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="apple-touch-icon" href="assets/icon-192.png" />
   <title>ZERO</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -21,7 +28,7 @@
   <div id="wakeBar"><span class="wake-dot"></span> LISTENING — audio is streaming to your browser's speech service <span id="wakeHeard"></span></div>
 
   <!-- ============ KILL SWITCH — always visible, always first ============ -->
-  <button id="killSwitch" onclick="Zero.toggleHalt()" title="Immediately stop all Zero activity">■ STOP</button>
+  <button id="killSwitch" onclick="Zero.toggleHalt()" title="Stop / resume all Zero activity">STOP</button>
 
   <!-- ============ VAULT LOCK SCREEN ============ -->
   <div id="lockScreen">
@@ -490,6 +497,16 @@
             <p class="hint">Zero has no server, no analytics, and no accounts. All your data lives in this browser only.</p>
             <button class="btn ghost" onclick="Zero.exportData()">⤓ Export my data (JSON)</button>
             <button class="btn ghost" onclick="Zero.wipeData()" style="margin-top:8px">⌫ Wipe everything</button>
+          </div>
+          <div class="card">
+            <h2>App &amp; Daily Brief</h2>
+            <label class="think-opt" style="margin-top:6px">
+              <input type="checkbox" id="autoBriefToggle" checked onchange="Zero.setAutoBrief(this.checked)" />
+              <span>Daily market analysis every time I open Zero</span>
+            </label>
+            <p class="hint" style="margin-top:14px">Install Zero as an app — its own window and icon, works offline, and launches like any other app.</p>
+            <button class="btn" id="installBtn" style="display:none;margin-top:6px" onclick="ZeroInstall()">⤓ Install Zero as an app</button>
+            <div class="notice">If the button isn't shown, install from your browser: Chrome/Edge desktop show an install icon in the address bar; on phones use Share → <b>Add to Home Screen</b>. Needs to be served over http(s) — see the README for turning this into a Play Store / Microsoft Store app.</div>
           </div>
         </div>
       </section>

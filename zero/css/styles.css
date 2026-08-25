@@ -754,20 +754,34 @@ input:focus, textarea:focus, select:focus {
 }
 
 
-/* ============ Subtle kill switch (you asked to hide it) ============
-   Still one tap, still Esc-Esc, still the Control Panel button — just
-   not shouting. It fades to a small dim marker until you reach for it,
-   and lights up fully the instant it matters (hover, focus, halted). */
+/* ============ Compact kill switch (visible, not shouting) ============
+   A small round STOP dot in the corner — always there and clickable,
+   never dominating. It shows just the ■ glyph, expands to the word on
+   hover, and goes full-size, green and unmissable the moment it halts.
+   Still one tap, still Esc-Esc, still the Control Panel button. */
 #killSwitch {
-  opacity: .28;
-  transform: scale(.82);
-  transform-origin: top right;
-  filter: saturate(.7);
-  transition: opacity .25s ease, transform .18s ease, filter .25s ease, box-shadow .25s ease;
+  width: 40px; height: 40px; padding: 0;
+  border-radius: 50%;
+  font-size: 0;                       /* hide the word at rest... */
+  letter-spacing: 0;
+  overflow: hidden;
+  display: grid; place-items: center;
+  opacity: .7;
+  animation: none;                    /* drop the loud pulse */
+  border-width: 1.5px;
+  box-shadow: 0 4px 16px rgba(0,0,0,.5), 0 0 14px rgba(255,43,69,.35);
+  transition: width .2s ease, opacity .2s ease, transform .12s ease, box-shadow .2s ease, background .2s ease;
 }
+#killSwitch::before { content: '\25A0'; font-size: 15px; line-height: 1; }  /* ■ always visible */
+#killSwitch.halted::before { content: '\25B6'; }                              /* ▶ when halted */
 #killSwitch:hover, #killSwitch:focus-visible {
-  opacity: 1; transform: scale(1); filter: none;
+  width: auto; padding: 0 18px; border-radius: 20px;
+  font-size: 14px; letter-spacing: 2px; opacity: 1;
 }
-/* When halted it must be unmissable regardless. */
-#killSwitch.halted { opacity: 1; transform: scale(1); filter: none; }
-@media (prefers-reduced-motion: reduce) { #killSwitch { transition: none; } }
+/* Halted: unmissable — full pill, green, pulsing. */
+#killSwitch.halted {
+  width: auto; padding: 0 22px; height: 44px; border-radius: 13px;
+  font-size: 15px; letter-spacing: 2.5px; opacity: 1;
+  animation: pulseKill 2.4s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) { #killSwitch { transition: none; } #killSwitch.halted { animation: none; } }

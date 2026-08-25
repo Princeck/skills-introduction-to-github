@@ -990,5 +990,83 @@ const Cook = (() => {
       'Or just ask a cooking question in plain words.';
   }
 
-  return { answer, index, RATIOS, TEMPS, SUBS, TECH };
+  /* Full recipes — real, tested proportions and method. */
+  const RECIPES = {
+    'carbonara': {
+      title: 'Spaghetti Carbonara (serves 2)',
+      ingredients: ['200 g spaghetti', '100 g guanciale or pancetta, diced', '2 whole eggs + 1 yolk',
+        '50 g Pecorino Romano, grated', 'Black pepper, lots', 'Salt for the pasta water'],
+      steps: [
+        'Boil the pasta in well-salted water (1%). Reserve a mug of pasta water before draining.',
+        'Render the guanciale in a cold, dry pan over medium heat until crisp; kill the heat.',
+        'Whisk eggs, yolk, pecorino and a heavy grind of pepper into a paste.',
+        'Drain pasta, add to the pan off the heat, toss with the fat. Wait 30 s so it is not scalding.',
+        'Add the egg mix, tossing hard, loosening with pasta water until it is a glossy sauce. Never let it scramble.',
+        'Serve at once with more pecorino and pepper.'],
+    },
+    'omelette': {
+      title: 'French Omelette (serves 1)',
+      ingredients: ['3 eggs', '1 tbsp butter', 'Salt', 'Chives or cheese (optional)'],
+      steps: [
+        'Beat the eggs with a pinch of salt until fully uniform.',
+        'Melt butter in a non-stick pan over medium heat until it foams but does not brown.',
+        'Pour in the eggs; stir constantly with a spatula, shaking the pan, 20–30 s.',
+        'When just-set but still glossy on top, stop stirring, let it sit 10 s.',
+        'Tilt the pan, fold a third over, roll it out onto the plate seam-down. Soft, pale, no colour.'],
+    },
+    'pancakes': {
+      title: 'Fluffy Pancakes (makes ~8)',
+      ingredients: ['200 g flour', '2 tsp baking powder', '1 tbsp sugar', 'pinch salt',
+        '300 ml milk', '1 egg', '2 tbsp melted butter'],
+      steps: [
+        'Whisk the dry ingredients. Separately whisk milk, egg and butter.',
+        'Combine, stirring just until no dry flour remains — lumps are fine; overmixing makes them tough.',
+        'Rest 10 min. Cook on a medium, lightly buttered pan.',
+        'Flip when bubbles rise and the edges look set, ~2 min; ~1 min on the second side.'],
+    },
+    'roast chicken': {
+      title: 'Roast Chicken',
+      ingredients: ['1 whole chicken (~1.5 kg)', 'Salt', 'Butter or oil', 'Pepper', 'Optional: lemon, herbs'],
+      steps: [
+        'Salt it all over, ideally the day before, uncovered in the fridge — dry skin crisps best.',
+        'Bring to room temp ~1 h out. Heat oven to 220 °C.',
+        'Rub with fat, pepper; put lemon/herbs in the cavity. Truss or tuck the wings.',
+        'Roast ~20 min, drop to 190 °C, continue until the thickest thigh reads 74 °C — about 1 h total.',
+        'Rest 15–20 min tented before carving, or the juices run out onto the board.'],
+    },
+    'tomato sauce': {
+      title: 'Simple Tomato Sauce',
+      ingredients: ['1 tin (400 g) whole tomatoes', '2 cloves garlic, sliced', '3 tbsp olive oil',
+        'Salt', 'Basil', 'Pinch sugar if needed'],
+      steps: [
+        'Warm the oil, add garlic, cook gently until pale gold — do not brown or it turns bitter.',
+        'Add the tomatoes, crushing by hand. Season. Simmer 20–30 min until it no longer tastes raw.',
+        'Adjust salt; a pinch of sugar if sharp. Tear in basil at the end.'],
+    },
+    'vinaigrette': {
+      title: 'House Vinaigrette',
+      ingredients: ['3 tbsp oil', '1 tbsp vinegar or lemon', '1 tsp mustard', 'Salt, pepper', 'Optional: honey'],
+      steps: [
+        'Dissolve salt in the acid, whisk in the mustard.',
+        'Drizzle the oil in slowly while whisking so it emulsifies.',
+        'Taste on a leaf, not the spoon — it should be brighter than you expect.'],
+    },
+  };
+
+  function recipe(name) {
+    const n = norm(name);
+    let key = Object.keys(RECIPES).find(k => n.includes(k) || k.includes(n));
+    if (!key) key = Object.keys(RECIPES).find(k => k.split(' ').some(w => n.includes(w)));
+    if (!key) return null;
+    const r = RECIPES[key];
+    return `🍳 ${r.title}\n\nIngredients\n` + r.ingredients.map(i => '  • ' + i).join('\n') +
+      '\n\nMethod\n' + r.steps.map((s, i) => `  ${i + 1}. ${s}`).join('\n');
+  }
+  function recipeList() {
+    return 'Recipes I can walk you through:\n' +
+      Object.values(RECIPES).map(r => '  • ' + r.title.replace(/ \(.*/, '')).join('\n') +
+      '\nSay e.g. `recipe carbonara`.';
+  }
+
+  return { answer, index, recipe, recipeList, RATIOS, TEMPS, SUBS, TECH, RECIPES };
 })();
