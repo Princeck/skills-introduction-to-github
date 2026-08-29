@@ -29,7 +29,12 @@ const Voice = (() => {
      cadence is as much of the identity as the voice itself, and it is
      the part that carries across every machine regardless of which
      voices happen to be installed. */
-  const PROSODY = { rate: 0.96, pitch: 0.88 };
+  let PROSODY = { rate: 0.96, pitch: 0.88 };
+  function setProsody(rate, pitch) {
+    if (typeof rate === 'number' && isFinite(rate)) PROSODY.rate = Math.min(1.5, Math.max(0.6, rate));
+    if (typeof pitch === 'number' && isFinite(pitch)) PROSODY.pitch = Math.min(1.4, Math.max(0.5, pitch));
+  }
+  function getProsody() { return { ...PROSODY }; }
 
   /* Curated shortlist, best first. These are the higher-fidelity or
      more characterful voices that ship with common systems; the browser
@@ -191,7 +196,7 @@ const Voice = (() => {
   const isListening = () => listening;
 
   return { canSpeak, canHear, speak, stop, listen, stopListening, isListening, startWake, stopWake, isAwake,
-           setVoice, currentVoiceName, listVoices };
+           setVoice, currentVoiceName, listVoices, setProsody, getProsody };
 })();
 
 

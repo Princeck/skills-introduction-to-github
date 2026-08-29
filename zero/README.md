@@ -106,6 +106,7 @@ the home screen; everything else is a side panel you visit when you need it.
 - **Built-in skills** — maths, unit and currency conversion, code scaffolds, hashes, slugs, passwords: all with no model
 - **Charts** — real price history drawn on canvas, with indicators computed from it
 - **News** — live **world** news (GDELT global feed) and tech news, no key
+- **Economic calendar** — high-impact releases (Forex-Factory-style) for USD/EUR/GBP/JPY/CNY, in the Trading tab
 - **Trading** — real TradingView charts for every market (stocks, forex, crypto, indices, commodities) — the one opt-in third-party feature
 - **Markets** — live crypto prices (BTC, ETH, SOL, BNB, XRP, DOGE), auto-refresh every 60s
 - **Assistant** — built-in commands (`help`, `task …`, `note …`, `price btc`, `tasks`, `time`) that need no model at all, plus open conversation through a local engine
@@ -209,7 +210,8 @@ new one — but it does **rank toward the best available**: neural / "Online" /
 "Natural" / premium engines win over the default robotic fallback, and a British
 register is nudged up as it reads as more composed. A picker in the assistant bar
 lists every English voice on your system; pick one and **▶ Test** previews it, and
-your choice is remembered.
+your choice is remembered. Settings adds delivery control — Butler / Calm / Natural /
+Crisp presets and speed/pitch sliders — so you can shape the cadence, not just the voice.
 
 For a genuinely one-of-a-kind synthetic voice you would need a local voice model
 (e.g. Piper) wired through the engine — the honest ceiling of what a browser's own
@@ -311,7 +313,7 @@ worth having. Write it down somewhere safe.
 
 **What's genuinely true:**
 - No server, no accounts, no analytics, no telemetry, no cookies, no tracking pixels
-- No third-party requests at all: no CDNs, no web fonts, no remote scripts
+- No third-party requests at all: no CDNs, and the fonts are self-hosted (embedded), so not even Google Fonts is called
 - Your prompts never leave the machine — the model runs locally
 - Tasks and notes are encrypted at rest; locked, they are unreadable without your passphrase
 - You can export or wipe everything with one click

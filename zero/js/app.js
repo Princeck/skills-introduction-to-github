@@ -27,6 +27,8 @@ const Zero = (() => {
     profile: 'zero.profile',   // what Zero has learned about how you work
     halted: 'zero.halted',     // pause state survives a reload
     autoBrief: 'zero.autoBrief',   // daily market analysis on every login
+    voiceRate: 'zero.voiceRate',
+    voicePitch: 'zero.voicePitch',
   };
 
   // Short rolling context so the assistant remembers the current thread.
@@ -266,7 +268,7 @@ const Zero = (() => {
     document.getElementById('viewSub').textContent = s;
     if (view === 'markets') { loadMarkets(); loadStocks(); loadRates(); }
     if (view === 'news') loadNews();
-    if (view === 'trading') { renderTvChips(); openTradingView(); }
+    if (view === 'trading') { renderTvChips(); openTradingView(); openEconCalendar(); }
     if (view === 'overview') renderOverview();
     if (view === 'security') { renderChecklist(); showPayloads(); }
     if (view === 'files') { filesUi(); listFolder(); }
@@ -830,10 +832,29 @@ const Zero = (() => {
     document.head.appendChild(sc);
   }
 
+  function openEconCalendar() {
+    const host = document.getElementById('econCalendar');
+    if (!host) return;
+    if (Control.halted || !Control.caps.network) { host.innerHTML = '<div class="spinner">Needs the network, currently blocked.</div>'; return; }
+    if (!store.raw(LS.tvOk)) { host.innerHTML = '<div class="spinner">Enable TradingView above to load the calendar.</div>'; return; }
+    if (host.dataset.loaded) return;
+    host.innerHTML = '<div class="tradingview-widget-container"><div class="tradingview-widget-container__widget"></div></div>';
+    log('Loading TradingView economic calendar (third-party).', true);
+    const sc = document.createElement('script');
+    sc.src = 'https://s3.tradingview.com/external-embedding/embed-widget-events.js';
+    sc.async = true;
+    sc.textContent = JSON.stringify({
+      colorTheme: 'dark', isTransparent: true, width: '100%', height: 460,
+      locale: 'en', importanceFilter: '0,1', countryFilter: 'us,eu,gb,jp,cn',
+    });
+    host.querySelector('.tradingview-widget-container').appendChild(sc);
+    host.dataset.loaded = '1';
+  }
+
   function allowTradingView() {
     store.rawSet(LS.tvOk, '1');
     log('TradingView enabled by user.');
-    openTradingView();
+    openTradingView(); openEconCalendar();
   }
 
   function tvSearch() {
@@ -1733,7 +1754,26 @@ const Zero = (() => {
   }
   function previewVoice() {
     Voice.stop();
-    Voice.speak("Zero online. Systems nominal. I'm listening.");
+    Voice.speak("Zero online. Systems nominal. Standing by for your command.");
+  }
+
+  function applyProsodyFromStore() {
+    const r = parseFloat(store.raw(LS.voiceRate)), pi = parseFloat(store.raw(LS.voicePitch));
+    Voice.setProsody(isFinite(r) ? r : 0.96, isFinite(pi) ? pi : 0.88);
+  }
+  function setVoiceRate(v)  { Voice.setProsody(parseFloat(v), Voice.getProsody().pitch); store.rawSet(LS.voiceRate, v); syncVoiceUi(); }
+  function setVoicePitch(v) { Voice.setProsody(Voice.getProsody().rate, parseFloat(v)); store.rawSet(LS.voicePitch, v); syncVoiceUi(); }
+  function voicePreset(name) {
+    const P = { butler: [0.9, 0.82], calm: [0.94, 0.86], natural: [1.0, 1.0], crisp: [1.08, 1.0] }[name] || [0.96, 0.88];
+    Voice.setProsody(P[0], P[1]);
+    store.rawSet(LS.voiceRate, P[0]); store.rawSet(LS.voicePitch, P[1]);
+    syncVoiceUi(); previewVoice();
+  }
+  function syncVoiceUi() {
+    const { rate, pitch } = Voice.getProsody();
+    const r = document.getElementById('voiceRate'), pi = document.getElementById('voicePitch');
+    if (r) r.value = rate; if (pi) pi.value = pitch;
+    setText('voiceRateVal', rate.toFixed(2)); setText('voicePitchVal', pitch.toFixed(2));
   }
 
   function setAutoBrief(on) { store.rawSet(LS.autoBrief, on ? '1' : '0'); log('Daily login briefing turned ' + (on ? 'ON' : 'OFF') + '.'); }
@@ -1883,6 +1923,8 @@ const Zero = (() => {
     const speakEl = document.getElementById('speakToggle');
     if (speakEl) { speakEl.checked = store.raw(LS.speak) === '1'; speakReplies = speakEl.checked; }
     if (store.raw(LS.voice)) Voice.setVoice(store.raw(LS.voice));
+    applyProsodyFromStore();
+    syncVoiceUi();
     populateVoices();
     // Chrome loads its voice catalogue asynchronously; refill when it lands.
     if (Voice.canSpeak()) window.speechSynthesis.addEventListener('voiceschanged', populateVoices);
@@ -1954,10 +1996,11 @@ const Zero = (() => {
     nav, loadMarkets, addTask, toggleTask, delTask, addNote, delNote,
     send, saveEngine, testEngine, saveStockKey, setThink, updateNow, loadStocks,
     loadRates, loadNews, setNewsMode, setSpeak, setVoice, previewVoice, micToggle, stopSpeaking: () => Voice.stop(),
+    setVoiceRate, setVoicePitch, voicePreset,
     toggleWake, renderOverview, checkPassword, cryptoTool, showPayloads, copyText, reconDomain,
     openAFile, saveBack, saveNew, connectFolder, listFolder, openFromFolder, disconnectFolder,
     addApp, removeApp, launchApp, forgetMemory, forgetProfile, renderProfile, storageInfo, addPreset,
-    openTradingView, allowTradingView, tvSearch, dailyBriefing, setAutoBrief,
+    openTradingView, allowTradingView, tvSearch, dailyBriefing, setAutoBrief, openEconCalendar,
     exportData, wipeData, init,
     toggleHalt, killNetwork, panic, setCap, clearLog,
     enableVault, unlockVault, lockVault, disableVault,
