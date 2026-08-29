@@ -1,0 +1,76 @@
+# Get Zero on your laptop — the simple way
+
+Two setups. **Basic** takes 2 minutes and gives you everything except open-ended
+AI chat. **Full** adds the local AI brain.
+
+---
+
+## ⚡ Basic — Zero running as an installed app (2 min)
+
+You need [Python](https://python.org) (already on most Macs/Linux) **or**
+[Node](https://nodejs.org). Either works.
+
+1. **Get the folder.** Download the repo (green **Code ▸ Download ZIP** on GitHub),
+   unzip it, and find the `zero` folder inside.
+
+2. **Start it.** Open a terminal *in the `zero` folder* and run one line:
+
+   ```bash
+   python3 -m http.server 8080
+   ```
+   (No Python? Use Node: `npx serve -l 8080`)
+
+3. **Open it.** Go to **http://localhost:8080** in Chrome or Edge.
+
+4. **Install it.** Click the **install icon** in the address bar (or Settings →
+   **Install Zero**). Now it has its own icon and window — launch it like any app.
+
+That's it. Markets, news, cooking, security, files, voice, the daily briefing —
+all working.
+
+> **Why not just double-click `index.html`?** That opens as a `file://` page, where
+> browsers block installing, the microphone, and file access. Serving on
+> `localhost` (step 2) is what unlocks the full app. It's one line.
+
+---
+
+## 🧠 Full — add Zero's AI brain (10 min, optional)
+
+This lets Zero hold open conversations. The model runs on your machine — no
+account, no company, nothing leaves your laptop.
+
+1. Install **[Ollama](https://ollama.com)** (one download).
+
+2. Pull a model and start it so Zero can reach it:
+
+   ```bash
+   ollama pull llama3.2
+   OLLAMA_ORIGINS=* ollama serve
+   ```
+   (`OLLAMA_ORIGINS=*` matters — without it the browser blocks Zero.)
+
+3. In Zero: **Settings → Zero Core**, leave the address as
+   `http://localhost:11434`, hit **Save & test**. It should say *Core online*.
+
+Now talking to Zero uses your local model. Turn it off any time — everything
+else keeps working without it.
+
+---
+
+## 🚀 Make it open on its own (optional)
+
+- **Launch at startup:** after installing, add it to Windows *Startup apps* or
+  macOS *Login Items*. With the daily briefing on, it greets you with the market
+  the moment your laptop opens.
+- **Put it online / in an app store:** host the `zero` folder on GitHub Pages
+  (this repo has a workflow — Settings → Pages → Source: *GitHub Actions*) or drag
+  it into [Netlify](https://netlify.com). Then wrap that URL with
+  [PWABuilder](https://pwabuilder.com) for the Microsoft Store or Google Play.
+
+---
+
+## The one button that matters
+
+Top-right corner, the small **■**. One tap stops everything Zero is doing —
+network, voice, the lot. Double-tap **Esc** does the same from anywhere. You are
+always in control.

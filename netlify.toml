@@ -1,0 +1,17 @@
+# Netlify deploy config — drag the repo (or connect it) and Netlify serves
+# Zero from the zero/ folder over https, ready to install as an app.
+[build]
+  publish = "zero"
+
+# Correct MIME type for the web app manifest.
+[[headers]]
+  for = "/manifest.webmanifest"
+  [headers.values]
+    Content-Type = "application/manifest+json"
+
+# Let the service worker control the whole scope.
+[[headers]]
+  for = "/sw.js"
+  [headers.values]
+    Cache-Control = "no-cache"
+    Service-Worker-Allowed = "/"
