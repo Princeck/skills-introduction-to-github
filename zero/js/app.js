@@ -1712,6 +1712,20 @@ const Zero = (() => {
   }
 
   /* ---------------- Settings ---------------- */
+  function useBridge() {
+    // The bundled Python server serves this page AND speaks native /api/chat,
+    // proxying to whatever provider its API key is set for.
+    const origin = location.protocol.startsWith('http') ? location.origin : 'http://localhost:8080';
+    document.getElementById('engineUrl').value = origin;
+    document.getElementById('engineMode').value = 'native';
+    document.getElementById('engineModel').value = '';   // the bridge reports its own model
+    store.rawSet(LS.engineUrl, origin);
+    store.rawSet(LS.engineMode, 'native');
+    store.rawSet(LS.engineModel, '');
+    log('Core pointed at the bundled Python bridge (' + origin + ').');
+    testEngine();
+  }
+
   function saveEngine() {
     store.rawSet(LS.engineUrl, document.getElementById('engineUrl').value.trim());
     store.rawSet(LS.engineModel, document.getElementById('engineModel').value.trim());
@@ -2000,7 +2014,7 @@ const Zero = (() => {
     toggleWake, renderOverview, checkPassword, cryptoTool, showPayloads, copyText, reconDomain,
     openAFile, saveBack, saveNew, connectFolder, listFolder, openFromFolder, disconnectFolder,
     addApp, removeApp, launchApp, forgetMemory, forgetProfile, renderProfile, storageInfo, addPreset,
-    openTradingView, allowTradingView, tvSearch, dailyBriefing, setAutoBrief, openEconCalendar,
+    openTradingView, allowTradingView, tvSearch, dailyBriefing, setAutoBrief, openEconCalendar, useBridge,
     exportData, wipeData, init,
     toggleHalt, killNetwork, panic, setCap, clearLog,
     enableVault, unlockVault, lockVault, disableVault,

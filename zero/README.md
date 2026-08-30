@@ -141,6 +141,35 @@ guessing — `chrt btc` gets you *"Did you mean `chart`?"*.
 
 ---
 
+## Python server & AI bridge
+
+`server.py` (standard library only — no pip install) does two things:
+
+1. **Serves Zero over http** so it installs as an app and the mic/file access work.
+2. **Bridges to any AI provider by API key** — OpenAI, Anthropic, OpenRouter, Groq,
+   Together, DeepSeek, or anything OpenAI-compatible.
+
+Your key lives with the server, never in the browser. Configure it with env vars
+or a `zero.config.json` (copy `zero.config.example.json`):
+
+```bash
+export ZERO_PROVIDER=openai        # openai | anthropic | compatible
+export ZERO_API_KEY=sk-...
+export ZERO_MODEL=gpt-4o-mini
+python3 server.py                  # → http://localhost:8080
+```
+
+For `compatible` providers also set `ZERO_BASE_URL` (e.g.
+`https://openrouter.ai/api/v1`). Then in Zero: **Settings → Zero Core → Use
+bundled bridge → Save & test**.
+
+Zero talks to this server exactly like a local engine (`/api/tags`, `/api/chat`),
+so nothing in the page changes — you're just choosing whose model answers. **With
+a hosted provider your prompts go to that company;** for a fully private setup,
+use a local model (Ollama) instead, which needs no key and no bridge.
+
+---
+
 ## Zero Core
 
 Core is Zero's reasoning engine. It is not a front-end for anyone's hosted AI —

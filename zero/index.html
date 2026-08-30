@@ -453,16 +453,17 @@
               <option value="native">Native (/api/chat)</option>
               <option value="compatible">Compatible (/v1/chat/completions)</option>
             </select>
-            <div style="margin-top:12px">
+            <div style="margin-top:12px;display:flex;gap:10px;flex-wrap:wrap">
               <button class="btn" onclick="Zero.saveEngine()">Save &amp; test</button>
               <button class="btn ghost" onclick="Zero.testEngine()">Test Core</button>
+              <button class="btn ghost" onclick="Zero.useBridge()">Use bundled bridge</button>
             </div>
             <div id="engineStatus" class="hint" style="margin-top:12px"></div>
             <div class="notice">
-              <b>Running an engine.</b> Core works with any local runtime that speaks one of the two formats above —
-              Ollama, llama.cpp, LM Studio and Jan all do. These are open-source runtimes you install yourself, not hosted services.
-              Serving Zero from a file means the runtime must be told to accept it: for Ollama that is
-              <code>OLLAMA_ORIGINS=* ollama serve</code>, otherwise the browser blocks the request and a working engine looks dead.
+              <b>Two ways to give Zero a brain.</b><br>
+              <b>1 · Local model (fully private):</b> any local runtime that speaks a format above — Ollama, llama.cpp, LM Studio, Jan.
+              For Ollama: <code>OLLAMA_ORIGINS=* ollama serve</code>.<br>
+              <b>2 · Any AI provider by API key (Python bridge):</b> run <code>python3 server.py</code> with your key set (OpenAI, Anthropic, OpenRouter, Groq, …), open the app it serves, then click <b>Use bundled bridge</b> above. Your key stays on the server, never in this page — see <code>server.py</code>. Note: with a hosted provider, your prompts go to that company.
             </div>
           </div>
 

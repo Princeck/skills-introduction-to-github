@@ -115,7 +115,7 @@
     <div class="mark">0</div>
     <h1>ZER<b>0</b> — source</h1>
   </header>
-  <p class="meta">zero-standalone.html · 582.1 KB · 4930 lines · self-contained</p>
+  <p class="meta">zero-standalone.html · 583.1 KB · 4945 lines · self-contained</p>
 
   <div class="actions">
     <button id="copy">Copy all code</button>
@@ -1403,16 +1403,17 @@ input[type=range]::-moz-range-thumb { width: 16px; height: 16px; border: none; b
               &lt;option value="native">Native (/api/chat)&lt;/option>
               &lt;option value="compatible">Compatible (/v1/chat/completions)&lt;/option>
             &lt;/select>
-            &lt;div style="margin-top:12px">
+            &lt;div style="margin-top:12px;display:flex;gap:10px;flex-wrap:wrap">
               &lt;button class="btn" onclick="Zero.saveEngine()">Save &amp;amp; test&lt;/button>
               &lt;button class="btn ghost" onclick="Zero.testEngine()">Test Core&lt;/button>
+              &lt;button class="btn ghost" onclick="Zero.useBridge()">Use bundled bridge&lt;/button>
             &lt;/div>
             &lt;div id="engineStatus" class="hint" style="margin-top:12px">&lt;/div>
             &lt;div class="notice">
-              &lt;b>Running an engine.&lt;/b> Core works with any local runtime that speaks one of the two formats above —
-              Ollama, llama.cpp, LM Studio and Jan all do. These are open-source runtimes you install yourself, not hosted services.
-              Serving Zero from a file means the runtime must be told to accept it: for Ollama that is
-              &lt;code>OLLAMA_ORIGINS=* ollama serve&lt;/code>, otherwise the browser blocks the request and a working engine looks dead.
+              &lt;b>Two ways to give Zero a brain.&lt;/b>&lt;br>
+              &lt;b>1 · Local model (fully private):&lt;/b> any local runtime that speaks a format above — Ollama, llama.cpp, LM Studio, Jan.
+              For Ollama: &lt;code>OLLAMA_ORIGINS=* ollama serve&lt;/code>.&lt;br>
+              &lt;b>2 · Any AI provider by API key (Python bridge):&lt;/b> run &lt;code>python3 server.py&lt;/code> with your key set (OpenAI, Anthropic, OpenRouter, Groq, …), open the app it serves, then click &lt;b>Use bundled bridge&lt;/b> above. Your key stays on the server, never in this page — see &lt;code>server.py&lt;/code>. Note: with a hosted provider, your prompts go to that company.
             &lt;/div>
           &lt;/div>
 
@@ -4753,6 +4754,20 @@ const Zero = (() => {
   }
 
   /* ---------------- Settings ---------------- */
+  function useBridge() {
+    // The bundled Python server serves this page AND speaks native /api/chat,
+    // proxying to whatever provider its API key is set for.
+    const origin = location.protocol.startsWith('http') ? location.origin : 'http://localhost:8080';
+    document.getElementById('engineUrl').value = origin;
+    document.getElementById('engineMode').value = 'native';
+    document.getElementById('engineModel').value = '';   // the bridge reports its own model
+    store.rawSet(LS.engineUrl, origin);
+    store.rawSet(LS.engineMode, 'native');
+    store.rawSet(LS.engineModel, '');
+    log('Core pointed at the bundled Python bridge (' + origin + ').');
+    testEngine();
+  }
+
   function saveEngine() {
     store.rawSet(LS.engineUrl, document.getElementById('engineUrl').value.trim());
     store.rawSet(LS.engineModel, document.getElementById('engineModel').value.trim());
@@ -5041,7 +5056,7 @@ const Zero = (() => {
     toggleWake, renderOverview, checkPassword, cryptoTool, showPayloads, copyText, reconDomain,
     openAFile, saveBack, saveNew, connectFolder, listFolder, openFromFolder, disconnectFolder,
     addApp, removeApp, launchApp, forgetMemory, forgetProfile, renderProfile, storageInfo, addPreset,
-    openTradingView, allowTradingView, tvSearch, dailyBriefing, setAutoBrief, openEconCalendar,
+    openTradingView, allowTradingView, tvSearch, dailyBriefing, setAutoBrief, openEconCalendar, useBridge,
     exportData, wipeData, init,
     toggleHalt, killNetwork, panic, setCap, clearLog,
     enableVault, unlockVault, lockVault, disableVault,
