@@ -5,6 +5,27 @@ AI chat. **Full** adds the local AI brain.
 
 ---
 
+## 🪟 Windows — one click (fastest)
+
+1. Install **[Python](https://python.org/downloads)** — on the first screen tick
+   **“Add Python to PATH”**, then Install.
+2. Get this repo: green **Code ▸ Download ZIP**, unzip it, open the `zero` folder.
+3. **Double-click `start-zero.bat`.** A black window opens and your browser lands
+   on Zero. Leave that window open while you use it; close it to stop Zero.
+
+Prefer to type it yourself? Open the `zero` folder in **VS Code**, then
+**Terminal ▸ New Terminal** (or Windows Terminal in the folder) and run:
+
+```powershell
+py server.py 8080
+```
+
+Then open **http://localhost:8080**. To give Zero any AI, go to **Settings →
+Zero Core — Any AI**, pick your provider, paste your API key, set the model,
+**Save & test**.
+
+---
+
 ## ⚡ Basic — Zero running as an installed app (2 min)
 
 You need [Python](https://python.org) (already on most Macs/Linux) **or**
