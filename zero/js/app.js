@@ -12,6 +12,11 @@ const Zero = (() => {
     engineUrl: 'zero.engineUrl',
     engineModel: 'zero.engineModel',
     engineMode: 'zero.engineMode',
+    engineProvider: 'zero.engineProvider',   // local | openai | anthropic | compatible
+    engineKey: 'zero.engineKey',             // API key for a hosted provider (this device only)
+    engineBase: 'zero.engineBase',           // base URL for a 'compatible' provider
+    mapSrc: 'zero.mapSrc',
+    mapPlace: 'zero.mapPlace',
     think: 'zero.think',
     stockKey: 'zero.stockKey',
     stockSymbols: 'zero.stockSymbols',
@@ -247,6 +252,7 @@ const Zero = (() => {
     overview:  ['Overview', 'Everything at a glance, live.'],
     security:  ['Security', 'Harden what is yours.'],
     files:     ['Files', 'Your disk, connected on your terms.'],
+    maps:      ['Maps', 'Every map on Earth — search anywhere.'],
     news:      ['News', 'What is happening right now.'],
     trading:   ['Trading', 'Live professional charts — every market.'],
     apps:      ['Apps', 'Your things, one keystroke away.'],
@@ -274,14 +280,70 @@ const Zero = (() => {
     if (view === 'files') { filesUi(); listFolder(); }
     if (view === 'apps') renderPresets();
     if (view === 'memory') { renderMemories(); renderProfile(); }
+    if (view === 'maps') renderMap();
+  }
+
+  /* Overview console → routes a command straight into the assistant. */
+  function ovSend() {
+    const inp = document.getElementById('ovInput');
+    const q = (inp?.value || '').trim();
+    if (!q) return;
+    inp.value = '';
+    setText('ovConsole', 'You: ' + q + '  →  opening Zero…');
+    nav('assistant');
+    const chat = document.getElementById('chatInput');
+    if (chat) { chat.value = q; send(); }
+  }
+
+  /* ---------------- Maps: every map on Earth, keyless ---------------- */
+  function mapUrl(src, place) {
+    const q = encodeURIComponent(place || 'World');
+    if (src === 'google')    return `https://www.google.com/maps?q=${q}&output=embed`;
+    if (src === 'satellite') return `https://www.google.com/maps?q=${q}&t=k&output=embed`;
+    // OpenStreetMap search embed (no key, no account)
+    return `https://www.openstreetmap.org/export/embed.html?bbox=-180,-60,180,80&layer=mapnik&search=${q}`;
+  }
+  function renderMap() {
+    const src = store.raw(LS.mapSrc) || 'osm';
+    const place = store.raw(LS.mapPlace) || 'World';
+    const frame = document.getElementById('mapFrame');
+    if (frame) frame.src = mapUrl(src, place);
+    setText('mapNow', place + '  ·  ' + src);
+    document.querySelectorAll('#mapTabs .chip').forEach(c =>
+      c.classList.toggle('on', c.dataset.src === src));
+  }
+  function mapSource(src) { store.rawSet(LS.mapSrc, src); renderMap(); log('Map source: ' + src + '.'); }
+  function mapSearch(place) {
+    const p = (place || document.getElementById('mapInput')?.value || '').trim();
+    if (!p) return;
+    store.rawSet(LS.mapPlace, p);
+    renderMap();
+    log('Map moved to "' + p + '".');
+  }
+  /* Let chat drive it: "map tokyo" / "navigate to paris" / "where is berlin". */
+  function mapCommand(q) {
+    const m = q.match(/^(?:map|navigate to|show me|where is|directions to)\s+(.+)$/i);
+    if (!m) return null;
+    const place = m[1].replace(/[.?!]$/, '').trim();
+    store.rawSet(LS.mapPlace, place);
+    if (!store.raw(LS.mapSrc)) store.rawSet(LS.mapSrc, 'osm');
+    nav('maps');
+    return `Here is ${place} on the map. Switch to Google or satellite with the tabs.`;
   }
 
   /* ---------------- Clock ---------------- */
   function tick() {
     const d = new Date();
-    document.getElementById('clock').textContent = d.toLocaleTimeString();
+    const t = d.toLocaleTimeString();
+    setText('clock', t);
     document.getElementById('date').textContent = d.toLocaleDateString(undefined,
       { weekday: 'short', month: 'short', day: 'numeric' });
+    // cockpit readouts
+    setText('hudClock', t);
+    setText('ovTime', t);
+    setText('ovUtc', d.toISOString().slice(11, 19) + 'Z');
+    setText('hudMode', Control.halted ? 'HALTED' : 'IDLE');
+    setText('ovCalls', Control.calls);
   }
 
   /* ---------------- Markets (live crypto) ---------------- */
@@ -620,13 +682,22 @@ const Zero = (() => {
     const el = document.getElementById('ovState');
     if (el) el.style.color = Control.halted ? 'var(--red)' : 'var(--green)';
 
+    // system-performance readouts
+    const capsOn = Object.values(Control.caps).filter(Boolean).length;
+    set('ovCaps', capsOn + '/4');
+    set('ovCalls', Control.calls);
+    const perf = document.getElementById('ovPerfBar');
+    if (perf) perf.style.width = Math.min(100, 8 + Control.calls * 4) + '%';
+
     const box = document.getElementById('ovMarket');
-    if (box) {
+    const watch = document.getElementById('ovWatch');
+    const flow = document.getElementById('ovFlow');
+    if (box || watch || flow) {
       try {
-        const r = await guardedFetch('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum,solana&vs_currencies=usd&include_24hr_change=true', {}, 'market');
+        const r = await guardedFetch('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum,solana,binancecoin,ripple&vs_currencies=usd&include_24hr_change=true', {}, 'market');
         if (!r.ok) throw new Error('HTTP ' + r.status);
         const d = await r.json();
-        box.innerHTML = [['bitcoin','BTC'],['ethereum','ETH'],['solana','SOL']].map(([id, sym]) => {
+        const rowsFor = pairs => pairs.map(([id, sym]) => {
           const p = d[id]; if (!p) return '';
           const c = p.usd_24h_change;
           const known = typeof c === 'number' && isFinite(c);
@@ -634,7 +705,22 @@ const Zero = (() => {
                  (known ? `<span class="${c >= 0 ? 'up' : 'down'}">${c >= 0 ? '▲' : '▼'} ${Math.abs(c).toFixed(2)}%</span>`
                         : `<span class="nodata">—</span>`) + `</div>`;
         }).join('');
-      } catch (e) { box.innerHTML = `<div class="nodata" style="font-size:12px">no live feed</div>`; }
+        if (box) box.innerHTML = rowsFor([['bitcoin','BTC'],['ethereum','ETH'],['solana','SOL']]);
+        if (watch) watch.innerHTML = rowsFor([['binancecoin','BNB'],['ripple','XRP'],['bitcoin','BTC']]);
+        if (flow) {
+          const changes = ['bitcoin','ethereum','solana','binancecoin','ripple']
+            .map(id => Math.abs(d[id]?.usd_24h_change || 0));
+          const max = Math.max(1, ...changes);
+          flow.innerHTML = Array.from({ length: 24 }, (_, i) => {
+            const base = changes[i % changes.length];
+            const h = 12 + (base / max) * 88 * (0.6 + Math.random() * 0.4);
+            return `<i style="height:${Math.min(100, h).toFixed(0)}%"></i>`;
+          }).join('');
+        }
+      } catch (e) {
+        const m = `<div class="nodata" style="font-size:12px">no live feed</div>`;
+        if (box) box.innerHTML = m; if (watch) watch.innerHTML = m;
+      }
     }
 
     const nb = document.getElementById('ovNews');
@@ -1354,6 +1440,7 @@ const Zero = (() => {
   function offlineCommand(q) {
     const s = q.trim();
     const low = s.toLowerCase();
+    const mapped = mapCommand(s); if (mapped) return mapped;
     if (low === 'help') {
       return [
         'Zero works with no AI model at all. Try:',
@@ -1543,7 +1630,12 @@ const Zero = (() => {
     // unrecognised falls back to native and shows as such in Settings.
     const raw = store.raw(LS.engineMode);
     const mode = raw === 'compatible' ? 'compatible' : 'native';
+    const provider = store.raw(LS.engineProvider) || 'local';
+    const PBASE = { openai: 'https://api.openai.com/v1', anthropic: 'https://api.anthropic.com' };
     return {
+      provider,
+      key: store.raw(LS.engineKey),
+      base: (store.raw(LS.engineBase) || PBASE[provider] || '').replace(/\/+$/, ''),
       url: (store.raw(LS.engineUrl) || 'http://localhost:11434').replace(/\/+$/, ''),
       model: store.raw(LS.engineModel),
       mode,
@@ -1563,8 +1655,11 @@ const Zero = (() => {
   /* No model configured? Adopt whatever the engine actually has rather
      than shipping a hardcoded default that may not be installed. */
   async function resolveModel() {
-    const { model } = engineCfg();
+    const { model, provider } = engineCfg();
     if (model) return model;
+    if (provider !== 'local') {
+      throw new Error('Set a model for this provider in Settings (e.g. gpt-4o-mini or claude-3-5-sonnet-latest).');
+    }
     const names = await listModels();
     if (!names.length) throw new Error('Your engine is running but has no models installed yet.');
     store.rawSet(LS.engineModel, names[0]);
@@ -1604,7 +1699,7 @@ const Zero = (() => {
   }
 
   async function callEngine(q, onToken) {
-    const { url, mode, think } = engineCfg();
+    const { url, mode, think, provider, key, base } = engineCfg();
     const model = await resolveModel();
     let system = CORE_PROMPT + (think ? THINK_PROMPT : '');
     if (memories.length) {
@@ -1615,20 +1710,44 @@ const Zero = (() => {
     if (learned) system += '\n\nWhat you have learned about this user:\n' + learned;
     const messages = [{ role: 'system', content: system }, ...chatHistory.slice(-24), { role: 'user', content: q }];
 
-    const [endpoint, body, pluck] = mode === 'compatible'
-      ? [url + '/v1/chat/completions', { model, stream: true, messages }, d => d.choices?.[0]?.delta?.content]
-      : [url + '/api/chat',            { model, stream: true, messages }, d => d.message?.content];
+    // Which brain answers. A hosted provider (with a key set in Settings) is
+    // called straight from here; otherwise it's the local engine as before.
+    let endpoint, body, headers = { 'content-type': 'application/json' }, pluck, reach;
+
+    if (provider === 'anthropic') {
+      if (!key) throw new Error('Add your Anthropic API key in Settings → Zero Core.');
+      const turns = messages.filter(m => m.role !== 'system').map(m => ({ role: m.role, content: m.content }));
+      endpoint = (base || 'https://api.anthropic.com') + '/v1/messages';
+      body = { model, max_tokens: 1024, stream: true, system, messages: turns };
+      headers = { 'content-type': 'application/json', 'x-api-key': key,
+                  'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' };
+      pluck = d => d.type === 'content_block_delta' ? d.delta?.text : '';
+      reach = 'Anthropic';
+    } else if (provider === 'openai' || provider === 'compatible') {
+      if (!key) throw new Error('Add your API key in Settings → Zero Core.');
+      const b = base || 'https://api.openai.com/v1';
+      endpoint = b + '/chat/completions';
+      body = { model, stream: true, messages };
+      headers = { 'content-type': 'application/json', 'authorization': 'Bearer ' + key };
+      pluck = d => d.choices?.[0]?.delta?.content;
+      reach = 'the provider';
+    } else {
+      [endpoint, body, pluck] = mode === 'compatible'
+        ? [url + '/v1/chat/completions', { model, stream: true, messages }, d => d.choices?.[0]?.delta?.content]
+        : [url + '/api/chat',            { model, stream: true, messages }, d => d.message?.content];
+      reach = 'the engine at ' + url;
+    }
 
     let r;
     try {
       r = await guardedFetch(endpoint, {
         method: 'POST',
-        headers: { 'content-type': 'application/json' },
+        headers,
         body: JSON.stringify(body),
       }, 'ai');
     } catch (e) {
       if (/halted|switched off/i.test(e.message)) throw e;
-      throw new Error(`Core can't reach the engine at ${url}. Is it running? (${e.message})`);
+      throw new Error(`Core can't reach ${reach}. ${provider === 'local' ? 'Is it running?' : 'The provider may block direct browser calls — use the Python bridge (option 3).'} (${e.message})`);
     }
 
     if (!r.ok) {
@@ -1670,7 +1789,16 @@ const Zero = (() => {
 
   async function testEngine() {
     const out = document.getElementById('engineStatus');
-    const { url, model } = engineCfg();
+    const { url, model, provider, key } = engineCfg();
+    // Hosted provider: confirm the key/model are set and let the first
+    // message be the real test (a probe would spend tokens needlessly).
+    if (provider !== 'local') {
+      if (!key) { out.innerHTML = `<b style="color:var(--red)">No API key.</b> Paste your ${esc(provider)} key above and Save.`; return; }
+      if (!model) { out.innerHTML = `<b style="color:var(--red)">No model set.</b> e.g. ${provider === 'anthropic' ? 'claude-3-5-sonnet-latest' : 'gpt-4o-mini'}.`; return; }
+      out.innerHTML = `<b style="color:var(--green)">Brain set: ${esc(provider)} · ${esc(model)}.</b> Ask Zero anything — the first message runs it. If the provider blocks browser calls, use the Python bridge.`;
+      refreshAiStatus();
+      return;
+    }
     out.textContent = 'Checking ' + url + ' …';
     try {
       const names = await listModels();
@@ -1716,22 +1844,44 @@ const Zero = (() => {
     // The bundled Python server serves this page AND speaks native /api/chat,
     // proxying to whatever provider its API key is set for.
     const origin = location.protocol.startsWith('http') ? location.origin : 'http://localhost:8080';
+    document.getElementById('engineProvider').value = 'local';
     document.getElementById('engineUrl').value = origin;
     document.getElementById('engineMode').value = 'native';
     document.getElementById('engineModel').value = '';   // the bridge reports its own model
+    store.rawSet(LS.engineProvider, 'local');
     store.rawSet(LS.engineUrl, origin);
     store.rawSet(LS.engineMode, 'native');
     store.rawSet(LS.engineModel, '');
+    onProvider();
     log('Core pointed at the bundled Python bridge (' + origin + ').');
     testEngine();
   }
 
   function saveEngine() {
+    const provider = document.getElementById('engineProvider')?.value || 'local';
+    store.rawSet(LS.engineProvider, provider);
+    store.rawSet(LS.engineKey, (document.getElementById('engineKey')?.value || '').trim());
+    store.rawSet(LS.engineBase, (document.getElementById('engineBase')?.value || '').trim());
     store.rawSet(LS.engineUrl, document.getElementById('engineUrl').value.trim());
     store.rawSet(LS.engineModel, document.getElementById('engineModel').value.trim());
     store.rawSet(LS.engineMode, document.getElementById('engineMode').value);
     refreshAiStatus();
     testEngine();
+  }
+
+  /* Show/hide the API-key vs local-address fields as the brain changes. */
+  function onProvider() {
+    const p = document.getElementById('engineProvider')?.value || 'local';
+    const hosted = p !== 'local';
+    const show = (id, on) => { const e = document.getElementById(id); if (e) e.style.display = on ? '' : 'none'; };
+    show('keyFields', hosted);
+    show('urlField', !hosted);
+    show('modeLabel', !hosted);
+    show('engineMode', !hosted);
+    show('baseLabel', p === 'compatible');
+    show('engineBase', p === 'compatible');
+    const pill = document.getElementById('brainPill');
+    if (pill) pill.textContent = hosted ? p : 'core';
   }
   async function storageInfo() {
     const el = document.getElementById('storageInfo');
@@ -1806,9 +1956,10 @@ const Zero = (() => {
   function refreshAiStatus() {
     const el = document.getElementById('aiStatus');
     if (!el) return;
-    const { model } = engineCfg();
-    el.textContent = 'local · ' + model;
+    const { model, provider } = engineCfg();
+    el.textContent = provider === 'local' ? ('local · ' + (model || 'core')) : (provider + ' · ' + (model || 'set model'));
     el.className = 'pill';
+    setText('ovEngine', provider === 'local' ? 'local' : provider);
   }
 
   /* ---------------- Vault ---------------- */
@@ -1925,9 +2076,14 @@ const Zero = (() => {
       const li = e.target.closest('li'); if (li) nav(li.dataset.view);
     });
     const cfg = engineCfg();
-    document.getElementById('engineUrl').value = cfg.url;
-    document.getElementById('engineModel').value = cfg.model;
-    document.getElementById('engineMode').value = cfg.mode;
+    const setV = (id, v) => { const e = document.getElementById(id); if (e) e.value = v; };
+    setV('engineProvider', cfg.provider);
+    setV('engineKey', cfg.key);
+    setV('engineBase', store.raw(LS.engineBase));
+    setV('engineUrl', cfg.url);
+    setV('engineModel', cfg.model);
+    setV('engineMode', cfg.mode);
+    onProvider();
     document.getElementById('stockKey').value = store.raw(LS.stockKey);
     document.getElementById('stockSymbols').value = store.raw(LS.stockSymbols);
     document.getElementById('lockPass')?.addEventListener('keydown', e => {
@@ -2015,6 +2171,7 @@ const Zero = (() => {
     openAFile, saveBack, saveNew, connectFolder, listFolder, openFromFolder, disconnectFolder,
     addApp, removeApp, launchApp, forgetMemory, forgetProfile, renderProfile, storageInfo, addPreset,
     openTradingView, allowTradingView, tvSearch, dailyBriefing, setAutoBrief, openEconCalendar, useBridge,
+    onProvider, ovSend, mapSearch, mapSource, renderMap,
     exportData, wipeData, init,
     toggleHalt, killNetwork, panic, setCap, clearLog,
     enableVault, unlockVault, lockVault, disableVault,

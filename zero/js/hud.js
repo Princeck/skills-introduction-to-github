@@ -13,10 +13,10 @@ const Orb = (() => {
   const particles = [];
 
   const PALETTE = {
-    idle:      ['#2f7bff', '#8b5cf6'],
-    listening: ['#ff2d55', '#d838c8'],
-    thinking:  ['#8b5cf6', '#5ce1ff'],
-    speaking:  ['#23e7a0', '#5ce1ff'],
+    idle:      ['#8a8a8a', '#ffffff'],
+    listening: ['#ffffff', '#bcbcbc'],
+    thinking:  ['#bcbcbc', '#ffffff'],
+    speaking:  ['#ffffff', '#d8d8d8'],
   };
   const TARGET = { idle: 0.18, listening: 0.85, thinking: 0.55, speaking: 0.7 };
 

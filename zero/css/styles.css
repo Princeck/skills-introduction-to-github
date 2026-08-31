@@ -799,3 +799,246 @@ input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 16px;
   background: var(--blue); cursor: pointer; box-shadow: 0 0 10px rgba(58,140,255,.7); }
 input[type=range]::-moz-range-thumb { width: 16px; height: 16px; border: none; border-radius: 50%;
   background: var(--blue); cursor: pointer; box-shadow: 0 0 10px rgba(58,140,255,.7); }
+
+/* ==================================================================
+   ZERO — MONOCHROME HUD OVERRIDE
+   Pure black & white cockpit. This block is loaded last, so it wins
+   over the earlier holographic theme: every colour token is retoned
+   to greyscale, the prismatic --holo edge becomes a white hairline,
+   the space backdrop becomes a black HUD grid, and panels gain
+   angular cut corners. Nothing above is deleted — it is overridden.
+   ================================================================== */
+:root {
+  --void:    #000000;
+  --deep:    #050505;
+  --glass:   rgba(8,8,9,.82);
+  --glass-2: rgba(14,14,15,.9);
+  --edge:    rgba(255,255,255,.20);
+
+  --white:   #ffffff;
+  --muted:   rgba(255,255,255,.62);
+  --dim:     rgba(255,255,255,.34);
+
+  /* every accent collapses to the monochrome scale */
+  --red:     #ffffff;
+  --pink:    #cfcfcf;
+  --magenta: #d8d8d8;
+  --violet:  #bdbdbd;
+  --blue:    #ffffff;
+  --cyan:    #d0d0d0;
+  --green:   #ffffff;
+
+  /* the "hologram" edge is now a travelling white hairline */
+  --holo: linear-gradient(115deg,
+    rgba(255,255,255,.05) 0%, rgba(255,255,255,.55) 30%,
+    rgba(255,255,255,.9) 50%, rgba(255,255,255,.55) 70%,
+    rgba(255,255,255,.05) 100%);
+
+  --radius: 2px;
+  --cut: 14px;   /* size of the angular corner chamfer */
+}
+
+/* ---- Ground: pure black with a faint HUD grid ---- */
+#backdrop {
+  background: #000 !important;
+  filter: none !important;
+}
+#backdrop::after {
+  background:
+    linear-gradient(rgba(255,255,255,.05) 1px, transparent 1px) 0 0 / 100% 44px,
+    linear-gradient(90deg, rgba(255,255,255,.05) 1px, transparent 1px) 0 0 / 44px 100%,
+    radial-gradient(120% 100% at 50% 40%, transparent 55%, rgba(0,0,0,.7) 100%) !important;
+  opacity: .5;
+}
+body.in-app #backdrop { opacity: 1; filter: none !important; }
+
+/* Ambient field: kill the coloured radials, keep a crisp grid only */
+body::before {
+  background:
+    linear-gradient(transparent 0 43px, rgba(255,255,255,.035) 43px 44px),
+    linear-gradient(90deg, transparent 0 43px, rgba(255,255,255,.035) 43px 44px) !important;
+  background-size: 44px 44px, 44px 44px !important;
+  animation: none !important;
+}
+body::after { opacity: .28; }   /* fainter scanlines */
+
+html, body { background: #000; color: #fff; }
+
+/* ---- Angular cut-corner panels with a hairline white border ---- */
+.card, #haltBanner .box, #lockScreen .box {
+  background: var(--glass) !important;
+  border-radius: 0 !important;
+  clip-path: polygon(
+    0 0, calc(100% - var(--cut)) 0, 100% var(--cut),
+    100% 100%, var(--cut) 100%, 0 calc(100% - var(--cut)));
+  box-shadow: 0 0 0 1px rgba(255,255,255,.16), 0 20px 60px rgba(0,0,0,.7) !important;
+}
+/* the prismatic ring is already white via --holo; calm its motion */
+.card::before, #haltBanner .box::before {
+  animation: none !important;
+  background: linear-gradient(180deg,
+    rgba(255,255,255,.4), rgba(255,255,255,.08) 40%, rgba(255,255,255,.08) 60%, rgba(255,255,255,.4)) !important;
+  opacity: .5;
+}
+.card::after { background: linear-gradient(105deg,
+  transparent 30%, rgba(255,255,255,.06) 50%, transparent 70%) !important; }
+
+.card h2, .card h3 {
+  font-family: var(--display);
+  color: #fff !important;
+  text-shadow: none !important;
+  letter-spacing: 2.6px;
+}
+
+/* Section-heading tick — the little bracket the HUD uses before labels */
+.card h2::before {
+  content: ''; display: inline-block; width: 8px; height: 8px; margin-right: 9px;
+  border-left: 2px solid #fff; border-top: 2px solid #fff; vertical-align: middle;
+}
+
+/* ---- Sidebar: black rail, white hairline, no colour ---- */
+.sidebar {
+  background: linear-gradient(180deg, rgba(6,6,7,.96), rgba(0,0,0,.98)) !important;
+  border-right: 1px solid var(--edge) !important;
+  box-shadow: none !important;
+}
+.sidebar::after {
+  background: linear-gradient(180deg, transparent, rgba(255,255,255,.5), transparent) !important;
+  animation: none !important; opacity: .5;
+}
+.nav li { border-radius: 0 !important; letter-spacing: 1.2px; text-transform: uppercase; font-size: 12px; }
+.nav li.active, .nav li:hover {
+  background: rgba(255,255,255,.06) !important;
+  box-shadow: inset 2px 0 0 #fff !important;
+  color: #fff !important;
+}
+.brand .name, .brand .name b { color: #fff !important; }
+
+/* ---- Buttons / pills / chips: outlined monochrome ---- */
+.btn, .btn.blue, .btn.ghost {
+  background: rgba(255,255,255,.04) !important;
+  color: #fff !important;
+  border: 1px solid rgba(255,255,255,.35) !important;
+  border-radius: 0 !important;
+  text-transform: uppercase; letter-spacing: 1.4px; font-size: 12px;
+  clip-path: polygon(0 0, calc(100% - 7px) 0, 100% 7px, 100% 100%, 7px 100%, 0 calc(100% - 7px));
+  box-shadow: none !important;
+}
+.btn:hover { background: #fff !important; color: #000 !important; }
+.pill, .chip {
+  background: transparent !important; color: #fff !important;
+  border: 1px solid rgba(255,255,255,.4) !important; border-radius: 999px !important;
+  text-transform: uppercase; letter-spacing: 1.4px;
+}
+.pill.red { border-color: #fff !important; color: #fff !important; }
+.chip.on { background: #fff !important; color: #000 !important; }
+
+/* Kill switch — a hard-edged white-bordered STOP */
+#killSwitch {
+  background: rgba(0,0,0,.7) !important; color: #fff !important;
+  border: 1px solid #fff !important; border-radius: 0 !important;
+  letter-spacing: 3px !important;
+  clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 8px 100%, 0 calc(100% - 8px));
+}
+#killSwitch:hover { background: #fff !important; color: #000 !important; }
+
+/* Inputs, selects, textareas */
+input, textarea, select {
+  background: rgba(255,255,255,.03) !important;
+  border: 1px solid rgba(255,255,255,.24) !important;
+  color: #fff !important; border-radius: 0 !important;
+}
+input:focus, textarea:focus, select:focus { border-color: #fff !important; outline: none; }
+
+/* Stat readouts / LEDs go monochrome */
+.stat .n { color: #fff !important; }
+.led.on { background: #fff !important; box-shadow: 0 0 8px rgba(255,255,255,.7) !important; }
+.led.off { background: rgba(255,255,255,.25) !important; }
+.notice { border-color: rgba(255,255,255,.16) !important; }
+
+/* Chat bubbles */
+.msg.zero, .msg.user { border-radius: 0 !important; }
+.msg.zero { border: 1px solid rgba(255,255,255,.16) !important; background: rgba(255,255,255,.03) !important; }
+.msg.user { background: rgba(255,255,255,.1) !important; color: #fff !important; }
+
+/* ==================================================================
+   COCKPIT OVERVIEW — the command-centre layout from the HUD image
+   ================================================================== */
+.cockpit {
+  display: grid; gap: 14px;
+  grid-template-columns: 1fr 1.15fr 1fr;
+  grid-template-areas:
+    "l  ring  r"
+    "l  console r";
+  align-items: start;
+}
+.cockpit .col-l { grid-area: l; display: grid; gap: 14px; }
+.cockpit .col-r { grid-area: r; display: grid; gap: 14px; }
+.cockpit .ring-cell { grid-area: ring; }
+.cockpit .console-cell { grid-area: console; }
+@media (max-width: 1050px){
+  .cockpit { grid-template-columns: 1fr; grid-template-areas: "ring" "l" "r" "console"; }
+}
+
+/* the central emblem: concentric rings with a big Ø */
+.hud-ring {
+  position: relative; aspect-ratio: 1/1; width: 100%; max-width: 340px; margin: 8px auto;
+  display: grid; place-items: center;
+}
+.hud-ring i {
+  position: absolute; border: 1px solid rgba(255,255,255,.35); border-radius: 50%;
+}
+.hud-ring i:nth-child(1){ inset: 0; }
+.hud-ring i:nth-child(2){ inset: 12%; border-style: dashed; opacity:.6; }
+.hud-ring i:nth-child(3){ inset: 26%; opacity:.5; }
+.hud-ring i:nth-child(4){ inset: 6%; border-color: rgba(255,255,255,.12); border-top-color:#fff; animation: spin 14s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.hud-ring .glyph {
+  font-family: var(--display); font-size: clamp(56px, 12vw, 120px); color:#fff;
+  text-shadow: 0 0 30px rgba(255,255,255,.4); line-height: 1;
+}
+.hud-ring canvas { position:absolute; inset:14%; width:72%; height:72%; opacity:.9; }
+.ring-labels { display:flex; justify-content:space-between; font-family:var(--mono); font-size:11px; color:var(--muted); letter-spacing:2px; margin-top:6px; }
+.ring-corners { display:grid; grid-template-columns:1fr 1fr; gap:6px 18px; font-family:var(--mono); font-size:11px; letter-spacing:1.5px; color:var(--muted); margin-top:12px; }
+.ring-corners b { color:#fff; font-weight:600; }
+
+/* small readout rows used across the cockpit cards */
+.readout { display:flex; justify-content:space-between; align-items:baseline; padding:7px 0; border-bottom:1px solid rgba(255,255,255,.08); font-family:var(--mono); font-size:12px; }
+.readout:last-child{ border-bottom:0; }
+.readout .k { color:var(--muted); letter-spacing:1px; text-transform:uppercase; font-size:11px; }
+.readout .v { color:#fff; }
+
+/* a thin bar-meter (SYSTEM PERFORMANCE / TEMP) */
+.meter { height:6px; background:rgba(255,255,255,.1); position:relative; margin:6px 0 2px; }
+.meter > span { position:absolute; left:0; top:0; bottom:0; background:#fff; }
+
+/* the DATA FLOW / sparkline strip */
+.flowbars { display:flex; align-items:flex-end; gap:3px; height:56px; margin-top:8px; }
+.flowbars i { flex:1; background:rgba(255,255,255,.55); min-height:3px; }
+
+/* module grid (CORE MODULES) */
+.modgrid { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:6px; }
+.modgrid button {
+  text-align:left; padding:10px; font-family:var(--mono); font-size:11px; letter-spacing:1px;
+  background:rgba(255,255,255,.03); color:#fff; border:1px solid rgba(255,255,255,.2);
+  text-transform:uppercase; cursor:pointer;
+  clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 8px 100%, 0 calc(100% - 8px));
+}
+.modgrid button:hover { background:#fff; color:#000; }
+.modgrid button b { display:block; font-size:13px; letter-spacing:2px; margin-bottom:3px; }
+
+/* the TALK TO ZERO console */
+.console-cell .mini-log { min-height:60px; max-height:150px; overflow:auto; font-family:var(--mono); font-size:12px; color:var(--muted); margin-bottom:10px; }
+
+/* top status pills row */
+.hud-status { display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-bottom:14px; font-family:var(--mono); font-size:11px; letter-spacing:2px; }
+.hud-status .dotpill { display:inline-flex; align-items:center; gap:7px; border:1px solid rgba(255,255,255,.3); padding:5px 12px; text-transform:uppercase; }
+.hud-status .dotpill::before { content:''; width:7px; height:7px; background:#fff; border-radius:50%; box-shadow:0 0 8px #fff; }
+
+/* ---- Maps view ---- */
+#view-maps iframe { width:100%; height:520px; border:1px solid rgba(255,255,255,.24); filter:grayscale(1) invert(.92) contrast(.9); background:#000; }
+.map-tabs { display:flex; gap:8px; flex-wrap:wrap; margin:12px 0; }
+
+/* Sidebar crest → monochrome so no colour survives anywhere */
+.brand .logo img { filter: grayscale(1) brightness(1.6) contrast(1.1); }
+.boot-mark, #boot .boot-mark { color:#fff !important; }

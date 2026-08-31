@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="robots" content="noindex, nofollow" />
-  <meta name="theme-color" content="#03050b" />
+  <meta name="theme-color" content="#000000" />
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
@@ -60,6 +60,7 @@
         <li data-view="overview"><span class="ic">⬡</span> Overview</li>
         <li data-view="control"><span class="ic">⏻</span> Control Panel</li>
         <li data-view="markets"><span class="ic">▲</span> Markets</li>
+        <li data-view="maps"><span class="ic">◍</span> Maps</li>
         <li data-view="news"><span class="ic">◉</span> News</li>
         <li data-view="trading"><span class="ic">▤</span> Trading</li>
         <li data-view="apps"><span class="ic">◱</span> Apps</li>
@@ -221,31 +222,119 @@
         </div>
       </section>
 
-      <!-- OVERVIEW -->
+      <!-- OVERVIEW — cockpit command centre -->
       <section class="view" id="view-overview">
-        <div class="ov-grid">
-          <div class="card ov-orb">
-            <canvas id="orb"></canvas>
-            <button class="btn ghost" id="wakeBtn" onclick="Zero.toggleWake()">◎ Wake word off</button>
-            <button class="btn blue" style="margin-top:10px" onclick="Zero.nav('assistant');Zero.dailyBriefing(false)">📈 Daily market briefing</button>
-            <p class="hint" style="text-align:center;margin-top:10px">Say <b>“Zero, …”</b> and it acts on what follows.</p>
-          </div>
-          <div class="card">
-            <h2>Markets</h2>
-            <div id="ovMarket"><div class="nodata" style="font-size:12px">loading…</div></div>
-            <h2 style="margin-top:18px">Headlines</h2>
-            <div id="ovNews"><div class="nodata" style="font-size:12px">loading…</div></div>
-          </div>
-          <div class="card">
-            <h2>State</h2>
-            <div class="ov-stats">
-              <div class="stat"><div class="n" id="ovState" style="font-size:19px">RUNNING</div><div class="l">System</div></div>
-              <div class="stat"><div class="n" id="ovTasks" style="font-size:19px;color:var(--red)">0</div><div class="l">Open tasks</div></div>
-              <div class="stat"><div class="n" id="ovNotes" style="font-size:19px">0</div><div class="l">Notes</div></div>
-              <div class="stat"><div class="n" id="ovMem" style="font-size:19px;color:var(--cyan)">0</div><div class="l">Memories</div></div>
+        <div class="hud-status">
+          <span class="dotpill" id="hudMode">IDLE</span>
+          <span class="dotpill" id="hudSecure">SECURE</span>
+          <span class="dotpill">ZERO // ONLINE</span>
+          <span style="flex:1"></span>
+          <span id="hudClock" style="color:#fff;letter-spacing:3px">--:--:--</span>
+          <button class="btn" onclick="Zero.toggleHalt()">STOP</button>
+        </div>
+
+        <div class="cockpit">
+          <!-- LEFT COLUMN -->
+          <div class="col-l">
+            <div class="card">
+              <h2>Market Overview</h2>
+              <div id="ovMarket"><div class="nodata" style="font-size:12px">loading…</div></div>
             </div>
-            <div class="notice">Always-listening streams audio continuously while armed — not only when you address Zero. The bar at the top of the screen is on whenever it is live.</div>
+            <div class="card">
+              <h2>Daily Market Flow</h2>
+              <div class="flowbars" id="ovFlow"></div>
+              <p class="hint" style="margin-top:8px">Relative movement across tracked assets, last refresh.</p>
+            </div>
+            <div class="card">
+              <h2>Watchlist</h2>
+              <div id="ovWatch"><div class="nodata" style="font-size:12px">loading…</div></div>
+            </div>
           </div>
+
+          <!-- CENTRE: RING EMBLEM -->
+          <div class="ring-cell">
+            <div class="card" style="text-align:center">
+              <div class="hud-ring">
+                <i></i><i></i><i></i><i></i>
+                <canvas id="orb"></canvas>
+                <span class="glyph">Ø</span>
+              </div>
+              <div class="ring-labels"><span>SYS//001</span><span>CORE//07</span><span>NET//02</span><span>SEC//09</span></div>
+              <div class="ring-corners">
+                <div>SYSTEM <b id="ovState">RUNNING</b></div>
+                <div>OPEN TASKS <b id="ovTasks">0</b></div>
+                <div>NOTES <b id="ovNotes">0</b></div>
+                <div>MEMORIES <b id="ovMem">0</b></div>
+              </div>
+              <div style="margin-top:14px;display:flex;gap:8px;justify-content:center;flex-wrap:wrap">
+                <button class="btn ghost" id="wakeBtn" onclick="Zero.toggleWake()">◎ Wake off</button>
+                <button class="btn" onclick="Zero.nav('assistant');Zero.dailyBriefing(false)">Daily briefing</button>
+              </div>
+            </div>
+
+            <!-- CONSOLE -->
+            <div class="console-cell" style="margin-top:14px">
+              <div class="card">
+                <h2>Talk to Zero</h2>
+                <div class="mini-log" id="ovConsole">Say “Zero, …” or type below — it acts on what follows.</div>
+                <div class="chat-input">
+                  <input id="ovInput" placeholder="Command Zero…" onkeydown="if(event.key==='Enter')Zero.ovSend()" />
+                  <button class="btn" onclick="Zero.ovSend()">Send</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- RIGHT COLUMN -->
+          <div class="col-r">
+            <div class="card">
+              <h2>Core Modules</h2>
+              <div class="modgrid">
+                <button onclick="Zero.nav('markets')"><b>MKT</b>Markets</button>
+                <button onclick="Zero.nav('maps')"><b>MAP</b>World maps</button>
+                <button onclick="Zero.nav('trading')"><b>TRD</b>Trading</button>
+                <button onclick="Zero.nav('security')"><b>SEC</b>Security</button>
+                <button onclick="Zero.nav('files')"><b>FIL</b>Files</button>
+                <button onclick="Zero.nav('memory')"><b>MEM</b>Memory</button>
+              </div>
+            </div>
+            <div class="card">
+              <h2>System Performance</h2>
+              <div class="readout"><span class="k">Network calls</span><span class="v" id="ovCalls">0</span></div>
+              <div class="meter"><span id="ovPerfBar" style="width:12%"></span></div>
+              <div class="readout"><span class="k">Capabilities</span><span class="v" id="ovCaps">4/4</span></div>
+              <div class="readout"><span class="k">Engine</span><span class="v" id="ovEngine">core</span></div>
+            </div>
+            <div class="card">
+              <h2>Data Flow · Headlines</h2>
+              <div id="ovNews"><div class="nodata" style="font-size:12px">loading…</div></div>
+            </div>
+            <div class="card">
+              <h2>System Time</h2>
+              <div class="readout"><span class="k">Local</span><span class="v" id="ovTime">--:--:--</span></div>
+              <div class="readout"><span class="k">UTC</span><span class="v" id="ovUtc">--:--:--</span></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- MAPS -->
+      <section class="view" id="view-maps">
+        <div class="card">
+          <h2>World Maps <span class="pill">live · no key</span></h2>
+          <p class="hint">Every map on Earth. Search any place; Zero drops it on the map and remembers your last view. Ask Zero <b>map paris</b> or <b>navigate to tokyo</b> in chat too.</p>
+          <div class="chat-input" style="margin-top:12px">
+            <input id="mapInput" placeholder="Search anywhere — a city, address, landmark…" onkeydown="if(event.key==='Enter')Zero.mapSearch()" />
+            <button class="btn" onclick="Zero.mapSearch()">Go</button>
+          </div>
+          <div class="map-tabs" id="mapTabs">
+            <button class="chip on" data-src="osm" onclick="Zero.mapSource('osm')">🗺 OpenStreetMap</button>
+            <button class="chip" data-src="google" onclick="Zero.mapSource('google')">🌍 Google Maps</button>
+            <button class="chip" data-src="satellite" onclick="Zero.mapSource('satellite')">🛰 Satellite</button>
+          </div>
+          <div class="hint" style="font-family:var(--mono);margin-bottom:8px">Showing: <span id="mapNow">—</span></div>
+          <iframe id="mapFrame" title="Map" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>
+          <div class="notice">Maps are drawn by OpenStreetMap and Google — those servers see the place you look up (that is unavoidable for a live map), but nothing else in Zero leaves your machine. Update the view any time; Zero keeps the last place you looked.</div>
         </div>
       </section>
 
@@ -442,17 +531,40 @@
       <section class="view" id="view-settings">
         <div class="grid cols-2">
           <div class="card">
-            <h2>Zero Core <span class="pill">no account</span></h2>
-            <p class="hint">Core is Zero's reasoning engine. It drives a model on this machine — no vendor, no sign-in, no key. Prompts go to the address below and nowhere else.</p>
-            <label class="hint" style="margin-top:12px;display:block">Engine address</label>
-            <input id="engineUrl" placeholder="http://localhost:11434" />
-            <label class="hint" style="margin-top:10px;display:block">Model <span style="opacity:.7">— leave blank and Core adopts whichever model your engine has</span></label>
+            <h2>Zero Core — Any AI <span class="pill" id="brainPill">core</span></h2>
+            <p class="hint">Give Zero a brain. Pick <b>Local engine</b> to stay fully private, or pick a provider and paste an <b>API key</b> to make Zero use any AI you tell it to.</p>
+
+            <label class="hint" style="margin-top:12px;display:block">Brain</label>
+            <select id="engineProvider" onchange="Zero.onProvider()">
+              <option value="local">Local engine (Ollama / LM Studio — private)</option>
+              <option value="openai">OpenAI (GPT)</option>
+              <option value="anthropic">Anthropic (Claude)</option>
+              <option value="compatible">Any OpenAI-compatible (OpenRouter, Groq, Together, DeepSeek, Mistral…)</option>
+            </select>
+
+            <!-- API KEY: shown for hosted providers -->
+            <div id="keyFields" style="display:none">
+              <label class="hint" style="margin-top:10px;display:block">API key <span style="opacity:.7">— stored on this device only, never sent anywhere but the provider you pick</span></label>
+              <input id="engineKey" type="password" placeholder="sk-…  /  paste any AI provider key here" autocomplete="off" />
+              <label class="hint" id="baseLabel" style="margin-top:10px;display:none">Base URL <span style="opacity:.7">— for “compatible”, e.g. https://openrouter.ai/api/v1</span></label>
+              <input id="engineBase" style="display:none" placeholder="https://openrouter.ai/api/v1" />
+            </div>
+
+            <!-- LOCAL: engine address -->
+            <div id="urlField">
+              <label class="hint" style="margin-top:10px;display:block">Engine address</label>
+              <input id="engineUrl" placeholder="http://localhost:11434" />
+            </div>
+
+            <label class="hint" style="margin-top:10px;display:block">Model <span style="opacity:.7">— e.g. gpt-4o-mini, claude-3-5-sonnet-latest; blank = auto-detect (local)</span></label>
             <input id="engineModel" placeholder="auto-detect" />
-            <label class="hint" style="margin-top:10px;display:block">Wire format</label>
+
+            <label class="hint" style="margin-top:10px;display:block" id="modeLabel">Wire format</label>
             <select id="engineMode">
               <option value="native">Native (/api/chat)</option>
               <option value="compatible">Compatible (/v1/chat/completions)</option>
             </select>
+
             <div style="margin-top:12px;display:flex;gap:10px;flex-wrap:wrap">
               <button class="btn" onclick="Zero.saveEngine()">Save &amp; test</button>
               <button class="btn ghost" onclick="Zero.testEngine()">Test Core</button>
@@ -460,10 +572,10 @@
             </div>
             <div id="engineStatus" class="hint" style="margin-top:12px"></div>
             <div class="notice">
-              <b>Two ways to give Zero a brain.</b><br>
-              <b>1 · Local model (fully private):</b> any local runtime that speaks a format above — Ollama, llama.cpp, LM Studio, Jan.
-              For Ollama: <code>OLLAMA_ORIGINS=* ollama serve</code>.<br>
-              <b>2 · Any AI provider by API key (Python bridge):</b> run <code>python3 server.py</code> with your key set (OpenAI, Anthropic, OpenRouter, Groq, …), open the app it serves, then click <b>Use bundled bridge</b> above. Your key stays on the server, never in this page — see <code>server.py</code>. Note: with a hosted provider, your prompts go to that company.
+              <b>Three ways to give Zero a brain.</b><br>
+              <b>1 · Local model (fully private):</b> Ollama, llama.cpp, LM Studio, Jan. For Ollama: <code>OLLAMA_ORIGINS=* ollama serve</code>.<br>
+              <b>2 · Any AI by API key (right here):</b> choose the provider above, paste your key, set the model, Save &amp; test. The key lives on this device only. Your prompts go straight to that provider — some (OpenRouter, Groq, Anthropic, most “compatible” hosts) allow the browser to call them directly; if a provider blocks browser calls, use option 3.<br>
+              <b>3 · Python bridge:</b> run <code>python3 server.py</code> with the key set server-side, then <b>Use bundled bridge</b>. Works with every provider.
             </div>
           </div>
 
