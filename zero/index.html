@@ -1,0 +1,694 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="robots" content="noindex, nofollow" />
+  <meta name="theme-color" content="#000000" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="ZERO" />
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="apple-touch-icon" href="assets/icon-192.png" />
+  <title>ZERO</title>
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+  <!-- ============ SPACE BACKDROP ============ -->
+  <div id="backdrop"></div>
+
+  <!-- ============ BOOT ============ -->
+  <div id="boot"><div class="boot-inner"><div class="boot-mark">0</div><div class="boot-feed"></div></div></div>
+
+  <!-- ============ ALWAYS-LISTENING INDICATOR ============ -->
+  <div id="wakeBar"><span class="wake-dot"></span> LISTENING — audio is streaming to your browser's speech service <span id="wakeHeard"></span></div>
+
+  <!-- ============ KILL SWITCH — always visible, always first ============ -->
+  <button id="killSwitch" onclick="Zero.toggleHalt()" title="Stop / resume all Zero activity">STOP</button>
+
+  <!-- ============ VAULT LOCK SCREEN ============ -->
+  <div id="lockScreen">
+    <div class="box">
+      <h2>ZERO LOCKED</h2>
+      <p>Your data is encrypted on this device. Enter the passphrase to open it.</p>
+      <input id="lockPass" type="password" placeholder="Passphrase" autocomplete="current-password" style="margin-top:16px" />
+      <div id="lockErr" class="lock-err"></div>
+      <p style="margin-top:14px"><button class="btn" onclick="Zero.unlockVault()">Unlock</button></p>
+    </div>
+  </div>
+
+  <div id="haltBanner">
+    <div class="box">
+      <h2>ZERO HALTED</h2>
+      <p>All automatic activity is stopped. No network calls, no market polling, no engine requests. Your data is untouched and safe.</p>
+      <p style="margin-top:18px">
+        <button class="btn blue" onclick="Zero.toggleHalt()">Resume Zero</button>
+      </p>
+    </div>
+  </div>
+
+  <div class="app">
+    <!-- ============ SIDEBAR ============ -->
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="logo"><img src="assets/zero-mark.png" alt="" /></div>
+        <div class="name">ZER<b>0</b></div>
+      </div>
+      <ul class="nav" id="nav">
+        <li data-view="assistant" class="active"><span class="ic">◈</span> Assistant</li>
+        <li data-view="overview"><span class="ic">⬡</span> Overview</li>
+        <li data-view="control"><span class="ic">⏻</span> Control Panel</li>
+        <li data-view="markets"><span class="ic">▲</span> Markets</li>
+        <li data-view="maps"><span class="ic">◍</span> Maps</li>
+        <li data-view="news"><span class="ic">◉</span> News</li>
+        <li data-view="trading"><span class="ic">▤</span> Trading</li>
+        <li data-view="apps"><span class="ic">◱</span> Apps</li>
+        <li data-view="memory"><span class="ic">❖</span> Memory</li>
+        <li data-view="security"><span class="ic">⛨</span> Security</li>
+        <li data-view="files"><span class="ic">▢</span> Files</li>
+        <li data-view="operator"><span class="ic">⌘</span> Operator</li>
+        <li data-view="tasks"><span class="ic">✓</span> Tasks</li>
+        <li data-view="notes"><span class="ic">✎</span> Notes</li>
+        <li data-view="settings"><span class="ic">⚙</span> Settings</li>
+      </ul>
+      <div class="foot">
+        <span class="dot"></span> Private mode &middot; local only<br />
+        No accounts &middot; no tracking &middot; no telemetry.
+      </div>
+    </aside>
+
+    <!-- ============ MAIN ============ -->
+    <main class="main">
+      <div class="topbar">
+        <div>
+          <h1 id="viewTitle">Assistant</h1>
+          <div class="sub" id="viewSub">Ask Zero anything. Nothing leaves this device.</div>
+        </div>
+        <div class="clock"><b id="clock">--:--:--</b><br /><span id="date"></span></div>
+      </div>
+
+      <!-- CONTROL PANEL -->
+      <section class="view" id="view-control">
+        <div class="card" style="border-color:var(--red)">
+          <h2>Master Control <span class="pill red">safety</span></h2>
+          <p class="hint">One button stops everything Zero does. It works even if the rest of the app is broken or misbehaving — nothing Zero runs can disable it.</p>
+          <div style="display:flex;gap:12px;margin-top:14px;flex-wrap:wrap">
+            <button class="btn" style="font-size:16px;padding:15px 30px" onclick="Zero.toggleHalt()">■ EMERGENCY STOP</button>
+            <button class="btn ghost" onclick="Zero.killNetwork()">⛔ Cut all network access</button>
+            <button class="btn ghost" onclick="Zero.panic()">☢ Panic: stop + lock vault</button>
+          </div>
+        </div>
+
+        <div class="grid cols-2" style="margin-top:16px">
+          <div class="card">
+            <h2>Capability Switches</h2>
+            <p class="hint">Turn any capability off individually. Off means Zero cannot use it at all.</p>
+            <div style="margin-top:10px">
+              <div class="ctrl-row">
+                <span class="led on" id="ledNet"></span>
+                <div class="label"><b>Network access</b><span>Lets Zero reach the internet</span></div>
+                <label class="toggle"><input type="checkbox" id="capNetwork" checked onchange="Zero.setCap('network',this.checked)" /><span class="track"></span></label>
+              </div>
+              <div class="ctrl-row">
+                <span class="led on" id="ledMkt"></span>
+                <div class="label"><b>Auto market polling</b><span>Refreshes prices every 60s</span></div>
+                <label class="toggle"><input type="checkbox" id="capMarket" checked onchange="Zero.setCap('market',this.checked)" /><span class="track"></span></label>
+              </div>
+              <div class="ctrl-row">
+                <span class="led off" id="ledAi"></span>
+                <div class="label"><b>Engine requests</b><span>Sends prompts to your local engine</span></div>
+                <label class="toggle"><input type="checkbox" id="capAi" checked onchange="Zero.setCap('ai',this.checked)" /><span class="track"></span></label>
+              </div>
+              <div class="ctrl-row">
+                <span class="led on" id="ledStore"></span>
+                <div class="label"><b>Local storage writes</b><span>Lets Zero save tasks & notes</span></div>
+                <label class="toggle"><input type="checkbox" id="capStorage" checked onchange="Zero.setCap('storage',this.checked)" /><span class="track"></span></label>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <h2>Activity Log <span class="pill">transparency</span></h2>
+            <p class="hint">Every action Zero takes is logged here so nothing happens without you seeing it.</p>
+            <div class="log-feed" id="logFeed"></div>
+            <button class="btn ghost" style="margin-top:10px" onclick="Zero.clearLog()">Clear log</button>
+          </div>
+        </div>
+
+        <div class="card" style="margin-top:16px">
+          <h2>System Status</h2>
+          <div class="grid cols-3">
+            <div class="stat"><div class="n" id="sysState" style="color:var(--green);font-size:20px">RUNNING</div><div class="l">State</div></div>
+            <div class="stat"><div class="n" id="sysCalls" style="color:var(--blue);font-size:20px">0</div><div class="l">Network calls</div></div>
+            <div class="stat"><div class="n" id="sysCaps" style="color:var(--white);font-size:20px">4/4</div><div class="l">Capabilities on</div></div>
+          </div>
+        </div>
+      </section>
+
+
+      <!-- MARKETS -->
+      <section class="view" id="view-markets">
+        <div class="card">
+          <h2>Crypto <span class="pill">live</span></h2>
+          <div class="mkt-row mkt-head"><div>Asset</div><div>Price</div><div>24h</div></div>
+          <div id="marketTable"><div class="spinner">Loading live prices…</div></div>
+          <div style="margin-top:14px;display:flex;gap:10px;align-items:center">
+            <button class="btn blue" onclick="Zero.loadMarkets()">↻ Refresh</button>
+            <span class="hint" id="marketUpdated"></span>
+          </div>
+          <div class="notice">Live from CoinGecko's public API. Every figure is fetched — where the feed gives no value, Zero shows <b>&mdash;</b> rather than a number it invented. Nothing here is financial advice.</div>
+        </div>
+
+        <div class="card" style="margin-top:16px">
+          <h2>Currencies <span class="pill">ECB · live</span></h2>
+          <div class="mkt-row mkt-head"><div>Pair</div><div>Rate</div><div>As of</div></div>
+          <div id="fxTable"><div class="spinner">Loading rates</div></div>
+          <div class="notice">Live reference rates published by the European Central Bank. No key needed. Ask Zero <b>100 usd to eur</b> in chat for any pair.</div>
+        </div>
+
+        <div class="card" style="margin-top:16px">
+          <h2>Stocks &amp; Indices</h2>
+          <div class="mkt-row mkt-head"><div>Symbol</div><div>Price</div><div>Today</div></div>
+          <div id="stockTable"></div>
+          <div style="margin-top:14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+            <button class="btn blue" onclick="Zero.loadStocks()">↻ Refresh</button>
+            <span class="hint" id="stockUpdated"></span>
+          </div>
+        </div>
+      </section>
+
+      <!-- TRADING -->
+      <section class="view" id="view-trading">
+        <div class="card">
+          <h2>Trading <span class="pill">TradingView · live</span></h2>
+          <p class="hint">Real professional charts for every market TradingView covers — stocks, forex, crypto, indices, commodities, futures. Try <code>OANDA:XAUUSD</code>, <code>NASDAQ:AAPL</code>, <code>BINANCE:BTCUSDT</code>.</p>
+          <div class="chat-input" style="margin-top:12px">
+            <input id="tvInput" placeholder="Symbol — e.g. NASDAQ:AAPL or XAUUSD" onkeydown="if(event.key==='Enter')Zero.tvSearch()" />
+            <button class="btn" onclick="Zero.tvSearch()">Load</button>
+          </div>
+          <div id="tvChips" class="chips" style="margin-top:12px"></div>
+          <div class="hint" style="margin-top:8px;font-family:var(--mono)">Showing: <span id="tvNow">—</span></div>
+
+          <div id="tvGate" class="tv-gate" style="display:none">
+            <p><b>This is the one part of Zero that reaches a third party.</b></p>
+            <p>TradingView's chart loads their script from <code>s3.tradingview.com</code>, and their servers see that you are using it, subject to TradingView's own terms and privacy policy. Everything else in Zero stays on your machine — this is the deliberate exception, because live pro charts cannot be drawn without their data.</p>
+            <p style="margin-top:12px"><button class="btn" onclick="Zero.allowTradingView()">Load TradingView charts</button></p>
+          </div>
+          <div id="tvContainer" style="margin-top:14px;min-height:200px"></div>
+          <div class="notice">Charts are information, not advice. The network switch and STOP both cut this like anything else.</div>
+        </div>
+
+        <div class="card" style="margin-top:16px">
+          <h2>Economic Calendar <span class="pill">high-impact events</span></h2>
+          <p class="hint">The Forex-Factory-style calendar — upcoming high-impact releases for USD, EUR, GBP, JPY and CNY that actually move markets. Loads with TradingView (same consent as the charts).</p>
+          <div id="econCalendar" style="margin-top:12px;min-height:120px"></div>
+        </div>
+      </section>
+
+      <!-- NEWS -->
+      <section class="view" id="view-news">
+        <div class="card">
+          <h2>Live News <span class="pill">no key</span></h2>
+          <p class="hint">Real stories pulled live from open, worldwide sources. Ask Zero <b>news</b> in chat and it reads them to you.</p>
+          <div id="newsTabs" class="chips" style="margin-top:12px">
+            <button class="chip on" data-mode="world" onclick="Zero.setNewsMode('world')">🌍 World</button>
+            <button class="chip" data-mode="tech" onclick="Zero.setNewsMode('tech')">💻 Tech</button>
+          </div>
+          <div id="newsList" style="margin-top:14px"></div>
+          <div style="margin-top:14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+            <button class="btn blue" onclick="Zero.loadNews()">↻ Refresh</button>
+            <span class="hint" id="newsUpdated"></span>
+          </div>
+        </div>
+      </section>
+
+      <!-- OVERVIEW — cockpit command centre -->
+      <section class="view" id="view-overview">
+        <div class="hud-status">
+          <span class="dotpill" id="hudMode">IDLE</span>
+          <span class="dotpill" id="hudSecure">SECURE</span>
+          <span class="dotpill">ZERO // ONLINE</span>
+          <span style="flex:1"></span>
+          <span id="hudClock" style="color:#fff;letter-spacing:3px">--:--:--</span>
+          <button class="btn" onclick="Zero.toggleHalt()">STOP</button>
+        </div>
+
+        <div class="cockpit">
+          <!-- LEFT COLUMN -->
+          <div class="col-l">
+            <div class="card">
+              <h2>Market Overview</h2>
+              <div id="ovMarket"><div class="nodata" style="font-size:12px">loading…</div></div>
+            </div>
+            <div class="card">
+              <h2>Daily Market Flow</h2>
+              <div class="flowbars" id="ovFlow"></div>
+              <p class="hint" style="margin-top:8px">Relative movement across tracked assets, last refresh.</p>
+            </div>
+            <div class="card">
+              <h2>Watchlist</h2>
+              <div id="ovWatch"><div class="nodata" style="font-size:12px">loading…</div></div>
+            </div>
+          </div>
+
+          <!-- CENTRE: RING EMBLEM -->
+          <div class="ring-cell">
+            <div class="card" style="text-align:center">
+              <div class="hud-ring">
+                <i></i><i></i><i></i><i></i>
+                <canvas id="orb"></canvas>
+                <span class="glyph">Ø</span>
+              </div>
+              <div class="ring-labels"><span>SYS//001</span><span>CORE//07</span><span>NET//02</span><span>SEC//09</span></div>
+              <div class="ring-corners">
+                <div>SYSTEM <b id="ovState">RUNNING</b></div>
+                <div>OPEN TASKS <b id="ovTasks">0</b></div>
+                <div>NOTES <b id="ovNotes">0</b></div>
+                <div>MEMORIES <b id="ovMem">0</b></div>
+              </div>
+              <div style="margin-top:14px;display:flex;gap:8px;justify-content:center;flex-wrap:wrap">
+                <button class="btn ghost" id="wakeBtn" onclick="Zero.toggleWake()">◎ Wake off</button>
+                <button class="btn" onclick="Zero.nav('assistant');Zero.dailyBriefing(false)">Daily briefing</button>
+              </div>
+            </div>
+
+            <!-- CONSOLE -->
+            <div class="console-cell" style="margin-top:14px">
+              <div class="card">
+                <h2>Talk to Zero</h2>
+                <div class="mini-log" id="ovConsole">Say “Zero, …” or type below — it acts on what follows.</div>
+                <div class="chat-input">
+                  <input id="ovInput" placeholder="Command Zero…" onkeydown="if(event.key==='Enter')Zero.ovSend()" />
+                  <button class="btn" onclick="Zero.ovSend()">Send</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- RIGHT COLUMN -->
+          <div class="col-r">
+            <div class="card">
+              <h2>Core Modules</h2>
+              <div class="modgrid">
+                <button onclick="Zero.nav('markets')"><b>MKT</b>Markets</button>
+                <button onclick="Zero.nav('maps')"><b>MAP</b>World maps</button>
+                <button onclick="Zero.nav('trading')"><b>TRD</b>Trading</button>
+                <button onclick="Zero.nav('security')"><b>SEC</b>Security</button>
+                <button onclick="Zero.nav('files')"><b>FIL</b>Files</button>
+                <button onclick="Zero.nav('memory')"><b>MEM</b>Memory</button>
+              </div>
+            </div>
+            <div class="card">
+              <h2>System Performance</h2>
+              <div class="readout"><span class="k">Network calls</span><span class="v" id="ovCalls">0</span></div>
+              <div class="meter"><span id="ovPerfBar" style="width:12%"></span></div>
+              <div class="readout"><span class="k">Capabilities</span><span class="v" id="ovCaps">4/4</span></div>
+              <div class="readout"><span class="k">Engine</span><span class="v" id="ovEngine">core</span></div>
+            </div>
+            <div class="card">
+              <h2>Data Flow · Headlines</h2>
+              <div id="ovNews"><div class="nodata" style="font-size:12px">loading…</div></div>
+            </div>
+            <div class="card">
+              <h2>System Time</h2>
+              <div class="readout"><span class="k">Local</span><span class="v" id="ovTime">--:--:--</span></div>
+              <div class="readout"><span class="k">UTC</span><span class="v" id="ovUtc">--:--:--</span></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- MAPS -->
+      <section class="view" id="view-maps">
+        <div class="card">
+          <h2>World Maps <span class="pill">live · no key</span></h2>
+          <p class="hint">Every map on Earth. Search any place; Zero drops it on the map and remembers your last view. Ask Zero <b>map paris</b> or <b>navigate to tokyo</b> in chat too.</p>
+          <div class="chat-input" style="margin-top:12px">
+            <input id="mapInput" placeholder="Search anywhere — a city, address, landmark…" onkeydown="if(event.key==='Enter')Zero.mapSearch()" />
+            <button class="btn" onclick="Zero.mapSearch()">Go</button>
+          </div>
+          <div class="map-tabs" id="mapTabs">
+            <button class="chip on" data-src="osm" onclick="Zero.mapSource('osm')">🗺 OpenStreetMap</button>
+            <button class="chip" data-src="google" onclick="Zero.mapSource('google')">🌍 Google Maps</button>
+            <button class="chip" data-src="satellite" onclick="Zero.mapSource('satellite')">🛰 Satellite</button>
+          </div>
+          <div class="hint" style="font-family:var(--mono);margin-bottom:8px">Showing: <span id="mapNow">—</span></div>
+          <iframe id="mapFrame" title="Map" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>
+          <div class="notice">Maps are drawn by OpenStreetMap and Google — those servers see the place you look up (that is unavoidable for a live map), but nothing else in Zero leaves your machine. Update the view any time; Zero keeps the last place you looked.</div>
+        </div>
+      </section>
+
+      <!-- SECURITY -->
+      <section class="view" id="view-security">
+        <div class="grid cols-2">
+          <div class="card">
+            <h2>Password Check</h2>
+            <p class="hint">Measures strength here on your machine, then checks whether it appears in public breach data.</p>
+            <div class="chat-input" style="margin-top:14px">
+              <input id="secPass" type="password" placeholder="Password to test" onkeydown="if(event.key==='Enter')Zero.checkPassword()" />
+              <button class="btn" onclick="Zero.checkPassword()">Check</button>
+            </div>
+            <div id="secResult" style="margin-top:14px"></div>
+            <div class="notice"><b>Your password is never sent.</b> It is hashed on this device and only the <b>first five characters of that hash</b> go out. The service replies with every suffix sharing that prefix and the match is made here — so it never learns which one you asked about. That is the only reason this check is acceptable to build.</div>
+          </div>
+          <div class="card">
+            <h2>Hardening Checklist</h2>
+            <p class="hint">For the sites and games you ship. Ordered by how often each one is what actually went wrong.</p>
+            <div id="secChecklist" style="margin-top:14px"></div>
+          </div>
+        </div>
+        <div class="grid cols-2" style="margin-top:16px">
+          <div class="card">
+            <h2>Crypto Toolkit</h2>
+            <p class="hint">Hashes, HMAC, base64, JWT decode, hash ID, entropy — all computed on your machine.</p>
+            <select id="cryptoOp" style="margin-top:12px" onchange="Zero.cryptoTool()">
+              <option value="sha256">SHA-256</option>
+              <option value="sha512">SHA-512</option>
+              <option value="sha1">SHA-1</option>
+              <option value="hmac">HMAC-SHA256 (needs key)</option>
+              <option value="b64enc">Base64 encode</option>
+              <option value="b64dec">Base64 decode</option>
+              <option value="jwt">Decode JWT</option>
+              <option value="idhash">Identify hash type</option>
+              <option value="entropy">Shannon entropy</option>
+            </select>
+            <textarea id="cryptoIn" rows="3" placeholder="Input" style="margin-top:10px" oninput="Zero.cryptoTool()"></textarea>
+            <input id="cryptoKey" placeholder="Key (HMAC only)" style="margin-top:10px" oninput="Zero.cryptoTool()" />
+            <pre id="cryptoOut" class="crypto-out"></pre>
+          </div>
+          <div class="card">
+            <h2>Test Payloads <span class="pill red">your own sites</span></h2>
+            <p class="hint">The exact strings attackers use. Paste them into <b>your own</b> forms to confirm they are handled safely.</p>
+            <select id="payloadKind" style="margin-top:12px" onchange="Zero.showPayloads()">
+              <option value="xss">Cross-site scripting (XSS)</option>
+              <option value="sqli">SQL injection</option>
+              <option value="traversal">Path traversal</option>
+              <option value="cmdi">Command injection</option>
+            </select>
+            <div id="payloadOut" style="margin-top:12px"></div>
+          </div>
+        </div>
+
+        <div class="card" style="margin-top:16px">
+          <h2>DNS Recon <span class="pill">domains you control</span></h2>
+          <p class="hint">Public DNS records over DNS-over-HTTPS — the way you map your own attack surface before an audit.</p>
+          <div class="chat-input" style="margin-top:12px">
+            <input id="reconIn" placeholder="example.com" onkeydown="if(event.key==='Enter')Zero.reconDomain()" />
+            <button class="btn" onclick="Zero.reconDomain()">Look up</button>
+          </div>
+          <div id="reconOut" style="margin-top:14px"></div>
+        </div>
+
+        <div class="card" style="margin-top:16px">
+          <h2>Scope</h2>
+          <p class="hint">Zero's security tooling is defensive: it hardens things you own and control. It contains no scanner, no exploit and no payload, and I won't add them — a tool built to break into other people's systems is a liability to whoever owns it first, and every serious security professional works inside written authorisation. If you're doing authorised testing, the real toolchain lives outside a browser tab anyway.</p>
+        </div>
+      </section>
+
+      <!-- FILES -->
+      <section class="view" id="view-files">
+        <div class="grid cols-2">
+          <div class="card">
+            <h2>Open a File</h2>
+            <p class="hint" id="fsSupport"></p>
+            <div style="margin-top:12px;display:flex;gap:10px;flex-wrap:wrap">
+              <button class="btn" onclick="Zero.openAFile()">Open from disk</button>
+              <button class="btn ghost" id="fileSaveBack" style="display:none" onclick="Zero.saveBack()">Save back</button>
+              <button class="btn ghost" onclick="Zero.saveNew()">Save as…</button>
+            </div>
+            <div class="hint" id="fileName" style="margin-top:10px;font-family:var(--mono)"></div>
+            <textarea id="fileEditor" rows="12" placeholder="File contents appear here — edit and save back in place." style="margin-top:10px;font-family:var(--mono);font-size:12.5px"></textarea>
+          </div>
+          <div class="card">
+            <h2>Connect a Folder</h2>
+            <p class="hint">Give Zero read/write access to one folder. It can list, open and save files inside it — and only it — for this session.</p>
+            <div style="margin-top:12px;display:flex;gap:10px;flex-wrap:wrap">
+              <button class="btn" onclick="Zero.connectFolder()">Connect folder</button>
+              <button class="btn ghost" onclick="Zero.listFolder()">↻ Refresh</button>
+              <button class="btn ghost" onclick="Zero.disconnectFolder()">Disconnect</button>
+            </div>
+            <div class="hint" id="folderName" style="margin-top:10px;font-family:var(--mono)"></div>
+            <div id="folderList" style="margin-top:12px"></div>
+            <div class="notice"><b>Your disk, on your terms.</b> The browser only ever gives Zero what you explicitly pick — a page cannot roam your drive on its own, and that limit is exactly what makes it safe to open. This is your real filesystem, not the browser's small box, so it is also where "big storage" actually lives.</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- APPS -->
+      <section class="view" id="view-apps">
+        <div class="card">
+          <h2>Your Apps</h2>
+          <p class="hint">Add anything the operating system can open — a website, or an app link like <code>vscode://</code>, <code>figma://</code>, <code>spotify:</code>. Then say <b>open figma</b> in chat and Zero launches it.</p>
+          <div id="appList" style="margin-top:16px"></div>
+          <p class="hint" style="margin-top:16px">Quick add:</p>
+          <div id="appPresets" class="chips" style="margin-top:8px"></div>
+          <div class="chat-input" style="margin-top:16px">
+            <input id="appName" placeholder="Name — e.g. Figma" style="max-width:220px" />
+            <input id="appUrl" placeholder="https://figma.com  or  vscode://" />
+            <button class="btn" onclick="Zero.addApp()">Add</button>
+          </div>
+          <div class="notice"><b>What this is and isn't.</b> A web page cannot reach inside other programs — that boundary is precisely why a browser is safe to open. What Zero can do is hand a link to your operating system and let it choose the app, which is how every deep link works. Launching: yes. Controlling: no, and anything claiming otherwise in a browser tab is misleading you.</div>
+        </div>
+      </section>
+
+      <!-- MEMORY -->
+      <section class="view" id="view-memory">
+        <div class="card">
+          <h2>Memory</h2>
+          <p class="hint">Facts Zero carries into every future conversation. Say <b>remember &lt;something&gt;</b> in chat to add one, <b>forget 2</b> to drop one.</p>
+          <div id="memoryList" style="margin-top:16px"></div>
+          <div class="notice">Memories are stored with your tasks and notes — encrypted when the vault is on, and dropped from memory the moment it locks.</div>
+        </div>
+
+        <div class="card" style="margin-top:16px">
+          <h2>What Zero has learned <span class="pill">local</span></h2>
+          <p class="hint">Zero watches how you write — length, tone, recurring topics — and adapts. This lives on your device only and feeds into the local engine. Cleared by wipe, or reset below.</p>
+          <div id="profileBody" style="margin-top:14px"></div>
+          <div style="margin-top:14px"><button class="btn ghost" onclick="Zero.forgetProfile()">Reset what Zero learned</button></div>
+        </div>
+
+        <div class="card" style="margin-top:16px">
+          <h2>Storage</h2>
+          <p class="hint">Zero keeps everything in a local database on this device — hundreds of megabytes rather than the ~5 MB a browser allows the simpler store.</p>
+          <div id="storageInfo" class="hint" style="margin-top:12px"></div>
+          <div style="margin-top:12px"><button class="btn ghost" onclick="Zero.storageInfo()">↻ Recheck</button></div>
+        </div>
+      </section>
+
+      <!-- ASSISTANT -->
+      <section class="view active" id="view-assistant">
+        <div class="card">
+          <h2>Zero Assistant <span class="pill" id="aiStatus">Core</span></h2>
+          <div class="assist-bar">
+            <label class="think-opt">
+              <input type="checkbox" id="thinkToggle" onchange="Zero.setThink(this.checked)" />
+              <span>Show reasoning</span>
+            </label>
+            <label class="think-opt" id="speakOpt">
+              <input type="checkbox" id="speakToggle" onchange="Zero.setSpeak(this.checked)" />
+              <span>Speak replies</span>
+            </label>
+            <select id="voiceSel" class="voice-sel" title="Zero's voice" onchange="Zero.setVoice(this.value)"></select>
+            <button class="btn ghost" onclick="Zero.previewVoice()" title="Hear it">▶ Test</button>
+            <button class="btn ghost" id="micBtn" onclick="Zero.micToggle()" title="Dictate — uses the browser speech service">🎤</button>
+            <button class="btn ghost" onclick="Zero.stopSpeaking()" title="Stop talking">◼ Quiet</button>
+            <button class="btn ghost" onclick="Zero.updateNow(true)">↻ Update now</button>
+          </div>
+          <div class="chat-wrap">
+            <div class="chat-log" id="chatLog"></div>
+            <div class="chat-input">
+              <input id="chatInput" placeholder="Ask Zero anything…" onkeydown="if(event.key==='Enter')Zero.send()" />
+              <button class="btn" onclick="Zero.send()">Send</button>
+            </div>
+          </div>
+          <div class="notice">Zero answers <b>help</b>, <b>task …</b>, <b>note …</b>, <b>price btc</b>, <b>time</b> and <b>update</b> with no model at all. For open conversation, point Core at your local engine in <b>Settings</b> — the prompt goes to your own machine and never leaves it.</div>
+        </div>
+      </section>
+
+      <!-- TASKS -->
+      <section class="view" id="view-tasks">
+        <div class="card">
+          <h2>Tasks</h2>
+          <div class="chat-input" style="margin-bottom:8px">
+            <input id="taskInput" placeholder="What needs doing?" onkeydown="if(event.key==='Enter')Zero.addTask()" />
+            <button class="btn" onclick="Zero.addTask()">Add</button>
+          </div>
+          <div id="taskList"></div>
+        </div>
+      </section>
+
+      <!-- NOTES -->
+      <section class="view" id="view-notes">
+        <div class="card">
+          <h2>Notes</h2>
+          <textarea id="noteInput" rows="3" placeholder="New note…"></textarea>
+          <div style="margin-top:10px"><button class="btn blue" onclick="Zero.addNote()">Save Note</button></div>
+          <div id="noteList" style="margin-top:16px"></div>
+        </div>
+      </section>
+
+      <!-- OPERATOR — the local agent that runs commands on your machine -->
+      <section class="view" id="view-operator">
+        <div class="card" style="border-color:rgba(255,255,255,.4)">
+          <h2>Operator <span class="pill" id="agentPill">not connected</span></h2>
+          <p class="hint">This is Zero's hands on <b>your own machine</b>. Run the local agent (<code>python3 zero-agent.py</code>), paste the token it prints, and Zero can run commands, open apps and drive your laptop — but <b>every command waits for your Run click</b>. Nothing executes on its own.</p>
+          <div class="chat-input" style="margin-top:14px">
+            <input id="agentUrl" placeholder="http://127.0.0.1:8770" style="max-width:220px" />
+            <input id="agentToken" type="password" placeholder="Paste the agent's pairing token" />
+            <button class="btn" onclick="Zero.agentConnect()">Connect</button>
+          </div>
+          <div id="agentStatus" class="hint" style="margin-top:12px;font-family:var(--mono)"></div>
+          <div class="notice">Runs on <b>127.0.0.1 only</b> — nothing off your machine can reach it. Token-gated, kill-switch aware, and it refuses catastrophic commands (disk format, mass delete) unless you start it with <code>ZERO_AGENT_ALLOW_DANGEROUS=1</code>. Every command is written to <code>zero-agent.log</code>.</div>
+        </div>
+
+        <div class="card" style="margin-top:16px">
+          <h2>Ask in plain English</h2>
+          <p class="hint">Describe what you want done. The AI you gave Zero (Settings → Zero Core) turns it into a command and shows it below — <b>you</b> approve and run it.</p>
+          <div class="chat-input" style="margin-top:12px">
+            <input id="agentAsk" placeholder="e.g. list the biggest files in my Downloads folder" onkeydown="if(event.key==='Enter')Zero.agentAsk()" />
+            <button class="btn" onclick="Zero.agentAsk()">Propose</button>
+          </div>
+        </div>
+
+        <div class="card" style="margin-top:16px">
+          <h2>Command</h2>
+          <div class="chat-input" style="margin-top:6px">
+            <input id="agentCmd" placeholder="A command to run on your machine…" onkeydown="if(event.key==='Enter')Zero.agentRun()" style="font-family:var(--mono)" />
+            <button class="btn" onclick="Zero.agentRun()">▶ Run</button>
+          </div>
+          <div class="hint" style="margin-top:8px;font-family:var(--mono)">Working dir: <span id="agentCwd">—</span></div>
+          <pre id="agentOut" class="crypto-out" style="margin-top:12px;min-height:60px;white-space:pre-wrap"></pre>
+        </div>
+
+        <div class="card" style="margin-top:16px">
+          <h2>Run History</h2>
+          <div id="agentHistory" class="log-feed"></div>
+        </div>
+      </section>
+
+      <!-- SETTINGS -->
+      <section class="view" id="view-settings">
+        <div class="grid cols-2">
+          <div class="card">
+            <h2>Zero Core — Any AI <span class="pill" id="brainPill">core</span></h2>
+            <p class="hint">Give Zero a brain. Pick <b>Local engine</b> to stay fully private, or pick a provider and paste an <b>API key</b> to make Zero use any AI you tell it to.</p>
+
+            <label class="hint" style="margin-top:12px;display:block">Brain</label>
+            <select id="engineProvider" onchange="Zero.onProvider()">
+              <option value="local">Local engine (Ollama / LM Studio — private)</option>
+              <option value="openai">OpenAI (GPT)</option>
+              <option value="anthropic">Anthropic (Claude)</option>
+              <option value="compatible">Any OpenAI-compatible (OpenRouter, Groq, Together, DeepSeek, Mistral…)</option>
+            </select>
+
+            <!-- API KEY: shown for hosted providers -->
+            <div id="keyFields" style="display:none">
+              <label class="hint" style="margin-top:10px;display:block">API key <span style="opacity:.7">— stored on this device only, never sent anywhere but the provider you pick</span></label>
+              <input id="engineKey" type="password" placeholder="sk-…  /  paste any AI provider key here" autocomplete="off" />
+              <label class="hint" id="baseLabel" style="margin-top:10px;display:none">Base URL <span style="opacity:.7">— for “compatible”, e.g. https://openrouter.ai/api/v1</span></label>
+              <input id="engineBase" style="display:none" placeholder="https://openrouter.ai/api/v1" />
+            </div>
+
+            <!-- LOCAL: engine address -->
+            <div id="urlField">
+              <label class="hint" style="margin-top:10px;display:block">Engine address</label>
+              <input id="engineUrl" placeholder="http://localhost:11434" />
+            </div>
+
+            <label class="hint" style="margin-top:10px;display:block">Model <span style="opacity:.7">— e.g. gpt-4o-mini, claude-3-5-sonnet-latest; blank = auto-detect (local)</span></label>
+            <input id="engineModel" placeholder="auto-detect" />
+
+            <label class="hint" style="margin-top:10px;display:block" id="modeLabel">Wire format</label>
+            <select id="engineMode">
+              <option value="native">Native (/api/chat)</option>
+              <option value="compatible">Compatible (/v1/chat/completions)</option>
+            </select>
+
+            <div style="margin-top:12px;display:flex;gap:10px;flex-wrap:wrap">
+              <button class="btn" onclick="Zero.saveEngine()">Save &amp; test</button>
+              <button class="btn ghost" onclick="Zero.testEngine()">Test Core</button>
+              <button class="btn ghost" onclick="Zero.useBridge()">Use bundled bridge</button>
+            </div>
+            <div id="engineStatus" class="hint" style="margin-top:12px"></div>
+            <div class="notice">
+              <b>Three ways to give Zero a brain.</b><br>
+              <b>1 · Local model (fully private):</b> Ollama, llama.cpp, LM Studio, Jan. For Ollama: <code>OLLAMA_ORIGINS=* ollama serve</code>.<br>
+              <b>2 · Any AI by API key (right here):</b> choose the provider above, paste your key, set the model, Save &amp; test. The key lives on this device only. Your prompts go straight to that provider — some (OpenRouter, Groq, Anthropic, most “compatible” hosts) allow the browser to call them directly; if a provider blocks browser calls, use option 3.<br>
+              <b>3 · Python bridge:</b> run <code>python3 server.py</code> with the key set server-side, then <b>Use bundled bridge</b>. Works with every provider.
+            </div>
+          </div>
+
+          <div class="card">
+            <h2>Vault <span class="pill" id="vaultState">off</span></h2>
+            <p class="hint">Encrypts your tasks and notes on this device with a passphrase. Without it, anything Zero saves can be read by anyone who reaches this browser profile or a backup of it.</p>
+
+            <div id="vaultSetup">
+              <label class="hint" style="margin-top:12px;display:block">Passphrase</label>
+              <input id="vaultPass" type="password" placeholder="at least 8 characters" />
+              <label class="hint" style="margin-top:10px;display:block">Confirm</label>
+              <input id="vaultPass2" type="password" placeholder="type it again" />
+              <div style="margin-top:12px"><button class="btn" onclick="Zero.enableVault()">Turn encryption on</button></div>
+              <div class="notice"><b>There is no reset.</b> The passphrase is never stored, so nobody — including Zero — can recover your data without it. Write it down somewhere safe before you continue.</div>
+            </div>
+
+            <div id="vaultManage" style="display:none">
+              <div style="margin-top:12px;display:flex;gap:10px;flex-wrap:wrap">
+                <button class="btn" onclick="Zero.lockVault()">Lock now</button>
+                <button class="btn ghost" onclick="Zero.disableVault()">Turn encryption off</button>
+              </div>
+              <div class="notice">Locking wipes the key and your data from memory. Zero keeps running; the saved data stays sealed until you unlock it again. <b>Panic</b> on the Control Panel does this instantly.</div>
+            </div>
+          </div>
+          <div class="card">
+            <h2>Market Data Key <span class="pill">optional</span></h2>
+            <p class="hint">Add a free Finnhub key to enable live stocks & indices.</p>
+            <input id="stockKey" type="password" placeholder="Finnhub API key…" />
+            <label class="hint" style="margin-top:10px;display:block">Symbols to track</label>
+            <input id="stockSymbols" placeholder="AAPL, MSFT, NVDA, TSLA, SPY" />
+            <div style="margin-top:12px"><button class="btn blue" onclick="Zero.saveStockKey()">Save</button></div>
+          </div>
+          <div class="card">
+            <h2>Zero's Voice</h2>
+            <p class="hint">Tune how Zero sounds. Pick the voice in the assistant bar; shape the delivery here.</p>
+            <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">
+              <button class="chip" onclick="Zero.voicePreset('butler')">Butler</button>
+              <button class="chip" onclick="Zero.voicePreset('calm')">Calm</button>
+              <button class="chip" onclick="Zero.voicePreset('natural')">Natural</button>
+              <button class="chip" onclick="Zero.voicePreset('crisp')">Crisp</button>
+            </div>
+            <label class="hint" style="margin-top:14px;display:block">Speed <span id="voiceRateVal" style="color:var(--cyan)"></span></label>
+            <input type="range" id="voiceRate" min="0.6" max="1.4" step="0.02" oninput="Zero.setVoiceRate(this.value)" style="width:100%" />
+            <label class="hint" style="margin-top:10px;display:block">Pitch <span id="voicePitchVal" style="color:var(--cyan)"></span></label>
+            <input type="range" id="voicePitch" min="0.6" max="1.3" step="0.02" oninput="Zero.setVoicePitch(this.value)" style="width:100%" />
+            <div style="margin-top:12px"><button class="btn" onclick="Zero.previewVoice()">▶ Hear it</button></div>
+          </div>
+          <div class="card">
+            <h2>Privacy</h2>
+            <p class="hint">Zero has no server, no analytics, and no accounts. All your data lives in this browser only.</p>
+            <button class="btn ghost" onclick="Zero.exportData()">⤓ Export my data (JSON)</button>
+            <button class="btn ghost" onclick="Zero.wipeData()" style="margin-top:8px">⌫ Wipe everything</button>
+          </div>
+          <div class="card">
+            <h2>App &amp; Daily Brief</h2>
+            <label class="think-opt" style="margin-top:6px">
+              <input type="checkbox" id="autoBriefToggle" checked onchange="Zero.setAutoBrief(this.checked)" />
+              <span>Daily market analysis every time I open Zero</span>
+            </label>
+            <p class="hint" style="margin-top:14px">Install Zero as an app — its own window and icon, works offline, and launches like any other app.</p>
+            <button class="btn" id="installBtn" style="display:none;margin-top:6px" onclick="ZeroInstall()">⤓ Install Zero as an app</button>
+            <div class="notice">If the button isn't shown, install from your browser: Chrome/Edge desktop show an install icon in the address bar; on phones use Share → <b>Add to Home Screen</b>. Needs to be served over http(s) — see the README for turning this into a Play Store / Microsoft Store app.</div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script src="js/vault.js"></script>
+  <script src="js/hud.js"></script>
+  <script src="js/storage.js"></script>
+  <script src="js/files.js"></script>
+  <script src="js/abilities.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
