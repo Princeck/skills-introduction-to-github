@@ -41,3 +41,8 @@ zero/zero.config.json
 
 # Operator agent audit log (local only)
 zero/zero-agent.log
+
+# Compiled native C++ core (build locally with build-core.sh/.bat)
+zero/zero-core
+zero/zero-core.exe
+zero/*.o

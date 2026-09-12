@@ -115,7 +115,7 @@
     <div class="mark">0</div>
     <h1>ZER<b>0</b> — source</h1>
   </header>
-  <p class="meta">zero-standalone.html · 616.3 KB · 5609 lines · self-contained</p>
+  <p class="meta">zero-standalone.html · 620.1 KB · 5689 lines · self-contained</p>
 
   <div class="actions">
     <button id="copy">Copy all code</button>
@@ -1764,7 +1764,7 @@ input:focus, textarea:focus, select:focus { border-color: #fff !important; outli
       &lt;section class="view" id="view-settings">
         &lt;div class="grid cols-2">
           &lt;div class="card">
-            &lt;h2>Zero Core — Any AI &lt;span class="pill" id="brainPill">core&lt;/span>&lt;/h2>
+            &lt;h2>Zero Core — Any AI &lt;span class="pill" id="brainPill">core&lt;/span> &lt;span class="pill" id="nativePill">C++ core off&lt;/span>&lt;/h2>
             &lt;p class="hint">Give Zero a brain. Pick &lt;b>Local engine&lt;/b> to stay fully private, or pick a provider and paste an &lt;b>API key&lt;/b> to make Zero use any AI you tell it to.&lt;/p>
 
             &lt;label class="hint" style="margin-top:12px;display:block">Brain&lt;/label>
@@ -3829,6 +3829,75 @@ const Zero = (() => {
     }
   }
 
+  /* ============================================================
+     NATIVE CORE (C++) — the fast offline brain, reached through
+     the Python bridge (JS → Python → C++). Ranks your own notes
+     and memories with real TF-IDF, no model and no network beyond
+     your own machine.
+     ============================================================ */
+  let nativeReady = null;   // null unknown · true/false once checked
+
+  // Where the bridge lives: the page's own origin when served over http,
+  // else the engine address you set (the bundled Python server).
+  function coreBase() {
+    if (location.protocol.startsWith('http')) return location.origin;
+    const u = store.raw(LS.engineUrl);
+    return (u &amp;&amp; /^https?:/.test(u)) ? u.replace(/\/+$/, '') : 'http://localhost:8080';
+  }
+
+  async function nativePing() {
+    try {
+      const r = await guardedFetch(coreBase() + '/api/core/ping', {}, 'ai');
+      const d = await r.json();
+      nativeReady = !!d.available;
+    } catch { nativeReady = false; }
+    const pill = document.getElementById('nativePill');
+    if (pill) pill.textContent = nativeReady ? 'C++ core online' : 'C++ core off';
+    return nativeReady;
+  }
+
+  async function nativeCore(mode, query) {
+    const docs = [
+      ...memories.map(m => ({ title: 'memory', text: m.text })),
+      ...notes.map(n => ({ title: 'note', text: n.text })),
+    ];
+    const r = await guardedFetch(coreBase() + '/api/core', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ mode, query, docs }),
+    }, 'ai');
+    return r.json();
+  }
+
+  /* `recall &lt;query>` — search your own notes+memories with the C++ core. */
+  async function recall(query) {
+    if (!notes.length &amp;&amp; !memories.length) return 'Nothing to recall yet — add notes or tell me to remember things first.';
+    try {
+      const ans = await nativeCore('answer', query);
+      if (ans.available === false) {
+        return 'The native C++ core is not running. Start Zero with the Python server and build it: run build-core.sh (or build-core.bat), then restart the server. ' +
+               'Until then I search locally in JavaScript instead.';
+      }
+      const hits = await nativeCore('search', query);
+      let out = '';
+      if (ans.answer &amp;&amp; ans.answer.trim()) out += ans.answer.trim() + '\n\n';
+      if (hits.results &amp;&amp; hits.results.length) {
+        out += 'From your notes (ranked by the C++ core):\n' +
+          hits.results.slice(0, 5).map((h, i) => `  ${i + 1}. [${h.title}] ${h.text}`).join('\n');
+      } else if (!out) {
+        out = `Nothing in your notes matched "${query}".`;
+      }
+      return out.trim();
+    } catch (e) {
+      // Bridge not up: fall back to a plain JS scan so recall still works.
+      const q = query.toLowerCase();
+      const hit = [...memories, ...notes].filter(x => x.text.toLowerCase().includes(q));
+      return hit.length
+        ? 'Found (JavaScript fallback — start the Python server for the C++ core):\n' + hit.slice(0, 5).map((h, i) => `  ${i + 1}. ${h.text}`).join('\n')
+        : `Nothing matched "${query}", and the C++ core is not reachable (${e.message}).`;
+    }
+  }
+
   /* Overview console → routes a command straight into the assistant. */
   function ovSend() {
     const inp = document.getElementById('ovInput');
@@ -4987,6 +5056,13 @@ const Zero = (() => {
     const s = q.trim();
     const low = s.toLowerCase();
     const mapped = mapCommand(s); if (mapped) return mapped;
+    // recall &lt;query> — native C++ retrieval over your own notes/memories
+    const rec = s.match(/^(?:recall|remember what|what did i (?:say|note|write)(?: about)?)\s+(.+)$/i);
+    if (rec) {
+      const holder = bubble('Searching your notes with the C++ core…', 'zero');
+      recall(rec[1].replace(/[.?!]$/, '').trim()).then(t => { holder.textContent = t; }).catch(() => {});
+      return HANDLED;
+    }
     if (low === 'help') {
       return [
         'Zero works with no AI model at all. Try:',
@@ -5020,6 +5096,8 @@ const Zero = (() => {
         'ORGANISING',
         '  task &lt;text>         add a task        tasks   list them',
         '  note &lt;text>         save a note       time    date &amp; time',
+        '  recall &lt;text>       search your notes/memories with the C++ core',
+        '  map &lt;place>         open any place on the world map',
         '',
         'Say it out loud with the mic button — Zero can talk back.',
       ].join('\n');
@@ -5664,6 +5742,7 @@ const Zero = (() => {
       if ((e.ctrlKey || e.metaKey) &amp;&amp; e.key === '.') { e.preventDefault(); toggleHalt(); }
     });
 
+    nativePing();               // detect the C++ core through the bridge
     tick(); setInterval(tick, 1000);
     renderTasks(); renderNotes(); renderMemories(); renderApps(); renderPresets(); refreshAiStatus(); updateStatus();
     // Move any records left behind by the localStorage era.
@@ -5721,6 +5800,7 @@ const Zero = (() => {
     openTradingView, allowTradingView, tvSearch, dailyBriefing, setAutoBrief, openEconCalendar, useBridge,
     onProvider, ovSend, mapSearch, mapSource, renderMap,
     agentConnect, agentRun, agentAsk, agentPing,
+    nativePing, recall,
     exportData, wipeData, init,
     toggleHalt, killNetwork, panic, setCap, clearLog,
     enableVault, unlockVault, lockVault, disableVault,

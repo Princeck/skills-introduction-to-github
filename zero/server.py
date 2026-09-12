@@ -51,6 +51,7 @@ Run:  python3 server.py            (defaults to port 8080)
 
 import json
 import os
+import subprocess
 import sys
 import urllib.request
 import urllib.error
@@ -58,6 +59,36 @@ from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from functools import partial
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+
+
+def core_binary():
+    """Path to the compiled C++ core next to this script, if built."""
+    for name in ("zero-core.exe", "zero-core"):
+        p = os.path.join(HERE, name)
+        if os.path.exists(p):
+            return p
+    return None
+
+
+def run_core(mode, query, docs):
+    """Feed the native C++ core its line protocol and return parsed JSON."""
+    binp = core_binary()
+    if not binp:
+        return {"available": False, "error": "native core not built — run build-core.sh / build-core.bat"}
+    lines = [mode, (query or "").replace("\n", " ")]
+    for d in docs:
+        title = str(d.get("title", "")).replace("\t", " ").replace("\n", " ")
+        text = str(d.get("text", "")).replace("\t", " ").replace("\n", " ")
+        lines.append(title + "\t" + text)
+    payload = ("\n".join(lines)).encode("utf-8", "replace")
+    proc = subprocess.run([binp], input=payload, capture_output=True, timeout=15)
+    out = proc.stdout.decode("utf-8", "replace").strip()
+    try:
+        result = json.loads(out)
+    except Exception:
+        return {"available": True, "error": "core returned unparseable output", "raw": out[:400]}
+    result["available"] = True
+    return result
 
 DEFAULT_BASES = {
     "openai": "https://api.openai.com/v1",
@@ -112,12 +143,48 @@ class Handler(SimpleHTTPRequestHandler):
     def do_GET(self):
         if self.path.rstrip("/") == "/api/tags":
             return self._tags()
+        if self.path.rstrip("/") == "/api/core/ping":
+            return self._core_ping()
         return super().do_GET()
 
     def do_POST(self):
         if self.path.rstrip("/") == "/api/chat":
             return self._chat()
+        if self.path.rstrip("/") == "/api/core":
+            return self._core()
         self.send_error(404, "Zero server: unknown endpoint")
+
+    # ---- native C++ core bridge ----------------------------------------
+    def _core_ping(self):
+        binp = core_binary()
+        self._send_json(200, {"available": bool(binp), "engine": "zero-core/c++",
+                              "path": os.path.basename(binp) if binp else None})
+
+    def _core(self):
+        try:
+            length = int(self.headers.get("Content-Length", 0))
+            req = json.loads(self.rfile.read(length) or b"{}")
+        except Exception:
+            return self._send_json(400, {"error": "bad request body"})
+        mode = req.get("mode", "search")
+        if mode not in ("search", "answer", "keywords"):
+            mode = "search"
+        try:
+            result = run_core(mode, req.get("query", ""), req.get("docs", []))
+            return self._send_json(200, result)
+        except subprocess.TimeoutExpired:
+            return self._send_json(200, {"available": True, "error": "core timed out"})
+        except Exception as e:
+            return self._send_json(200, {"available": True, "error": str(e)})
+
+    def _send_json(self, code, obj):
+        body = json.dumps(obj).encode()
+        self.send_response(code)
+        self._cors()
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
 
     # ---- /api/tags : lets Zero's "Save & test" see a model --------------
     def _tags(self):
@@ -259,6 +326,8 @@ def main():
     print(f"│  AI bridge    →  provider: {cfg['provider']}"
           + (f", model: {cfg['model']}" if cfg["model"] else " (no model set)"))
     print(f"│  API key      →  {'set ✓' if cfg['api_key'] else 'NOT set — see server.py header'}")
+    _bin = core_binary()
+    print(f"│  C++ core     →  {'built ✓ (' + os.path.basename(_bin) + ')' if _bin else 'not built — run build-core.sh / build-core.bat'}")
     print("│  In Zero: Settings → Zero Core → Use bundled bridge → Save & test")
     print("│  Ctrl+C to stop.")
     print("└───────────────────────────────────────────────")

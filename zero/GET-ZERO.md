@@ -78,6 +78,29 @@ else keeps working without it.
 
 ---
 
+## ⚙️ Native C++ core (optional, fast offline brain)
+
+Zero's brain spans three languages: **JavaScript** (the app), **Python** (the
+server/bridge), and a native **C++** core that does fast, offline retrieval over
+your own notes and memories — real TF-IDF ranking, keyword extraction and
+extractive answers, compiled to one small binary.
+
+1. Build it once (needs `g++`/`clang++`, or MSVC/MinGW on Windows):
+
+   ```bash
+   ./build-core.sh        # Windows: double-click build-core.bat
+   ```
+
+2. Run Zero through the Python server (`python3 server.py`). It detects the
+   binary automatically — the startup banner shows `C++ core → built ✓`, and
+   Settings shows **C++ core online**.
+
+3. In chat: `recall <anything>` searches your notes/memories with the C++ core.
+   No model, no network — it all runs on your machine. If the core isn't built,
+   Zero falls back to a JavaScript search, so nothing breaks.
+
+---
+
 ## ⌘ Operator — let Zero run commands on your machine (advanced)
 
 This turns Zero into a hands-on assistant that can run commands, open apps and
