@@ -78,6 +78,35 @@ else keeps working without it.
 
 ---
 
+## ⌘ Operator — let Zero run commands on your machine (advanced)
+
+This turns Zero into a hands-on assistant that can run commands, open apps and
+drive your laptop. It is deliberately separate and opt-in, and **you approve
+every command** — nothing runs on its own.
+
+1. In the `zero` folder, start the agent (double-click **`start-agent.bat`** on
+   Windows, or run it):
+
+   ```bash
+   python3 zero-agent.py
+   ```
+
+2. It prints a **pairing token**. In Zero go to the **Operator** panel, paste the
+   token, and click **Connect**.
+
+3. Now you can:
+   - type a command and press **▶ Run**, or
+   - describe a task in plain English and let the AI **propose** a command —
+     which you review and run.
+
+**Safety by design:** the agent listens on `127.0.0.1` only (nothing off your
+machine can reach it), needs the token on every request, obeys Zero's **STOP**
+switch, refuses catastrophic commands (disk format, mass delete) unless you
+start it with `ZERO_AGENT_ALLOW_DANGEROUS=1`, and writes every command to
+`zero-agent.log`.
+
+---
+
 ## 🚀 Make it open on its own (optional)
 
 - **Launch at startup:** after installing, add it to Windows *Startup apps* or

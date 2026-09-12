@@ -67,6 +67,7 @@
         <li data-view="memory"><span class="ic">❖</span> Memory</li>
         <li data-view="security"><span class="ic">⛨</span> Security</li>
         <li data-view="files"><span class="ic">▢</span> Files</li>
+        <li data-view="operator"><span class="ic">⌘</span> Operator</li>
         <li data-view="tasks"><span class="ic">✓</span> Tasks</li>
         <li data-view="notes"><span class="ic">✎</span> Notes</li>
         <li data-view="settings"><span class="ic">⚙</span> Settings</li>
@@ -524,6 +525,45 @@
           <textarea id="noteInput" rows="3" placeholder="New note…"></textarea>
           <div style="margin-top:10px"><button class="btn blue" onclick="Zero.addNote()">Save Note</button></div>
           <div id="noteList" style="margin-top:16px"></div>
+        </div>
+      </section>
+
+      <!-- OPERATOR — the local agent that runs commands on your machine -->
+      <section class="view" id="view-operator">
+        <div class="card" style="border-color:rgba(255,255,255,.4)">
+          <h2>Operator <span class="pill" id="agentPill">not connected</span></h2>
+          <p class="hint">This is Zero's hands on <b>your own machine</b>. Run the local agent (<code>python3 zero-agent.py</code>), paste the token it prints, and Zero can run commands, open apps and drive your laptop — but <b>every command waits for your Run click</b>. Nothing executes on its own.</p>
+          <div class="chat-input" style="margin-top:14px">
+            <input id="agentUrl" placeholder="http://127.0.0.1:8770" style="max-width:220px" />
+            <input id="agentToken" type="password" placeholder="Paste the agent's pairing token" />
+            <button class="btn" onclick="Zero.agentConnect()">Connect</button>
+          </div>
+          <div id="agentStatus" class="hint" style="margin-top:12px;font-family:var(--mono)"></div>
+          <div class="notice">Runs on <b>127.0.0.1 only</b> — nothing off your machine can reach it. Token-gated, kill-switch aware, and it refuses catastrophic commands (disk format, mass delete) unless you start it with <code>ZERO_AGENT_ALLOW_DANGEROUS=1</code>. Every command is written to <code>zero-agent.log</code>.</div>
+        </div>
+
+        <div class="card" style="margin-top:16px">
+          <h2>Ask in plain English</h2>
+          <p class="hint">Describe what you want done. The AI you gave Zero (Settings → Zero Core) turns it into a command and shows it below — <b>you</b> approve and run it.</p>
+          <div class="chat-input" style="margin-top:12px">
+            <input id="agentAsk" placeholder="e.g. list the biggest files in my Downloads folder" onkeydown="if(event.key==='Enter')Zero.agentAsk()" />
+            <button class="btn" onclick="Zero.agentAsk()">Propose</button>
+          </div>
+        </div>
+
+        <div class="card" style="margin-top:16px">
+          <h2>Command</h2>
+          <div class="chat-input" style="margin-top:6px">
+            <input id="agentCmd" placeholder="A command to run on your machine…" onkeydown="if(event.key==='Enter')Zero.agentRun()" style="font-family:var(--mono)" />
+            <button class="btn" onclick="Zero.agentRun()">▶ Run</button>
+          </div>
+          <div class="hint" style="margin-top:8px;font-family:var(--mono)">Working dir: <span id="agentCwd">—</span></div>
+          <pre id="agentOut" class="crypto-out" style="margin-top:12px;min-height:60px;white-space:pre-wrap"></pre>
+        </div>
+
+        <div class="card" style="margin-top:16px">
+          <h2>Run History</h2>
+          <div id="agentHistory" class="log-feed"></div>
         </div>
       </section>
 

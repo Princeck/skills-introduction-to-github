@@ -17,6 +17,8 @@ const Zero = (() => {
     engineBase: 'zero.engineBase',           // base URL for a 'compatible' provider
     mapSrc: 'zero.mapSrc',
     mapPlace: 'zero.mapPlace',
+    agentUrl: 'zero.agentUrl',      // local operator agent address
+    agentToken: 'zero.agentToken',  // pairing token for the operator agent
     think: 'zero.think',
     stockKey: 'zero.stockKey',
     stockSymbols: 'zero.stockSymbols',
@@ -252,6 +254,7 @@ const Zero = (() => {
     overview:  ['Overview', 'Everything at a glance, live.'],
     security:  ['Security', 'Harden what is yours.'],
     files:     ['Files', 'Your disk, connected on your terms.'],
+    operator:  ['Operator', 'Zero runs commands on your machine — you approve each one.'],
     maps:      ['Maps', 'Every map on Earth — search anywhere.'],
     news:      ['News', 'What is happening right now.'],
     trading:   ['Trading', 'Live professional charts — every market.'],
@@ -281,6 +284,112 @@ const Zero = (() => {
     if (view === 'apps') renderPresets();
     if (view === 'memory') { renderMemories(); renderProfile(); }
     if (view === 'maps') renderMap();
+    if (view === 'operator') agentInit();
+  }
+
+  /* ============================================================
+     OPERATOR — the local agent that runs commands on YOUR machine.
+     Zero (or the AI) proposes; you approve every run. All calls go
+     through guardedFetch, so STOP and the Engine switch halt it too.
+     ============================================================ */
+  const agentCfg = () => ({
+    url: (store.raw(LS.agentUrl) || 'http://127.0.0.1:8770').replace(/\/+$/, ''),
+    token: store.raw(LS.agentToken),
+  });
+
+  function agentInit() {
+    const u = document.getElementById('agentUrl'); if (u && !u.value) u.value = agentCfg().url;
+    const t = document.getElementById('agentToken'); if (t && !t.value) t.value = agentCfg().token;
+    if (agentCfg().token) agentPing();
+  }
+
+  async function agentPing() {
+    const { url } = agentCfg();
+    const pill = document.getElementById('agentPill');
+    const status = document.getElementById('agentStatus');
+    try {
+      const r = await guardedFetch(url + '/api/agent/ping', {}, 'ai');
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      const d = await r.json();
+      if (pill) { pill.textContent = 'connected'; pill.className = 'pill'; }
+      setText('agentCwd', d.cwd || '—');
+      if (status) status.innerHTML = `<b style="color:var(--green)">Agent online.</b> ${esc(d.os)} ${esc(d.release || '')} · shell ${esc(d.shell)} · dir ${esc(d.cwd)}${d.dangerous_allowed ? ' · <span style="color:var(--red)">DANGEROUS ALLOWED</span>' : ''}`;
+      return true;
+    } catch (e) {
+      if (pill) { pill.textContent = 'not connected'; pill.className = 'pill'; }
+      if (status) status.innerHTML = `<b style="color:var(--red)">No agent at ${esc(url)}.</b> Start it: <code>python3 zero-agent.py</code> in the zero folder, then Connect. (${esc(e.message)})`;
+      return false;
+    }
+  }
+
+  function agentConnect() {
+    store.rawSet(LS.agentUrl, (document.getElementById('agentUrl')?.value || '').trim());
+    store.rawSet(LS.agentToken, (document.getElementById('agentToken')?.value || '').trim());
+    log('Operator agent settings saved.');
+    agentPing();
+  }
+
+  async function agentRun(cmdText) {
+    const cmd = (cmdText || document.getElementById('agentCmd')?.value || '').trim();
+    if (!cmd) return;
+    const { url, token } = agentCfg();
+    const out = document.getElementById('agentOut');
+    if (!token) { if (out) out.textContent = 'Connect first: paste the token the agent printed and press Connect.'; return; }
+    if (out) out.textContent = '$ ' + cmd + '\n\nrunning…';
+    log('Operator run: ' + cmd);
+    try {
+      const r = await guardedFetch(url + '/api/agent/exec', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'x-zero-token': token },
+        body: JSON.stringify({ cmd }),
+      }, 'ai');
+      const d = await r.json().catch(() => ({}));
+      if (r.status === 401) { if (out) out.textContent = 'Rejected: the token is wrong. Re-copy it from the agent window and Connect again.'; return; }
+      if (d.blocked) { if (out) out.textContent = '$ ' + cmd + '\n\n⛔ ' + (d.error || 'Blocked.'); agentHist(cmd, 'blocked'); return; }
+      if (d.error && d.code === undefined) { if (out) out.textContent = '$ ' + cmd + '\n\n' + d.error; return; }
+      const head = `$ ${cmd}\n[exit ${d.code}${d.duration != null ? ' · ' + d.duration + 's' : ''}]\n`;
+      const body = (d.stdout || '') + (d.stderr ? '\n' + d.stderr : '');
+      if (out) out.textContent = head + '\n' + (body.trim() || '(no output)');
+      agentHist(cmd, 'exit ' + d.code);
+    } catch (e) {
+      if (out) out.textContent = '$ ' + cmd + '\n\nCould not reach the agent: ' + e.message;
+    }
+  }
+
+  function agentHist(cmd, result) {
+    const feed = document.getElementById('agentHistory');
+    if (!feed) return;
+    const d = document.createElement('div');
+    d.innerHTML = `<span class="t">${new Date().toLocaleTimeString()}</span> ` +
+      `<span class="${/blocked|exit [^0]/.test(result) ? 'warn' : ''}">${esc(result)}</span> — <code>${esc(cmd)}</code>`;
+    feed.prepend(d);
+    while (feed.children.length > 100) feed.lastChild.remove();
+  }
+
+  /* Plain English → a command, via whatever AI Zero is pointed at.
+     The command is only PROPOSED into the box; the user runs it. */
+  async function agentAsk() {
+    const ask = (document.getElementById('agentAsk')?.value || '').trim();
+    if (!ask) return;
+    const out = document.getElementById('agentOut');
+    const osHint = navigator.platform || 'the user\'s machine';
+    if (out) out.textContent = 'Asking the AI for a command…';
+    const prompt = `You translate a request into ONE single shell command for ${osHint}. ` +
+      `Reply with ONLY the command, no explanation, no markdown, no backticks. Request: ${ask}`;
+    try {
+      let full = '';
+      full = await callEngine(prompt, t => { full = t; });
+      // take the first non-empty line, strip any stray fencing
+      let cmd = (full || '').split('\n').map(s => s.trim()).find(Boolean) || '';
+      cmd = cmd.replace(/^```[a-z]*/i, '').replace(/```$/, '').replace(/^\$\s*/, '').trim();
+      const box = document.getElementById('agentCmd');
+      if (box) box.value = cmd;
+      if (out) out.textContent = 'Proposed:\n\n$ ' + cmd + '\n\nReview it, then press ▶ Run.';
+      log('Operator proposed: ' + cmd);
+    } catch (e) {
+      if (out) out.textContent = 'Could not get a command from the AI: ' + e.message +
+        '\n\nGive Zero a brain in Settings → Zero Core (local engine or an API key).';
+    }
   }
 
   /* Overview console → routes a command straight into the assistant. */
@@ -2084,6 +2193,8 @@ const Zero = (() => {
     setV('engineModel', cfg.model);
     setV('engineMode', cfg.mode);
     onProvider();
+    setV('agentUrl', agentCfg().url);
+    setV('agentToken', agentCfg().token);
     document.getElementById('stockKey').value = store.raw(LS.stockKey);
     document.getElementById('stockSymbols').value = store.raw(LS.stockSymbols);
     document.getElementById('lockPass')?.addEventListener('keydown', e => {
@@ -2172,6 +2283,7 @@ const Zero = (() => {
     addApp, removeApp, launchApp, forgetMemory, forgetProfile, renderProfile, storageInfo, addPreset,
     openTradingView, allowTradingView, tvSearch, dailyBriefing, setAutoBrief, openEconCalendar, useBridge,
     onProvider, ovSend, mapSearch, mapSource, renderMap,
+    agentConnect, agentRun, agentAsk, agentPing,
     exportData, wipeData, init,
     toggleHalt, killNetwork, panic, setCap, clearLog,
     enableVault, unlockVault, lockVault, disableVault,

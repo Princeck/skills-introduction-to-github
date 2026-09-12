@@ -38,3 +38,6 @@ Thumbs.db
 
 # Zero: never commit real API keys
 zero/zero.config.json
+
+# Operator agent audit log (local only)
+zero/zero-agent.log
