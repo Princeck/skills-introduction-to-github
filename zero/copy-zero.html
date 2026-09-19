@@ -115,7 +115,7 @@
     <div class="mark">0</div>
     <h1>ZER<b>0</b> — source</h1>
   </header>
-  <p class="meta">zero-standalone.html · 620.1 KB · 5689 lines · self-contained</p>
+  <p class="meta">zero-standalone.html · 620.5 KB · 5700 lines · self-contained</p>
 
   <div class="actions">
     <button id="copy">Copy all code</button>
@@ -1202,7 +1202,18 @@ input:focus, textarea:focus, select:focus { border-color: #fff !important; outli
 .map-tabs { display:flex; gap:8px; flex-wrap:wrap; margin:12px 0; }
 
 /* Sidebar crest → monochrome so no colour survives anywhere */
-.brand .logo img { filter: grayscale(1) brightness(1.6) contrast(1.1); }
+.brand .logo img { filter: grayscale(1) brightness(1.6) contrast(1.1) !important; }
+/* neutralise the old red/blue crest arcs → monochrome white rings */
+.brand .logo::before {
+  border-left-color: rgba(255,255,255,.9) !important;
+  border-top-color: rgba(255,255,255,.35) !important;
+  filter: none !important;
+}
+.brand .logo::after {
+  border-right-color: rgba(255,255,255,.6) !important;
+  border-bottom-color: rgba(255,255,255,.25) !important;
+  filter: none !important;
+}
 .boot-mark, #boot .boot-mark { color:#fff !important; }
 
   &lt;/style>
