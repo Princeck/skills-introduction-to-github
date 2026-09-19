@@ -1,0 +1,7 @@
+{
+  "_comment": "Copy this to zero.config.json and fill it in, OR use environment variables (see server.py). Never commit your real key.",
+  "provider": "openai",
+  "api_key": "sk-REPLACE-ME",
+  "model": "gpt-4o-mini",
+  "base_url": ""
+}
