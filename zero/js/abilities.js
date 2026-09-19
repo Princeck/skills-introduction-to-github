@@ -83,16 +83,63 @@ const Voice = (() => {
   function currentVoiceName() { return (voice || pickVoice())?.name || null; }
   function listVoices() { return catalogue().map(v => ({ name: v.name, lang: v.lang, local: v.localService })); }
 
-  function speak(text, opts = {}) {
-    if (!canSpeak() || !text) return false;
-    speechSynthesis.cancel();
-    // Strip markup and code fences — reading punctuation aloud is noise.
-    const clean = String(text)
+  // ---- Voice engine: browser Web Speech, or ElevenLabs (Zero's own voice) ----
+  let tts = { provider: 'browser', key: '', voiceId: '', model: 'eleven_multilingual_v2' };
+  let netFetch = (u, o) => fetch(u, o);   // app.js swaps in guardedFetch
+  let audioEl = null;                      // current ElevenLabs / clip playback
+  function setNet(fn) { if (typeof fn === 'function') netFetch = fn; }
+  function configureTTS(cfg) { tts = { ...tts, ...cfg }; }
+  function getTTS() { return { ...tts, key: tts.key ? '(set)' : '' }; }
+
+  function cleanText(text) {
+    return String(text)
       .replace(/```[\s\S]*?```/g, ' (code block) ')
       .replace(/[*_`#>|]/g, '')
       .replace(/\s+/g, ' ')
       .trim();
+  }
+
+  function stopAudio() { if (audioEl) { try { audioEl.pause(); } catch {} audioEl = null; } }
+
+  /* ElevenLabs: synthesise arbitrary text in Zero's own cloned voice. */
+  async function speakEleven(clean, opts) {
+    stopAudio();
+    const url = 'https://api.elevenlabs.io/v1/text-to-speech/' + encodeURIComponent(tts.voiceId);
+    const r = await netFetch(url, {
+      method: 'POST',
+      headers: { 'xi-api-key': tts.key, 'content-type': 'application/json', 'accept': 'audio/mpeg' },
+      body: JSON.stringify({
+        text: clean.slice(0, 800),
+        model_id: tts.model || 'eleven_multilingual_v2',
+        voice_settings: { stability: 0.5, similarity_boost: 0.75 },
+      }),
+    });
+    if (!r.ok) { const d = await r.text().catch(() => ''); throw new Error('ElevenLabs ' + r.status + ' ' + d.slice(0, 120)); }
+    const blob = await r.blob();
+    const src = URL.createObjectURL(blob);
+    audioEl = new Audio(src);
+    audioEl.onended = () => { URL.revokeObjectURL(src); audioEl = null; opts.onend && opts.onend(); };
+    await audioEl.play();
+  }
+
+  function speak(text, opts = {}) {
+    const clean = cleanText(text);
     if (!clean) return false;
+    // Zero's own voice via ElevenLabs, when configured.
+    if (tts.provider === 'elevenlabs' && tts.key && tts.voiceId) {
+      speakEleven(clean, opts).catch(() => {
+        // network/CORS/quota problem → fall back to the browser voice so
+        // Zero still talks rather than going silent.
+        if (canSpeak()) browserSpeak(clean, opts);
+      });
+      return true;
+    }
+    return browserSpeak(clean, opts);
+  }
+
+  function browserSpeak(clean, opts = {}) {
+    if (!canSpeak()) return false;
+    speechSynthesis.cancel();
     const u = new SpeechSynthesisUtterance(clean.slice(0, 600));
     if (!voice) voice = pickVoice();
     if (voice) u.voice = voice;
@@ -103,7 +150,23 @@ const Voice = (() => {
     return true;
   }
 
-  function stop() { if (canSpeak()) speechSynthesis.cancel(); }
+  /* Play the embedded Zero voice sample (the ElevenLabs clip in the page). */
+  function playClip(onend) {
+    const el = document.getElementById('zeroVoiceClip');
+    if (!el) return false;
+    stop();
+    el.currentTime = 0;
+    if (onend) el.onended = onend;
+    el.play().catch(() => {});
+    return true;
+  }
+
+  function stop() {
+    if (canSpeak()) speechSynthesis.cancel();
+    stopAudio();
+    const el = document.getElementById('zeroVoiceClip');
+    if (el) { try { el.pause(); } catch {} }
+  }
 
   /* onResult(text, isFinal) fires as you speak. */
   function listen(onResult, onState, onError) {
@@ -196,7 +259,8 @@ const Voice = (() => {
   const isListening = () => listening;
 
   return { canSpeak, canHear, speak, stop, listen, stopListening, isListening, startWake, stopWake, isAwake,
-           setVoice, currentVoiceName, listVoices, setProsody, getProsody };
+           setVoice, currentVoiceName, listVoices, setProsody, getProsody,
+           setNet, configureTTS, getTTS, playClip };
 })();
 
 

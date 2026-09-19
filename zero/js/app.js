@@ -37,6 +37,9 @@ const Zero = (() => {
     autoBrief: 'zero.autoBrief',   // daily market analysis on every login
     voiceRate: 'zero.voiceRate',
     voicePitch: 'zero.voicePitch',
+    voiceEngine: 'zero.voiceEngine',   // browser | elevenlabs
+    elevenKey: 'zero.elevenKey',       // ElevenLabs API key (this device only)
+    elevenVoice: 'zero.elevenVoice',   // ElevenLabs voice id (Zero's voice)
   };
 
   // Short rolling context so the assistant remembers the current thread.
@@ -486,6 +489,10 @@ const Zero = (() => {
     setText('acAiState', provider === 'local'
       ? 'Local engine' + (model ? ' · ' + model : '')
       : (key ? provider + ' · ' + (model || 'no model') + ' · key set' : provider + ' · no key'));
+    const vEng = store.raw(LS.voiceEngine) || 'browser';
+    setText('acVoiceState', vEng === 'elevenlabs'
+      ? (store.raw(LS.elevenKey) && store.raw(LS.elevenVoice) ? "ElevenLabs · Zero's voice" : 'ElevenLabs · incomplete')
+      : 'browser voice');
     setText('acMktState', store.raw(LS.stockKey) ? 'Finnhub key set' : 'no key (crypto & FX still work)');
     setText('acAgentState', store.raw(LS.agentToken) ? 'token saved' : 'not paired');
     nativePing().then(() => setText('acCoreState', nativeReady ? 'C++ core online' : 'not built / server off'));
@@ -2288,6 +2295,37 @@ const Zero = (() => {
     setText('voiceRateVal', rate.toFixed(2)); setText('voicePitchVal', pitch.toFixed(2));
   }
 
+  /* ---- Voice engine: browser speech, or Zero's own ElevenLabs voice ---- */
+  function applyVoiceEngine() {
+    Voice.configureTTS({
+      provider: store.raw(LS.voiceEngine) || 'browser',
+      key: store.raw(LS.elevenKey),
+      voiceId: store.raw(LS.elevenVoice),
+    });
+  }
+  function setVoiceEngine(v) { store.rawSet(LS.voiceEngine, v); applyVoiceEngine(); syncVoiceEngineUi(); }
+  function saveEleven() {
+    store.rawSet(LS.elevenKey, (document.getElementById('elevenKey')?.value || '').trim());
+    store.rawSet(LS.elevenVoice, (document.getElementById('elevenVoice')?.value || '').trim());
+    const ready = store.raw(LS.elevenKey) && store.raw(LS.elevenVoice);
+    if (ready) store.rawSet(LS.voiceEngine, 'elevenlabs');
+    applyVoiceEngine();
+    syncVoiceEngineUi();
+    const s = document.getElementById('elevenStatus');
+    if (s) s.innerHTML = ready
+      ? '<b style="color:var(--green)">Saved — Zero now speaks in your ElevenLabs voice.</b> Turn on “Speak replies” and hit Test.'
+      : '<b style="color:var(--red)">Need both</b> an API key and a voice id.';
+    log('Voice engine set to ' + (store.raw(LS.voiceEngine) || 'browser') + '.');
+  }
+  function playZeroSample() { Voice.playClip(); }
+  function syncVoiceEngineUi() {
+    const engine = store.raw(LS.voiceEngine) || 'browser';
+    const sel = document.getElementById('voiceEngine'); if (sel) sel.value = engine;
+    const wrap = document.getElementById('elevenFields'); if (wrap) wrap.style.display = engine === 'elevenlabs' ? '' : 'none';
+    const k = document.getElementById('elevenKey'); if (k && !k.value) k.value = store.raw(LS.elevenKey);
+    const v = document.getElementById('elevenVoice'); if (v && !v.value) v.value = store.raw(LS.elevenVoice);
+  }
+
   function setAutoBrief(on) { store.rawSet(LS.autoBrief, on ? '1' : '0'); log('Daily login briefing turned ' + (on ? 'ON' : 'OFF') + '.'); }
 
   function setThink(on) {
@@ -2443,6 +2481,10 @@ const Zero = (() => {
     const speakEl = document.getElementById('speakToggle');
     if (speakEl) { speakEl.checked = store.raw(LS.speak) === '1'; speakReplies = speakEl.checked; }
     if (store.raw(LS.voice)) Voice.setVoice(store.raw(LS.voice));
+    // Route Zero's ElevenLabs voice through the kill switch, and load the engine.
+    Voice.setNet((u, o) => guardedFetch(u, o, 'network'));
+    applyVoiceEngine();
+    syncVoiceEngineUi();
     applyProsodyFromStore();
     syncVoiceUi();
     populateVoices();
@@ -2518,6 +2560,7 @@ const Zero = (() => {
     send, saveEngine, testEngine, saveStockKey, setThink, updateNow, loadStocks,
     loadRates, loadNews, setNewsMode, setSpeak, setVoice, previewVoice, micToggle, stopSpeaking: () => Voice.stop(),
     setVoiceRate, setVoicePitch, voicePreset,
+    setVoiceEngine, saveEleven, playZeroSample,
     toggleWake, renderOverview, checkPassword, cryptoTool, showPayloads, copyText, reconDomain,
     openAFile, saveBack, saveNew, connectFolder, listFolder, openFromFolder, disconnectFolder,
     addApp, removeApp, launchApp, forgetMemory, forgetProfile, renderProfile, storageInfo, addPreset,

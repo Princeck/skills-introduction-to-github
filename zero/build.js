@@ -34,7 +34,7 @@ if (!out.includes(css)) { console.error('✗ Embedded CSS does not match css/sty
 
 // Embed the design assets as data URIs so the standalone stays one file.
 // (The multi-file zero/ version references them by relative path instead.)
-const mime = { '.jpg': 'image/jpeg', '.png': 'image/png' };
+const mime = { '.jpg': 'image/jpeg', '.png': 'image/png', '.mp3': 'audio/mpeg' };
 const dataUri = rel => {
   const ext = path.extname(rel);
   const b64 = fs.readFileSync(path.join(dir, rel)).toString('base64');
@@ -43,8 +43,9 @@ const dataUri = rel => {
 let out2 = out
   .replace(/url\('assets\/backdrop\.jpg'\)/g, () => `url('${dataUri('assets/backdrop.jpg')}')`)
   .replace(/src="assets\/zero-mark\.png"/g, () => `src="${dataUri('assets/zero-mark.png')}"`)
-  .replace(/src="assets\/zero-crest\.png"/g, () => `src="${dataUri('assets/zero-crest.png')}"`);
-if (/assets\/(backdrop\.jpg|zero-mark\.png|zero-crest\.png)/.test(out2)) {
+  .replace(/src="assets\/zero-crest\.png"/g, () => `src="${dataUri('assets/zero-crest.png')}"`)
+  .replace(/src="assets\/zero-voice\.mp3"/g, () => `src="${dataUri('assets/zero-voice.mp3')}"`);
+if (/assets\/(backdrop\.jpg|zero-mark\.png|zero-crest\.png|zero-voice\.mp3)/.test(out2)) {
   console.error('✗ An asset reference was left un-embedded.'); process.exit(1);
 }
 

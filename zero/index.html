@@ -18,6 +18,9 @@
   <!-- ============ SPACE BACKDROP ============ -->
   <div id="backdrop"></div>
 
+  <!-- ============ ZERO'S OWN VOICE (embedded sample) ============ -->
+  <audio id="zeroVoiceClip" src="assets/zero-voice.mp3" preload="auto" hidden></audio>
+
   <!-- ============ BOOT ============ -->
   <div id="boot"><div class="boot-inner"><div class="boot-mark">0</div><div class="boot-feed"></div></div></div>
 
@@ -536,6 +539,7 @@
           <p class="hint">One place for every key and connection Zero uses. Nothing here is sent anywhere except the service each key belongs to. Wipe clears it all.</p>
           <div class="api-status">
             <div class="readout"><span class="k">AI provider</span><span class="v" id="acAiState">—</span></div>
+            <div class="readout"><span class="k">Voice</span><span class="v" id="acVoiceState">—</span></div>
             <div class="readout"><span class="k">Market data</span><span class="v" id="acMktState">—</span></div>
             <div class="readout"><span class="k">Operator agent</span><span class="v" id="acAgentState">—</span></div>
             <div class="readout"><span class="k">Native C++ core</span><span class="v" id="acCoreState">—</span></div>
@@ -722,7 +726,29 @@
           </div>
           <div class="card">
             <h2>Zero's Voice</h2>
-            <p class="hint">Tune how Zero sounds. Pick the voice in the assistant bar; shape the delivery here.</p>
+            <p class="hint">Zero has its own voice. Play the sample, or connect ElevenLabs so Zero speaks <b>everything</b> in that voice.</p>
+            <div style="margin-top:10px;display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+              <button class="btn" onclick="Zero.playZeroSample()">▶ Play Zero's voice</button>
+            </div>
+            <label class="hint" style="margin-top:14px;display:block">Voice engine</label>
+            <select id="voiceEngine" onchange="Zero.setVoiceEngine(this.value)">
+              <option value="browser">Browser voice (offline, robotic)</option>
+              <option value="elevenlabs">ElevenLabs — Zero's own voice (needs key)</option>
+            </select>
+            <div id="elevenFields" style="display:none">
+              <label class="hint" style="margin-top:10px;display:block">ElevenLabs API key <span style="opacity:.7">— this device only</span></label>
+              <input id="elevenKey" type="password" placeholder="xi-api-key…" autocomplete="off" />
+              <label class="hint" style="margin-top:10px;display:block">Voice ID <span style="opacity:.7">— the ZERO voice in your ElevenLabs library</span></label>
+              <input id="elevenVoice" placeholder="e.g. 21m00Tcm4TlvDq8ikWAM" />
+              <div style="margin-top:10px;display:flex;gap:10px;flex-wrap:wrap">
+                <button class="btn" onclick="Zero.saveEleven()">Save voice</button>
+                <button class="btn ghost" onclick="Zero.previewVoice()">▶ Test spoken reply</button>
+              </div>
+              <div id="elevenStatus" class="hint" style="margin-top:10px"></div>
+              <div class="notice">Zero sends the text of its reply to ElevenLabs and plays back the audio in your voice. The key stays on this device. In the API Center this shows as your voice provider. If ElevenLabs is unreachable, Zero falls back to the browser voice so it never goes silent.</div>
+            </div>
+            <hr style="border:none;border-top:1px solid rgba(255,255,255,.12);margin:16px 0" />
+            <p class="hint">Fine-tune the browser voice: pick it in the assistant bar; shape delivery here.</p>
             <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">
               <button class="chip" onclick="Zero.voicePreset('butler')">Butler</button>
               <button class="chip" onclick="Zero.voicePreset('calm')">Calm</button>
