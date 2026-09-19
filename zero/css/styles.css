@@ -1053,3 +1053,13 @@ input:focus, textarea:focus, select:focus { border-color: #fff !important; outli
   filter: none !important;
 }
 .boot-mark, #boot .boot-mark { color:#fff !important; }
+
+/* ---- API Center ---- */
+.api-status { margin-top:14px; }
+.api-add { display:flex; gap:8px; flex-wrap:wrap; margin-top:12px; align-items:center; }
+.api-add input, .api-add select { flex:1; min-width:140px; }
+.api-item { border:1px solid rgba(255,255,255,.16); padding:12px; margin-bottom:10px;
+  clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 8px 100%, 0 calc(100% - 8px)); }
+.api-item .api-main { display:flex; justify-content:space-between; align-items:baseline; gap:12px; flex-wrap:wrap; }
+.api-item .api-main b { font-family:var(--display); letter-spacing:1.5px; }
+.api-item .api-meta { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-top:8px; }

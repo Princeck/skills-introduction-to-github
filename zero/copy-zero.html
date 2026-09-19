@@ -115,7 +115,7 @@
     <div class="mark">0</div>
     <h1>ZER<b>0</b> — source</h1>
   </header>
-  <p class="meta">zero-standalone.html · 620.5 KB · 5700 lines · self-contained</p>
+  <p class="meta">zero-standalone.html · 633.7 KB · 5944 lines · self-contained</p>
 
   <div class="actions">
     <button id="copy">Copy all code</button>
@@ -1216,6 +1216,16 @@ input:focus, textarea:focus, select:focus { border-color: #fff !important; outli
 }
 .boot-mark, #boot .boot-mark { color:#fff !important; }
 
+/* ---- API Center ---- */
+.api-status { margin-top:14px; }
+.api-add { display:flex; gap:8px; flex-wrap:wrap; margin-top:12px; align-items:center; }
+.api-add input, .api-add select { flex:1; min-width:140px; }
+.api-item { border:1px solid rgba(255,255,255,.16); padding:12px; margin-bottom:10px;
+  clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 8px 100%, 0 calc(100% - 8px)); }
+.api-item .api-main { display:flex; justify-content:space-between; align-items:baseline; gap:12px; flex-wrap:wrap; }
+.api-item .api-main b { font-family:var(--display); letter-spacing:1.5px; }
+.api-item .api-meta { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-top:8px; }
+
   &lt;/style>
 &lt;/head>
 &lt;body>
@@ -1272,6 +1282,7 @@ input:focus, textarea:focus, select:focus { border-color: #fff !important; outli
         &lt;li data-view="security">&lt;span class="ic">⛨&lt;/span> Security&lt;/li>
         &lt;li data-view="files">&lt;span class="ic">▢&lt;/span> Files&lt;/li>
         &lt;li data-view="operator">&lt;span class="ic">⌘&lt;/span> Operator&lt;/li>
+        &lt;li data-view="api">&lt;span class="ic">⧉&lt;/span> API Center&lt;/li>
         &lt;li data-view="tasks">&lt;span class="ic">✓&lt;/span> Tasks&lt;/li>
         &lt;li data-view="notes">&lt;span class="ic">✎&lt;/span> Notes&lt;/li>
         &lt;li data-view="settings">&lt;span class="ic">⚙&lt;/span> Settings&lt;/li>
@@ -1729,6 +1740,77 @@ input:focus, textarea:focus, select:focus { border-color: #fff !important; outli
           &lt;textarea id="noteInput" rows="3" placeholder="New note…">&lt;/textarea>
           &lt;div style="margin-top:10px">&lt;button class="btn blue" onclick="Zero.addNote()">Save Note&lt;/button>&lt;/div>
           &lt;div id="noteList" style="margin-top:16px">&lt;/div>
+        &lt;/div>
+      &lt;/section>
+
+      &lt;!-- API CENTER — one hub for every key and connection -->
+      &lt;section class="view" id="view-api">
+        &lt;div class="card">
+          &lt;h2>API Center &lt;span class="pill">local · keys never leave this device&lt;/span>&lt;/h2>
+          &lt;p class="hint">One place for every key and connection Zero uses. Nothing here is sent anywhere except the service each key belongs to. Wipe clears it all.&lt;/p>
+          &lt;div class="api-status">
+            &lt;div class="readout">&lt;span class="k">AI provider&lt;/span>&lt;span class="v" id="acAiState">—&lt;/span>&lt;/div>
+            &lt;div class="readout">&lt;span class="k">Market data&lt;/span>&lt;span class="v" id="acMktState">—&lt;/span>&lt;/div>
+            &lt;div class="readout">&lt;span class="k">Operator agent&lt;/span>&lt;span class="v" id="acAgentState">—&lt;/span>&lt;/div>
+            &lt;div class="readout">&lt;span class="k">Native C++ core&lt;/span>&lt;span class="v" id="acCoreState">—&lt;/span>&lt;/div>
+            &lt;div class="readout">&lt;span class="k">Custom APIs&lt;/span>&lt;span class="v" id="acCount">0&lt;/span>&lt;/div>
+          &lt;/div>
+        &lt;/div>
+
+        &lt;div class="grid cols-2" style="margin-top:16px">
+          &lt;div class="card">
+            &lt;h2>AI Provider&lt;/h2>
+            &lt;p class="hint">The brain Zero uses for chat. Pick a provider and paste a key to use any AI, or keep it local.&lt;/p>
+            &lt;label class="hint" style="margin-top:12px;display:block">Provider&lt;/label>
+            &lt;select id="acProvider" onchange="Zero.acOnProvider()">
+              &lt;option value="local">Local engine (private)&lt;/option>
+              &lt;option value="openai">OpenAI (GPT)&lt;/option>
+              &lt;option value="anthropic">Anthropic (Claude)&lt;/option>
+              &lt;option value="compatible">OpenAI-compatible (OpenRouter, Groq, …)&lt;/option>
+            &lt;/select>
+            &lt;div id="acKeyWrap" style="display:none">
+              &lt;label class="hint" style="margin-top:10px;display:block">API key&lt;/label>
+              &lt;input id="acKey" type="password" placeholder="paste your key" autocomplete="off" />
+            &lt;/div>
+            &lt;div id="acBaseWrap" style="display:none">
+              &lt;label class="hint" style="margin-top:10px;display:block">Base URL&lt;/label>
+              &lt;input id="acBase" placeholder="https://openrouter.ai/api/v1" />
+            &lt;/div>
+            &lt;label class="hint" style="margin-top:10px;display:block">Model&lt;/label>
+            &lt;input id="acModel" placeholder="gpt-4o-mini · claude-3-5-sonnet-latest · blank=auto" />
+            &lt;div style="margin-top:12px">&lt;button class="btn" onclick="Zero.saveApiAi()">Save&lt;/button>&lt;/div>
+            &lt;div id="acAiStatus" class="hint" style="margin-top:10px">&lt;/div>
+          &lt;/div>
+
+          &lt;div class="card">
+            &lt;h2>Market Data&lt;/h2>
+            &lt;p class="hint">A free Finnhub key turns on live stocks &amp;amp; indices. Crypto and FX work without any key.&lt;/p>
+            &lt;label class="hint" style="margin-top:12px;display:block">Finnhub API key&lt;/label>
+            &lt;input id="acStock" type="password" placeholder="Finnhub key…" />
+            &lt;label class="hint" style="margin-top:10px;display:block">Symbols to track&lt;/label>
+            &lt;input id="acSymbols" placeholder="AAPL, MSFT, NVDA, TSLA, SPY" />
+            &lt;div style="margin-top:12px">&lt;button class="btn" onclick="Zero.saveApiMkt()">Save&lt;/button>&lt;/div>
+            &lt;div class="notice">More providers (news, weather, anything) go in &lt;b>Connected APIs&lt;/b> below — the API Center can hold any key.&lt;/div>
+          &lt;/div>
+        &lt;/div>
+
+        &lt;div class="card" style="margin-top:16px">
+          &lt;h2>Connected APIs &lt;span class="pill" id="acCountPill">&lt;/span>&lt;/h2>
+          &lt;p class="hint">Register &lt;b>any&lt;/b> API by key. Zero can then call it from chat: &lt;code>api &amp;lt;name&amp;gt; &amp;lt;path&amp;gt;&lt;/code> — e.g. &lt;code>api weather /v1/current?city=tokyo&lt;/code>. Choose how the key is sent.&lt;/p>
+          &lt;div class="api-add">
+            &lt;input id="apiName" placeholder="Name — e.g. weather" style="max-width:170px" />
+            &lt;input id="apiBase" placeholder="Base URL — https://api.example.com" />
+            &lt;input id="apiKey2" type="password" placeholder="API key (optional)" style="max-width:200px" />
+            &lt;select id="apiHeader" title="How the key is sent">
+              &lt;option value="bearer">Authorization: Bearer&lt;/option>
+              &lt;option value="xapikey">x-api-key&lt;/option>
+              &lt;option value="query">?key= in URL&lt;/option>
+              &lt;option value="none">No key&lt;/option>
+            &lt;/select>
+            &lt;button class="btn" onclick="Zero.addApi()">Add&lt;/button>
+          &lt;/div>
+          &lt;div id="apiList" style="margin-top:14px">&lt;/div>
+          &lt;div class="notice">Calls go through Zero's kill switch and network switch like everything else. Some APIs block direct browser calls (CORS) — those you'd reach through your own server or the Python bridge.&lt;/div>
         &lt;/div>
       &lt;/section>
 
@@ -3467,6 +3549,7 @@ const Zero = (() => {
     mapPlace: 'zero.mapPlace',
     agentUrl: 'zero.agentUrl',      // local operator agent address
     agentToken: 'zero.agentToken',  // pairing token for the operator agent
+    apiRegistry: 'zero.apiRegistry',// user-registered custom APIs (name, base, key, header)
     think: 'zero.think',
     stockKey: 'zero.stockKey',
     stockSymbols: 'zero.stockSymbols',
@@ -3703,6 +3786,7 @@ const Zero = (() => {
     security:  ['Security', 'Harden what is yours.'],
     files:     ['Files', 'Your disk, connected on your terms.'],
     operator:  ['Operator', 'Zero runs commands on your machine — you approve each one.'],
+    api:       ['API Center', 'Every key and connection Zero uses — all on this device.'],
     maps:      ['Maps', 'Every map on Earth — search anywhere.'],
     news:      ['News', 'What is happening right now.'],
     trading:   ['Trading', 'Live professional charts — every market.'],
@@ -3733,6 +3817,7 @@ const Zero = (() => {
     if (view === 'memory') { renderMemories(); renderProfile(); }
     if (view === 'maps') renderMap();
     if (view === 'operator') agentInit();
+    if (view === 'api') apiCenterInit();
   }
 
   /* ============================================================
@@ -3907,6 +3992,155 @@ const Zero = (() => {
         ? 'Found (JavaScript fallback — start the Python server for the C++ core):\n' + hit.slice(0, 5).map((h, i) => `  ${i + 1}. ${h.text}`).join('\n')
         : `Nothing matched "${query}", and the C++ core is not reachable (${e.message}).`;
     }
+  }
+
+  /* ============================================================
+     API CENTER — one hub for every key and connection Zero uses.
+     Built-in providers (AI, market data, operator) plus any custom
+     API you register. Everything is stored on this device only.
+     ============================================================ */
+  let apiRegistry = store.get(LS.apiRegistry, []);
+
+  const HEADERS = {
+    bearer: k => ({ 'authorization': 'Bearer ' + k }),
+    xapikey: k => ({ 'x-api-key': k }),
+    query: () => ({}),               // key appended to the URL instead
+    none: () => ({}),
+  };
+
+  function saveApiRegistry() { store.rawSet(LS.apiRegistry, JSON.stringify(apiRegistry)); }
+
+  function renderApiCenter() {
+    // built-in status pills
+    const { provider, key, model } = engineCfg();
+    setText('acAiState', provider === 'local'
+      ? 'Local engine' + (model ? ' · ' + model : '')
+      : (key ? provider + ' · ' + (model || 'no model') + ' · key set' : provider + ' · no key'));
+    setText('acMktState', store.raw(LS.stockKey) ? 'Finnhub key set' : 'no key (crypto &amp; FX still work)');
+    setText('acAgentState', store.raw(LS.agentToken) ? 'token saved' : 'not paired');
+    nativePing().then(() => setText('acCoreState', nativeReady ? 'C++ core online' : 'not built / server off'));
+
+    // custom registry
+    setText('acCount', apiRegistry.length);
+    setText('acCountPill', apiRegistry.length + (apiRegistry.length === 1 ? ' API' : ' APIs'));
+    const list = document.getElementById('apiList');
+    if (!list) return;
+    if (!apiRegistry.length) {
+      list.innerHTML = '&lt;div class="nodata" style="font-size:12px">No custom APIs yet. Add one above — then call it in chat with &lt;code>api &amp;lt;name&amp;gt; &amp;lt;path&amp;gt;&lt;/code>.&lt;/div>';
+      return;
+    }
+    list.innerHTML = apiRegistry.map((a, i) => `
+      &lt;div class="api-item">
+        &lt;div class="api-main">
+          &lt;b>${esc(a.name)}&lt;/b>
+          &lt;span class="hint" style="font-family:var(--mono)">${esc(a.base)}&lt;/span>
+        &lt;/div>
+        &lt;div class="api-meta">
+          &lt;span class="pill">${esc(a.header)}&lt;/span>
+          &lt;span class="pill">${a.key ? 'key set' : 'no key'}&lt;/span>
+          &lt;button class="btn ghost" onclick="Zero.testApi(${i})">Test&lt;/button>
+          &lt;button class="btn ghost" onclick="Zero.delApi(${i})">Remove&lt;/button>
+        &lt;/div>
+        &lt;div class="hint" id="apiTest${i}" style="font-family:var(--mono);margin-top:6px">&lt;/div>
+      &lt;/div>`).join('');
+  }
+
+  function addApi() {
+    const name = (document.getElementById('apiName')?.value || '').trim();
+    const base = (document.getElementById('apiBase')?.value || '').trim().replace(/\/+$/, '');
+    const key = (document.getElementById('apiKey2')?.value || '').trim();
+    const header = document.getElementById('apiHeader')?.value || 'bearer';
+    if (!name || !base) { alert('Give the API a name and a base URL.'); return; }
+    apiRegistry.push({ name, base, key, header });
+    saveApiRegistry();
+    ['apiName', 'apiBase', 'apiKey2'].forEach(id => { const e = document.getElementById(id); if (e) e.value = ''; });
+    log('API registered: ' + name);
+    renderApiCenter();
+  }
+
+  function delApi(i) {
+    if (!confirm('Remove "' + (apiRegistry[i]?.name || '') + '"?')) return;
+    apiRegistry.splice(i, 1); saveApiRegistry(); renderApiCenter();
+  }
+
+  /* Build the request for a registered API and fetch it (path optional). */
+  async function apiFetch(entry, path, opts = {}) {
+    let url = entry.base + (path || '');
+    let headers = { ...(opts.headers || {}) };
+    if (entry.header === 'query' &amp;&amp; entry.key) {
+      url += (url.includes('?') ? '&amp;' : '?') + 'key=' + encodeURIComponent(entry.key);
+    } else if (entry.key) {
+      Object.assign(headers, (HEADERS[entry.header] || HEADERS.bearer)(entry.key));
+    }
+    return guardedFetch(url, { ...opts, headers }, 'network');
+  }
+
+  async function testApi(i) {
+    const a = apiRegistry[i]; if (!a) return;
+    const out = document.getElementById('apiTest' + i);
+    if (out) out.textContent = 'testing ' + a.base + ' …';
+    try {
+      const r = await apiFetch(a, '');
+      const body = (await r.text()).slice(0, 160);
+      if (out) out.innerHTML = `&lt;b style="color:${r.ok ? 'var(--green)' : 'var(--red)'}">HTTP ${r.status}&lt;/b> · ${esc(body)}`;
+    } catch (e) {
+      if (out) out.innerHTML = `&lt;b style="color:var(--red)">unreachable&lt;/b> · ${esc(e.message)}`;
+    }
+  }
+
+  /* chat: `api &lt;name> &lt;path>` → calls a registered API and shows the reply. */
+  async function apiCall(a, path, holder) {
+    try {
+      const r = await apiFetch(a, path.startsWith('/') || !path ? path : '/' + path);
+      const text = await r.text();
+      let pretty = text;
+      try { pretty = JSON.stringify(JSON.parse(text), null, 2); } catch { /* not json */ }
+      holder.textContent = `[${a.name}] HTTP ${r.status}\n\n` + pretty.slice(0, 2000);
+    } catch (e) { holder.textContent = `Could not call ${a.name}: ${e.message}`; }
+  }
+
+  function saveApiAi() {
+    const p = document.getElementById('acProvider')?.value || 'local';
+    store.rawSet(LS.engineProvider, p);
+    store.rawSet(LS.engineKey, (document.getElementById('acKey')?.value || '').trim());
+    store.rawSet(LS.engineBase, (document.getElementById('acBase')?.value || '').trim());
+    store.rawSet(LS.engineModel, (document.getElementById('acModel')?.value || '').trim());
+    // keep the Settings copy in sync if it exists
+    const setV = (id, v) => { const e = document.getElementById(id); if (e) e.value = v; };
+    setV('engineProvider', p); setV('engineKey', store.raw(LS.engineKey));
+    setV('engineBase', store.raw(LS.engineBase)); setV('engineModel', store.raw(LS.engineModel));
+    if (typeof onProvider === 'function') onProvider();
+    refreshAiStatus(); renderApiCenter();
+    log('AI provider updated from API Center.');
+    const s = document.getElementById('acAiStatus');
+    if (s) s.innerHTML = `&lt;b style="color:var(--green)">Saved.&lt;/b> ${p === 'local' ? 'Local engine.' : esc(p) + ' — Zero will use it for chat.'}`;
+  }
+
+  function acOnProvider() {
+    const p = document.getElementById('acProvider')?.value || 'local';
+    const hosted = p !== 'local';
+    const show = (id, on) => { const e = document.getElementById(id); if (e) e.style.display = on ? '' : 'none'; };
+    show('acKeyWrap', hosted);
+    show('acBaseWrap', p === 'compatible');
+  }
+
+  function saveApiMkt() {
+    store.rawSet(LS.stockKey, (document.getElementById('acStock')?.value || '').trim());
+    const sym = (document.getElementById('acSymbols')?.value || '').trim();
+    if (sym) store.rawSet(LS.stockSymbols, sym);
+    const se = document.getElementById('stockKey'); if (se) se.value = store.raw(LS.stockKey);
+    log('Market data key updated from API Center.');
+    renderApiCenter();
+  }
+
+  function apiCenterInit() {
+    const setV = (id, v) => { const e = document.getElementById(id); if (e) e.value = v; };
+    const cfg = engineCfg();
+    setV('acProvider', cfg.provider); setV('acKey', cfg.key);
+    setV('acBase', store.raw(LS.engineBase)); setV('acModel', cfg.model);
+    setV('acStock', store.raw(LS.stockKey)); setV('acSymbols', store.raw(LS.stockSymbols));
+    acOnProvider();
+    renderApiCenter();
   }
 
   /* Overview console → routes a command straight into the assistant. */
@@ -5067,6 +5301,15 @@ const Zero = (() => {
     const s = q.trim();
     const low = s.toLowerCase();
     const mapped = mapCommand(s); if (mapped) return mapped;
+    const apiM = s.match(/^api\s+(\S+)\s*(.*)$/i);
+    if (apiM) {
+      const a = apiRegistry.find(x => x.name.toLowerCase() === apiM[1].toLowerCase());
+      if (!a) return `No API named "${apiM[1]}" is registered. Add it in the API Center.`;
+      const path = (apiM[2] || '').trim();
+      const holder = bubble(`Calling ${a.name}${path ? ' ' + path : ''}…`, 'zero');
+      apiCall(a, path, holder);
+      return HANDLED;
+    }
     // recall &lt;query> — native C++ retrieval over your own notes/memories
     const rec = s.match(/^(?:recall|remember what|what did i (?:say|note|write)(?: about)?)\s+(.+)$/i);
     if (rec) {
@@ -5812,6 +6055,7 @@ const Zero = (() => {
     onProvider, ovSend, mapSearch, mapSource, renderMap,
     agentConnect, agentRun, agentAsk, agentPing,
     nativePing, recall,
+    addApi, delApi, testApi, saveApiAi, acOnProvider, saveApiMkt,
     exportData, wipeData, init,
     toggleHalt, killNetwork, panic, setCap, clearLog,
     enableVault, unlockVault, lockVault, disableVault,

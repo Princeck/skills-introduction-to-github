@@ -68,6 +68,7 @@
         <li data-view="security"><span class="ic">⛨</span> Security</li>
         <li data-view="files"><span class="ic">▢</span> Files</li>
         <li data-view="operator"><span class="ic">⌘</span> Operator</li>
+        <li data-view="api"><span class="ic">⧉</span> API Center</li>
         <li data-view="tasks"><span class="ic">✓</span> Tasks</li>
         <li data-view="notes"><span class="ic">✎</span> Notes</li>
         <li data-view="settings"><span class="ic">⚙</span> Settings</li>
@@ -525,6 +526,77 @@
           <textarea id="noteInput" rows="3" placeholder="New note…"></textarea>
           <div style="margin-top:10px"><button class="btn blue" onclick="Zero.addNote()">Save Note</button></div>
           <div id="noteList" style="margin-top:16px"></div>
+        </div>
+      </section>
+
+      <!-- API CENTER — one hub for every key and connection -->
+      <section class="view" id="view-api">
+        <div class="card">
+          <h2>API Center <span class="pill">local · keys never leave this device</span></h2>
+          <p class="hint">One place for every key and connection Zero uses. Nothing here is sent anywhere except the service each key belongs to. Wipe clears it all.</p>
+          <div class="api-status">
+            <div class="readout"><span class="k">AI provider</span><span class="v" id="acAiState">—</span></div>
+            <div class="readout"><span class="k">Market data</span><span class="v" id="acMktState">—</span></div>
+            <div class="readout"><span class="k">Operator agent</span><span class="v" id="acAgentState">—</span></div>
+            <div class="readout"><span class="k">Native C++ core</span><span class="v" id="acCoreState">—</span></div>
+            <div class="readout"><span class="k">Custom APIs</span><span class="v" id="acCount">0</span></div>
+          </div>
+        </div>
+
+        <div class="grid cols-2" style="margin-top:16px">
+          <div class="card">
+            <h2>AI Provider</h2>
+            <p class="hint">The brain Zero uses for chat. Pick a provider and paste a key to use any AI, or keep it local.</p>
+            <label class="hint" style="margin-top:12px;display:block">Provider</label>
+            <select id="acProvider" onchange="Zero.acOnProvider()">
+              <option value="local">Local engine (private)</option>
+              <option value="openai">OpenAI (GPT)</option>
+              <option value="anthropic">Anthropic (Claude)</option>
+              <option value="compatible">OpenAI-compatible (OpenRouter, Groq, …)</option>
+            </select>
+            <div id="acKeyWrap" style="display:none">
+              <label class="hint" style="margin-top:10px;display:block">API key</label>
+              <input id="acKey" type="password" placeholder="paste your key" autocomplete="off" />
+            </div>
+            <div id="acBaseWrap" style="display:none">
+              <label class="hint" style="margin-top:10px;display:block">Base URL</label>
+              <input id="acBase" placeholder="https://openrouter.ai/api/v1" />
+            </div>
+            <label class="hint" style="margin-top:10px;display:block">Model</label>
+            <input id="acModel" placeholder="gpt-4o-mini · claude-3-5-sonnet-latest · blank=auto" />
+            <div style="margin-top:12px"><button class="btn" onclick="Zero.saveApiAi()">Save</button></div>
+            <div id="acAiStatus" class="hint" style="margin-top:10px"></div>
+          </div>
+
+          <div class="card">
+            <h2>Market Data</h2>
+            <p class="hint">A free Finnhub key turns on live stocks &amp; indices. Crypto and FX work without any key.</p>
+            <label class="hint" style="margin-top:12px;display:block">Finnhub API key</label>
+            <input id="acStock" type="password" placeholder="Finnhub key…" />
+            <label class="hint" style="margin-top:10px;display:block">Symbols to track</label>
+            <input id="acSymbols" placeholder="AAPL, MSFT, NVDA, TSLA, SPY" />
+            <div style="margin-top:12px"><button class="btn" onclick="Zero.saveApiMkt()">Save</button></div>
+            <div class="notice">More providers (news, weather, anything) go in <b>Connected APIs</b> below — the API Center can hold any key.</div>
+          </div>
+        </div>
+
+        <div class="card" style="margin-top:16px">
+          <h2>Connected APIs <span class="pill" id="acCountPill"></span></h2>
+          <p class="hint">Register <b>any</b> API by key. Zero can then call it from chat: <code>api &lt;name&gt; &lt;path&gt;</code> — e.g. <code>api weather /v1/current?city=tokyo</code>. Choose how the key is sent.</p>
+          <div class="api-add">
+            <input id="apiName" placeholder="Name — e.g. weather" style="max-width:170px" />
+            <input id="apiBase" placeholder="Base URL — https://api.example.com" />
+            <input id="apiKey2" type="password" placeholder="API key (optional)" style="max-width:200px" />
+            <select id="apiHeader" title="How the key is sent">
+              <option value="bearer">Authorization: Bearer</option>
+              <option value="xapikey">x-api-key</option>
+              <option value="query">?key= in URL</option>
+              <option value="none">No key</option>
+            </select>
+            <button class="btn" onclick="Zero.addApi()">Add</button>
+          </div>
+          <div id="apiList" style="margin-top:14px"></div>
+          <div class="notice">Calls go through Zero's kill switch and network switch like everything else. Some APIs block direct browser calls (CORS) — those you'd reach through your own server or the Python bridge.</div>
         </div>
       </section>
 

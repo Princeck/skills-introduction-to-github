@@ -19,6 +19,7 @@ const Zero = (() => {
     mapPlace: 'zero.mapPlace',
     agentUrl: 'zero.agentUrl',      // local operator agent address
     agentToken: 'zero.agentToken',  // pairing token for the operator agent
+    apiRegistry: 'zero.apiRegistry',// user-registered custom APIs (name, base, key, header)
     think: 'zero.think',
     stockKey: 'zero.stockKey',
     stockSymbols: 'zero.stockSymbols',
@@ -255,6 +256,7 @@ const Zero = (() => {
     security:  ['Security', 'Harden what is yours.'],
     files:     ['Files', 'Your disk, connected on your terms.'],
     operator:  ['Operator', 'Zero runs commands on your machine — you approve each one.'],
+    api:       ['API Center', 'Every key and connection Zero uses — all on this device.'],
     maps:      ['Maps', 'Every map on Earth — search anywhere.'],
     news:      ['News', 'What is happening right now.'],
     trading:   ['Trading', 'Live professional charts — every market.'],
@@ -285,6 +287,7 @@ const Zero = (() => {
     if (view === 'memory') { renderMemories(); renderProfile(); }
     if (view === 'maps') renderMap();
     if (view === 'operator') agentInit();
+    if (view === 'api') apiCenterInit();
   }
 
   /* ============================================================
@@ -459,6 +462,155 @@ const Zero = (() => {
         ? 'Found (JavaScript fallback — start the Python server for the C++ core):\n' + hit.slice(0, 5).map((h, i) => `  ${i + 1}. ${h.text}`).join('\n')
         : `Nothing matched "${query}", and the C++ core is not reachable (${e.message}).`;
     }
+  }
+
+  /* ============================================================
+     API CENTER — one hub for every key and connection Zero uses.
+     Built-in providers (AI, market data, operator) plus any custom
+     API you register. Everything is stored on this device only.
+     ============================================================ */
+  let apiRegistry = store.get(LS.apiRegistry, []);
+
+  const HEADERS = {
+    bearer: k => ({ 'authorization': 'Bearer ' + k }),
+    xapikey: k => ({ 'x-api-key': k }),
+    query: () => ({}),               // key appended to the URL instead
+    none: () => ({}),
+  };
+
+  function saveApiRegistry() { store.rawSet(LS.apiRegistry, JSON.stringify(apiRegistry)); }
+
+  function renderApiCenter() {
+    // built-in status pills
+    const { provider, key, model } = engineCfg();
+    setText('acAiState', provider === 'local'
+      ? 'Local engine' + (model ? ' · ' + model : '')
+      : (key ? provider + ' · ' + (model || 'no model') + ' · key set' : provider + ' · no key'));
+    setText('acMktState', store.raw(LS.stockKey) ? 'Finnhub key set' : 'no key (crypto & FX still work)');
+    setText('acAgentState', store.raw(LS.agentToken) ? 'token saved' : 'not paired');
+    nativePing().then(() => setText('acCoreState', nativeReady ? 'C++ core online' : 'not built / server off'));
+
+    // custom registry
+    setText('acCount', apiRegistry.length);
+    setText('acCountPill', apiRegistry.length + (apiRegistry.length === 1 ? ' API' : ' APIs'));
+    const list = document.getElementById('apiList');
+    if (!list) return;
+    if (!apiRegistry.length) {
+      list.innerHTML = '<div class="nodata" style="font-size:12px">No custom APIs yet. Add one above — then call it in chat with <code>api &lt;name&gt; &lt;path&gt;</code>.</div>';
+      return;
+    }
+    list.innerHTML = apiRegistry.map((a, i) => `
+      <div class="api-item">
+        <div class="api-main">
+          <b>${esc(a.name)}</b>
+          <span class="hint" style="font-family:var(--mono)">${esc(a.base)}</span>
+        </div>
+        <div class="api-meta">
+          <span class="pill">${esc(a.header)}</span>
+          <span class="pill">${a.key ? 'key set' : 'no key'}</span>
+          <button class="btn ghost" onclick="Zero.testApi(${i})">Test</button>
+          <button class="btn ghost" onclick="Zero.delApi(${i})">Remove</button>
+        </div>
+        <div class="hint" id="apiTest${i}" style="font-family:var(--mono);margin-top:6px"></div>
+      </div>`).join('');
+  }
+
+  function addApi() {
+    const name = (document.getElementById('apiName')?.value || '').trim();
+    const base = (document.getElementById('apiBase')?.value || '').trim().replace(/\/+$/, '');
+    const key = (document.getElementById('apiKey2')?.value || '').trim();
+    const header = document.getElementById('apiHeader')?.value || 'bearer';
+    if (!name || !base) { alert('Give the API a name and a base URL.'); return; }
+    apiRegistry.push({ name, base, key, header });
+    saveApiRegistry();
+    ['apiName', 'apiBase', 'apiKey2'].forEach(id => { const e = document.getElementById(id); if (e) e.value = ''; });
+    log('API registered: ' + name);
+    renderApiCenter();
+  }
+
+  function delApi(i) {
+    if (!confirm('Remove "' + (apiRegistry[i]?.name || '') + '"?')) return;
+    apiRegistry.splice(i, 1); saveApiRegistry(); renderApiCenter();
+  }
+
+  /* Build the request for a registered API and fetch it (path optional). */
+  async function apiFetch(entry, path, opts = {}) {
+    let url = entry.base + (path || '');
+    let headers = { ...(opts.headers || {}) };
+    if (entry.header === 'query' && entry.key) {
+      url += (url.includes('?') ? '&' : '?') + 'key=' + encodeURIComponent(entry.key);
+    } else if (entry.key) {
+      Object.assign(headers, (HEADERS[entry.header] || HEADERS.bearer)(entry.key));
+    }
+    return guardedFetch(url, { ...opts, headers }, 'network');
+  }
+
+  async function testApi(i) {
+    const a = apiRegistry[i]; if (!a) return;
+    const out = document.getElementById('apiTest' + i);
+    if (out) out.textContent = 'testing ' + a.base + ' …';
+    try {
+      const r = await apiFetch(a, '');
+      const body = (await r.text()).slice(0, 160);
+      if (out) out.innerHTML = `<b style="color:${r.ok ? 'var(--green)' : 'var(--red)'}">HTTP ${r.status}</b> · ${esc(body)}`;
+    } catch (e) {
+      if (out) out.innerHTML = `<b style="color:var(--red)">unreachable</b> · ${esc(e.message)}`;
+    }
+  }
+
+  /* chat: `api <name> <path>` → calls a registered API and shows the reply. */
+  async function apiCall(a, path, holder) {
+    try {
+      const r = await apiFetch(a, path.startsWith('/') || !path ? path : '/' + path);
+      const text = await r.text();
+      let pretty = text;
+      try { pretty = JSON.stringify(JSON.parse(text), null, 2); } catch { /* not json */ }
+      holder.textContent = `[${a.name}] HTTP ${r.status}\n\n` + pretty.slice(0, 2000);
+    } catch (e) { holder.textContent = `Could not call ${a.name}: ${e.message}`; }
+  }
+
+  function saveApiAi() {
+    const p = document.getElementById('acProvider')?.value || 'local';
+    store.rawSet(LS.engineProvider, p);
+    store.rawSet(LS.engineKey, (document.getElementById('acKey')?.value || '').trim());
+    store.rawSet(LS.engineBase, (document.getElementById('acBase')?.value || '').trim());
+    store.rawSet(LS.engineModel, (document.getElementById('acModel')?.value || '').trim());
+    // keep the Settings copy in sync if it exists
+    const setV = (id, v) => { const e = document.getElementById(id); if (e) e.value = v; };
+    setV('engineProvider', p); setV('engineKey', store.raw(LS.engineKey));
+    setV('engineBase', store.raw(LS.engineBase)); setV('engineModel', store.raw(LS.engineModel));
+    if (typeof onProvider === 'function') onProvider();
+    refreshAiStatus(); renderApiCenter();
+    log('AI provider updated from API Center.');
+    const s = document.getElementById('acAiStatus');
+    if (s) s.innerHTML = `<b style="color:var(--green)">Saved.</b> ${p === 'local' ? 'Local engine.' : esc(p) + ' — Zero will use it for chat.'}`;
+  }
+
+  function acOnProvider() {
+    const p = document.getElementById('acProvider')?.value || 'local';
+    const hosted = p !== 'local';
+    const show = (id, on) => { const e = document.getElementById(id); if (e) e.style.display = on ? '' : 'none'; };
+    show('acKeyWrap', hosted);
+    show('acBaseWrap', p === 'compatible');
+  }
+
+  function saveApiMkt() {
+    store.rawSet(LS.stockKey, (document.getElementById('acStock')?.value || '').trim());
+    const sym = (document.getElementById('acSymbols')?.value || '').trim();
+    if (sym) store.rawSet(LS.stockSymbols, sym);
+    const se = document.getElementById('stockKey'); if (se) se.value = store.raw(LS.stockKey);
+    log('Market data key updated from API Center.');
+    renderApiCenter();
+  }
+
+  function apiCenterInit() {
+    const setV = (id, v) => { const e = document.getElementById(id); if (e) e.value = v; };
+    const cfg = engineCfg();
+    setV('acProvider', cfg.provider); setV('acKey', cfg.key);
+    setV('acBase', store.raw(LS.engineBase)); setV('acModel', cfg.model);
+    setV('acStock', store.raw(LS.stockKey)); setV('acSymbols', store.raw(LS.stockSymbols));
+    acOnProvider();
+    renderApiCenter();
   }
 
   /* Overview console → routes a command straight into the assistant. */
@@ -1619,6 +1771,15 @@ const Zero = (() => {
     const s = q.trim();
     const low = s.toLowerCase();
     const mapped = mapCommand(s); if (mapped) return mapped;
+    const apiM = s.match(/^api\s+(\S+)\s*(.*)$/i);
+    if (apiM) {
+      const a = apiRegistry.find(x => x.name.toLowerCase() === apiM[1].toLowerCase());
+      if (!a) return `No API named "${apiM[1]}" is registered. Add it in the API Center.`;
+      const path = (apiM[2] || '').trim();
+      const holder = bubble(`Calling ${a.name}${path ? ' ' + path : ''}…`, 'zero');
+      apiCall(a, path, holder);
+      return HANDLED;
+    }
     // recall <query> — native C++ retrieval over your own notes/memories
     const rec = s.match(/^(?:recall|remember what|what did i (?:say|note|write)(?: about)?)\s+(.+)$/i);
     if (rec) {
@@ -2364,6 +2525,7 @@ const Zero = (() => {
     onProvider, ovSend, mapSearch, mapSource, renderMap,
     agentConnect, agentRun, agentAsk, agentPing,
     nativePing, recall,
+    addApi, delApi, testApi, saveApiAi, acOnProvider, saveApiMkt,
     exportData, wipeData, init,
     toggleHalt, killNetwork, panic, setCap, clearLog,
     enableVault, unlockVault, lockVault, disableVault,
