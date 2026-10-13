@@ -501,7 +501,10 @@
           </div>
           <div class="chat-wrap">
             <div class="chat-log" id="chatLog"></div>
+            <div id="attachRow" class="chips" style="display:none;margin:8px 0"></div>
+            <input id="attachInput" type="file" multiple accept="image/*,.txt,.md,.json,.csv,.js,.ts,.py,.html,.css,.log,.xml,.yml,.yaml" style="display:none" onchange="Zero.attachFiles(this.files);this.value=''" />
             <div class="chat-input">
+              <button class="btn ghost" onclick="Zero.pickAttachment()" title="Attach an image or text file">📎</button>
               <input id="chatInput" placeholder="Ask Zero anything…" onkeydown="if(event.key==='Enter')Zero.send()" />
               <button class="btn" onclick="Zero.send()">Send</button>
             </div>
@@ -519,6 +522,12 @@
             <button class="btn" onclick="Zero.addTask()">Add</button>
           </div>
           <div id="taskList"></div>
+        </div>
+        <div class="card" style="margin-top:16px">
+          <h2>Reminders <span class="pill">proactive</span></h2>
+          <p class="hint">Zero reminds you on time — a desktop notification, a spoken nudge, and a chat line. Say <b>remind me to … in 20 minutes</b> or <b>remind me to trade at 9am</b> in chat.</p>
+          <div id="reminderList" style="margin-top:12px"></div>
+          <div class="notice">Reminders and the scheduled brief fire while Zero is open (install it and leave it running, or keep the tab alive). Allow notifications when your browser asks.</div>
         </div>
       </section>
 
@@ -697,7 +706,7 @@
 
           <div class="card">
             <h2>Vault <span class="pill" id="vaultState">off</span></h2>
-            <p class="hint">Encrypts your tasks and notes on this device with a passphrase. Without it, anything Zero saves can be read by anyone who reaches this browser profile or a backup of it.</p>
+            <p class="hint">Encrypts your tasks, notes, memories <b>and every API key &amp; token</b> on this device with a passphrase. Without it, anything Zero saves — keys included — can be read by anyone who reaches this browser profile or a backup of it.</p>
 
             <div id="vaultSetup">
               <label class="hint" style="margin-top:12px;display:block">Passphrase</label>
@@ -773,6 +782,11 @@
               <input type="checkbox" id="autoBriefToggle" checked onchange="Zero.setAutoBrief(this.checked)" />
               <span>Daily market analysis every time I open Zero</span>
             </label>
+            <label class="hint" style="margin-top:14px;display:block">Or run the brief automatically at a set time</label>
+            <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+              <input type="time" id="briefTime" onchange="Zero.setBriefTime(this.value)" style="max-width:150px" />
+              <span class="hint">leave blank for off · fires while Zero is open</span>
+            </div>
             <p class="hint" style="margin-top:14px">Install Zero as an app — its own window and icon, works offline, and launches like any other app.</p>
             <button class="btn" id="installBtn" style="display:none;margin-top:6px" onclick="ZeroInstall()">⤓ Install Zero as an app</button>
             <div class="notice">If the button isn't shown, install from your browser: Chrome/Edge desktop show an install icon in the address bar; on phones use Share → <b>Add to Home Screen</b>. Needs to be served over http(s) — see the README for turning this into a Play Store / Microsoft Store app.</div>

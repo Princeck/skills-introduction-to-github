@@ -35,6 +35,9 @@ const Zero = (() => {
     profile: 'zero.profile',   // what Zero has learned about how you work
     halted: 'zero.halted',     // pause state survives a reload
     autoBrief: 'zero.autoBrief',   // daily market analysis on every login
+    reminders: 'zero.reminders',   // [{text, at, done}]
+    briefTime: 'zero.briefTime',   // "HH:MM" to auto-run the daily brief
+    lastBrief: 'zero.lastBrief',   // date string of the last scheduled brief
     voiceRate: 'zero.voiceRate',
     voicePitch: 'zero.voicePitch',
     voiceEngine: 'zero.voiceEngine',   // browser | elevenlabs
@@ -79,6 +82,45 @@ const Zero = (() => {
   // Keys that hold user content and must never survive as plaintext
   // once the vault is on.
   const PLAINTEXT_KEYS = ['zero.tasks', 'zero.notes', 'zero.memories', 'zero.convo', 'zero.profile'];
+
+  /* ---- Secrets: API keys & tokens, encrypted with the vault ----
+     Sensitive values (provider keys, the voice key, the agent token, the
+     market key, and the custom-API registry) live in memory and, when the
+     vault is on, only as ciphertext in IndexedDB — never as plaintext on
+     disk. Vault off: they stay in localStorage as before. */
+  const SECRET_KEYS = ['zero.engineKey', 'zero.elevenKey', 'zero.agentToken', 'zero.stockKey'];
+  let secrets = {};
+
+  function getSecret(k) { return (k in secrets) ? secrets[k] : (localStorage.getItem(k) || ''); }
+  function setSecret(k, v) {
+    secrets[k] = v;
+    if (Vault.isEnabled() && Vault.isUnlocked()) { localStorage.removeItem(k); persistSecrets(); }
+    else if (Control.caps.storage) localStorage.setItem(k, v);
+  }
+
+  async function persistSecrets() {
+    if (!(Vault.isEnabled() && Vault.isUnlocked()) || !Control.caps.storage) return;
+    const bundle = {};
+    SECRET_KEYS.forEach(k => bundle[k] = secrets[k] || '');
+    bundle['zero.apiRegistry'] = JSON.stringify(apiRegistry || []);
+    try {
+      await Store.set('zero.secrets', await Vault.encrypt(JSON.stringify(bundle)));
+      SECRET_KEYS.forEach(k => localStorage.removeItem(k));
+      localStorage.removeItem('zero.apiRegistry');
+    } catch (e) { log('Could not seal secrets: ' + e.message, true); }
+  }
+
+  async function loadSecretsEncrypted() {
+    try {
+      const cipher = await Store.get('zero.secrets');
+      if (!cipher) return;
+      const obj = JSON.parse(await Vault.decrypt(cipher));
+      SECRET_KEYS.forEach(k => { if (obj[k] != null) secrets[k] = obj[k]; });
+      if (obj['zero.apiRegistry']) { try { apiRegistry = JSON.parse(obj['zero.apiRegistry']); } catch {} }
+      SECRET_KEYS.forEach(k => localStorage.removeItem(k));
+      localStorage.removeItem('zero.apiRegistry');
+    } catch { /* wrong key is handled by the unlock flow */ }
+  }
 
   /* Encrypt the in-memory model and write it. Fire-and-forget: callers
      stay synchronous, and a locked vault simply declines to write. */
@@ -287,6 +329,7 @@ const Zero = (() => {
     if (view === 'security') { renderChecklist(); showPayloads(); }
     if (view === 'files') { filesUi(); listFolder(); }
     if (view === 'apps') renderPresets();
+    if (view === 'tasks') renderReminders();
     if (view === 'memory') { renderMemories(); renderProfile(); }
     if (view === 'maps') renderMap();
     if (view === 'operator') agentInit();
@@ -300,7 +343,7 @@ const Zero = (() => {
      ============================================================ */
   const agentCfg = () => ({
     url: (store.raw(LS.agentUrl) || 'http://127.0.0.1:8770').replace(/\/+$/, ''),
-    token: store.raw(LS.agentToken),
+    token: getSecret(LS.agentToken),
   });
 
   function agentInit() {
@@ -330,7 +373,7 @@ const Zero = (() => {
 
   function agentConnect() {
     store.rawSet(LS.agentUrl, (document.getElementById('agentUrl')?.value || '').trim());
-    store.rawSet(LS.agentToken, (document.getElementById('agentToken')?.value || '').trim());
+    setSecret(LS.agentToken, (document.getElementById('agentToken')?.value || '').trim());
     log('Operator agent settings saved.');
     agentPing();
   }
@@ -426,10 +469,7 @@ const Zero = (() => {
   }
 
   async function nativeCore(mode, query) {
-    const docs = [
-      ...memories.map(m => ({ title: 'memory', text: m.text })),
-      ...notes.map(n => ({ title: 'note', text: n.text })),
-    ];
+    const docs = memoryDocs();
     const r = await guardedFetch(coreBase() + '/api/core', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
@@ -437,6 +477,161 @@ const Zero = (() => {
     }, 'ai');
     return r.json();
   }
+
+  function memoryDocs() {
+    return [
+      ...memories.map(m => ({ title: 'memory', text: m.text })),
+      ...notes.map(n => ({ title: 'note', text: n.text })),
+    ];
+  }
+
+  const RSTOP = new Set('the a an and or of to in it is are be i you we my me for on with that this what how why can do does at as by from was were has have had not but so if then than into out up about over your'.split(' '));
+  const rtok = s => (String(s).toLowerCase().match(/[a-z0-9]+/g) || []).filter(w => w.length > 2 && !RSTOP.has(w));
+
+  /* The notes & memories most relevant to a query, as a prompt block.
+     Uses the C++ core when the bridge is up; a JS word-overlap score else. */
+  async function relevantContext(query) {
+    const docs = memoryDocs();
+    if (!docs.length) return '';
+    let picked = [];
+    if (nativeReady) {
+      try {
+        const r = await nativeCore('search', query);
+        if (r && r.results && r.results.length) picked = r.results.map(h => ({ title: h.title, text: h.text }));
+      } catch { /* fall through to JS */ }
+    }
+    if (!picked.length) {
+      const q = new Set(rtok(query));
+      picked = docs
+        .map(d => ({ d, s: rtok(d.text).reduce((n, w) => n + (q.has(w) ? 1 : 0), 0) }))
+        .filter(x => x.s > 0)
+        .sort((a, b) => b.s - a.s)
+        .slice(0, 6)
+        .map(x => x.d);
+    }
+    if (!picked.length) picked = memories.slice(-6).map(m => ({ title: 'memory', text: m.text }));
+    if (!picked.length) return '';
+    return 'Relevant things you know about this user (their own notes & memories — use them):\n' +
+      picked.slice(0, 6).map(h => `- [${h.title || 'note'}] ${h.text}`).join('\n');
+  }
+
+  /* Quietly remember clear first-person facts the user states, so Zero
+     builds a picture of you over time. Conservative: short declaratives
+     only, deduped and capped. Stays on-device like all memory. */
+  function autoCapture(text) {
+    const t = text.trim();
+    if (t.length < 6 || t.length > 160 || /[?]$/.test(t)) return;
+    if (!/^(i |i'm |im |i am |my |i've |ive |i have |i like|i love|i prefer|i hate|i work|i live|i use|i own|i drive|call me |remember )/i.test(t)) return;
+    const key = t.toLowerCase().slice(0, 48);
+    if (memories.some(m => m.text.toLowerCase().includes(key))) return;
+    memories.push({ text: t, ts: Date.now(), auto: true });
+    while (memories.length > 300) memories.shift();
+    store.set(LS.memories, memories);
+    renderMemories();
+    log('Remembered: ' + t.slice(0, 60));
+  }
+
+  /* ============================================================
+     PROACTIVE — reminders and a scheduled daily brief. Zero acts
+     on time, not only when you open it. Reminders fire a desktop
+     notification (if allowed), speak, and drop a chat line.
+     ============================================================ */
+  let reminders = (() => { try { return JSON.parse(store.raw(LS.reminders) || '[]'); } catch { return []; } })();
+  function saveReminders() { store.rawSet(LS.reminders, JSON.stringify(reminders)); }
+
+  function ensureNotify() {
+    try { if ('Notification' in window && Notification.permission === 'default') Notification.requestPermission(); } catch {}
+  }
+  function notify(title, body) {
+    try { if ('Notification' in window && Notification.permission === 'granted') { new Notification(title, { body }); return true; } } catch {}
+    return false;
+  }
+
+  function fmtWhen(ts) {
+    const d = new Date(ts), now = new Date();
+    const same = d.toDateString() === now.toDateString();
+    const time = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    return same ? 'at ' + time : 'on ' + d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' }) + ' at ' + time;
+  }
+
+  /* Turn "in 20 minutes", "at 5pm", "tomorrow 9am" into a timestamp. */
+  function parseWhen(s) {
+    const now = Date.now();
+    let m = s.match(/\bin\s+(\d+)\s*(minutes?|mins?|hours?|hrs?|h|m|days?|d)\b/i);
+    if (m) {
+      const n = +m[1], u = m[2].toLowerCase();
+      const ms = /^h|hour|hr/.test(u) ? 3600e3 : /^d|day/.test(u) ? 86400e3 : 60e3;
+      return now + n * ms;
+    }
+    m = s.match(/\bat\s+(\d{1,2})(?::(\d{2}))?\s*(am|pm)?\b/i);
+    if (m) {
+      const d = new Date(); let h = +m[1]; const min = m[2] ? +m[2] : 0; const ap = (m[3] || '').toLowerCase();
+      if (ap === 'pm' && h < 12) h += 12; if (ap === 'am' && h === 12) h = 0;
+      d.setHours(h, min, 0, 0);
+      if (/tomorrow/i.test(s)) d.setDate(d.getDate() + 1);
+      else if (d.getTime() <= now) d.setDate(d.getDate() + 1);
+      return d.getTime();
+    }
+    if (/\btomorrow\b/i.test(s)) { const d = new Date(); d.setDate(d.getDate() + 1); d.setHours(9, 0, 0, 0); return d.getTime(); }
+    return null;
+  }
+
+  function remindCommand(q) {
+    const m = q.match(/^remind me (?:to |that |about )?(.+)$/i);
+    if (!m) return null;
+    const body = m[1].trim();
+    const when = parseWhen(body);
+    if (!when) return 'When? Try “remind me to call mum in 30 minutes” or “remind me to trade at 9am”.';
+    const text = body.replace(/\b(in\s+\d+\s*\w+|at\s+\d{1,2}(:\d{2})?\s*(am|pm)?|tomorrow)\b/ig, '').replace(/\s+/g, ' ').trim() || body;
+    reminders.push({ text, at: when, done: false, ts: Date.now() });
+    saveReminders(); renderReminders(); ensureNotify();
+    return `Reminder set: “${text}” ${fmtWhen(when)}.`;
+  }
+
+  function fireReminder(r) {
+    const fired = notify('⏰ Zero reminder', r.text);
+    if (speakReplies) Voice.speak('Reminder. ' + r.text);
+    bubble('⏰ Reminder: ' + r.text, 'zero');
+    log('Reminder: ' + r.text);
+    return fired;
+  }
+
+  function checkReminders() {
+    const now = Date.now(); let changed = false;
+    reminders.forEach(r => { if (!r.done && r.at <= now) { r.done = true; changed = true; fireReminder(r); } });
+    if (changed) { saveReminders(); renderReminders(); }
+    checkScheduledBrief();
+  }
+
+  function checkScheduledBrief() {
+    const t = store.raw(LS.briefTime); if (!t) return;
+    const d = new Date();
+    const hhmm = String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+    if (hhmm === t && store.raw(LS.lastBrief) !== d.toDateString()) {
+      store.rawSet(LS.lastBrief, d.toDateString());
+      notify('Zero', 'Running your daily market briefing.');
+      nav('assistant'); dailyBriefing(true);
+    }
+  }
+
+  function setBriefTime(v) {
+    store.rawSet(LS.briefTime, (v || '').trim());
+    if (v) { ensureNotify(); log('Daily brief scheduled for ' + v + '.'); }
+    else log('Scheduled daily brief cleared.');
+  }
+
+  function renderReminders() {
+    const box = document.getElementById('reminderList');
+    if (!box) return;
+    const pending = reminders.filter(r => !r.done).sort((a, b) => a.at - b.at);
+    if (!pending.length) { box.innerHTML = '<div class="nodata" style="font-size:12px">No reminders. Say “remind me to … in 20 minutes”.</div>'; return; }
+    box.innerHTML = pending.map(r => {
+      const i = reminders.indexOf(r);
+      return `<div class="task"><span class="t">⏰ ${esc(r.text)} <span class="hint">${fmtWhen(r.at)}</span></span>` +
+        `<button class="del" onclick="Zero.delReminder(${i})" title="cancel">✕</button></div>`;
+    }).join('');
+  }
+  function delReminder(i) { reminders.splice(i, 1); saveReminders(); renderReminders(); }
 
   /* `recall <query>` — search your own notes+memories with the C++ core. */
   async function recall(query) {
@@ -481,7 +676,10 @@ const Zero = (() => {
     none: () => ({}),
   };
 
-  function saveApiRegistry() { store.rawSet(LS.apiRegistry, JSON.stringify(apiRegistry)); }
+  function saveApiRegistry() {
+    if (Vault.isEnabled() && Vault.isUnlocked()) { persistSecrets(); return; }
+    store.rawSet(LS.apiRegistry, JSON.stringify(apiRegistry));
+  }
 
   function renderApiCenter() {
     // built-in status pills
@@ -491,10 +689,10 @@ const Zero = (() => {
       : (key ? provider + ' · ' + (model || 'no model') + ' · key set' : provider + ' · no key'));
     const vEng = store.raw(LS.voiceEngine) || 'browser';
     setText('acVoiceState', vEng === 'elevenlabs'
-      ? (store.raw(LS.elevenKey) && store.raw(LS.elevenVoice) ? "ElevenLabs · Zero's voice" : 'ElevenLabs · incomplete')
+      ? (getSecret(LS.elevenKey) && store.raw(LS.elevenVoice) ? "ElevenLabs · Zero's voice" : 'ElevenLabs · incomplete')
       : 'browser voice');
-    setText('acMktState', store.raw(LS.stockKey) ? 'Finnhub key set' : 'no key (crypto & FX still work)');
-    setText('acAgentState', store.raw(LS.agentToken) ? 'token saved' : 'not paired');
+    setText('acMktState', getSecret(LS.stockKey) ? 'Finnhub key set' : 'no key (crypto & FX still work)');
+    setText('acAgentState', getSecret(LS.agentToken) ? 'token saved' : 'not paired');
     nativePing().then(() => setText('acCoreState', nativeReady ? 'C++ core online' : 'not built / server off'));
 
     // custom registry
@@ -579,12 +777,12 @@ const Zero = (() => {
   function saveApiAi() {
     const p = document.getElementById('acProvider')?.value || 'local';
     store.rawSet(LS.engineProvider, p);
-    store.rawSet(LS.engineKey, (document.getElementById('acKey')?.value || '').trim());
+    setSecret(LS.engineKey, (document.getElementById('acKey')?.value || '').trim());
     store.rawSet(LS.engineBase, (document.getElementById('acBase')?.value || '').trim());
     store.rawSet(LS.engineModel, (document.getElementById('acModel')?.value || '').trim());
     // keep the Settings copy in sync if it exists
     const setV = (id, v) => { const e = document.getElementById(id); if (e) e.value = v; };
-    setV('engineProvider', p); setV('engineKey', store.raw(LS.engineKey));
+    setV('engineProvider', p); setV('engineKey', getSecret(LS.engineKey));
     setV('engineBase', store.raw(LS.engineBase)); setV('engineModel', store.raw(LS.engineModel));
     if (typeof onProvider === 'function') onProvider();
     refreshAiStatus(); renderApiCenter();
@@ -602,10 +800,10 @@ const Zero = (() => {
   }
 
   function saveApiMkt() {
-    store.rawSet(LS.stockKey, (document.getElementById('acStock')?.value || '').trim());
+    setSecret(LS.stockKey, (document.getElementById('acStock')?.value || '').trim());
     const sym = (document.getElementById('acSymbols')?.value || '').trim();
     if (sym) store.rawSet(LS.stockSymbols, sym);
-    const se = document.getElementById('stockKey'); if (se) se.value = store.raw(LS.stockKey);
+    const se = document.getElementById('stockKey'); if (se) se.value = getSecret(LS.stockKey);
     log('Market data key updated from API Center.');
     renderApiCenter();
   }
@@ -615,7 +813,7 @@ const Zero = (() => {
     const cfg = engineCfg();
     setV('acProvider', cfg.provider); setV('acKey', cfg.key);
     setV('acBase', store.raw(LS.engineBase)); setV('acModel', cfg.model);
-    setV('acStock', store.raw(LS.stockKey)); setV('acSymbols', store.raw(LS.stockSymbols));
+    setV('acStock', getSecret(LS.stockKey)); setV('acSymbols', store.raw(LS.stockSymbols));
     acOnProvider();
     renderApiCenter();
   }
@@ -1569,7 +1767,7 @@ const Zero = (() => {
   async function loadStocks() {
     const box = document.getElementById('stockTable');
     if (!box) return;
-    const key = store.raw(LS.stockKey);
+    const key = getSecret(LS.stockKey);
     if (!key) {
       box.innerHTML = '<p class="hint">No stock feed connected. Add a free Finnhub key in Settings and Zero will pull live quotes here.</p>';
       return;
@@ -1681,15 +1879,62 @@ const Zero = (() => {
     return d;
   }
 
+  /* ---- Attachments: images & text files you can hand to the AI ---- */
+  let pendingAttachments = [];
+  function attachFiles(list) {
+    Array.from(list || []).forEach(f => {
+      if (f.size > 8 * 1024 * 1024) { bubble(`“${f.name}” is over 8 MB — too big to attach.`, 'zero'); return; }
+      const reader = new FileReader();
+      if (f.type.startsWith('image/')) {
+        reader.onload = () => { pendingAttachments.push({ kind: 'image', name: f.name, type: f.type, dataUrl: reader.result }); renderAttachments(); };
+        reader.readAsDataURL(f);
+      } else if (/^text\//.test(f.type) || /\.(txt|md|json|csv|js|ts|py|html|css|log|xml|ya?ml|ini|conf|sh)$/i.test(f.name)) {
+        reader.onload = () => { pendingAttachments.push({ kind: 'text', name: f.name, type: 'text', text: String(reader.result).slice(0, 20000) }); renderAttachments(); };
+        reader.readAsText(f);
+      } else {
+        bubble(`“${f.name}” (${f.type || 'unknown type'}) isn’t supported yet — attach images or text files. For a PDF, paste the text.`, 'zero');
+      }
+    });
+  }
+  function renderAttachments() {
+    const row = document.getElementById('attachRow');
+    if (!row) return;
+    row.innerHTML = pendingAttachments.map((a, i) =>
+      `<span class="chip">${a.kind === 'image' ? '🖼' : '📄'} ${esc(a.name)} <b onclick="Zero.removeAttachment(${i})" style="cursor:pointer;margin-left:4px">✕</b></span>`).join('');
+    row.style.display = pendingAttachments.length ? 'flex' : 'none';
+  }
+  function removeAttachment(i) { pendingAttachments.splice(i, 1); renderAttachments(); }
+  function pickAttachment() { document.getElementById('attachInput')?.click(); }
+
   async function send() {
     const inp = document.getElementById('chatInput');
     const q = inp.value.trim();
-    if (!q) return;
+    const atts = pendingAttachments.slice();
+    if (!q && !atts.length) return;
     inp.value = '';
-    bubble(q, 'user');
+    bubble(q + (atts.length ? (q ? '\n' : '') + '📎 ' + atts.map(a => a.name).join(', ') : ''), 'user');
+    pendingAttachments = []; renderAttachments();
+
+    // With attachments, go straight to the AI — offline commands can't see files.
+    if (atts.length) {
+      if (!(store.raw(LS.engineUrl) || store.raw(LS.engineModel) || engineCfg().key)) {
+        bubble('To work with files or images, give Zero a brain first — Settings → Zero Core (a local engine, or a provider + API key).', 'zero');
+        return;
+      }
+      const thinking = bubble('…', 'zero');
+      try {
+        const reply = await callEngine(q, partial => renderReply(thinking, partial, false), atts);
+        renderReply(thinking, reply, true);
+        if (speakReplies) Voice.speak(splitThinking(reply).answer || reply);
+        chatHistory.push({ role: 'user', content: q || '(attachment)' }, { role: 'assistant', content: reply });
+        if (chatHistory.length > 40) chatHistory = chatHistory.slice(-40);
+      } catch (e) { renderReply(thinking, 'Could not process that: ' + e.message, true); }
+      return;
+    }
 
     // Learn from how the user writes, and remember what was said.
     learnFromMessage(q);
+    autoCapture(q);
     convo.push({ who: 'user', text: q, ts: Date.now() });
     store.set(LS.convo, convo);
 
@@ -1778,6 +2023,7 @@ const Zero = (() => {
     const s = q.trim();
     const low = s.toLowerCase();
     const mapped = mapCommand(s); if (mapped) return mapped;
+    const rem = remindCommand(s); if (rem) return rem;
     const apiM = s.match(/^api\s+(\S+)\s*(.*)$/i);
     if (apiM) {
       const a = apiRegistry.find(x => x.name.toLowerCase() === apiM[1].toLowerCase());
@@ -1828,6 +2074,7 @@ const Zero = (() => {
         '  task <text>         add a task        tasks   list them',
         '  note <text>         save a note       time    date & time',
         '  recall <text>       search your notes/memories with the C++ core',
+        '  remind me to … in 20 minutes / at 9am    set a reminder',
         '  map <place>         open any place on the world map',
         '',
         'Say it out loud with the mic button — Zero can talk back.',
@@ -1989,7 +2236,7 @@ const Zero = (() => {
     const PBASE = { openai: 'https://api.openai.com/v1', anthropic: 'https://api.anthropic.com' };
     return {
       provider,
-      key: store.raw(LS.engineKey),
+      key: getSecret(LS.engineKey),
       base: (store.raw(LS.engineBase) || PBASE[provider] || '').replace(/\/+$/, ''),
       url: (store.raw(LS.engineUrl) || 'http://localhost:11434').replace(/\/+$/, ''),
       model: store.raw(LS.engineModel),
@@ -2053,17 +2300,28 @@ const Zero = (() => {
     el.appendChild(out);
   }
 
-  async function callEngine(q, onToken) {
+  async function callEngine(q, onToken, attachments = []) {
     const { url, mode, think, provider, key, base } = engineCfg();
     const model = await resolveModel();
     let system = CORE_PROMPT + (think ? THINK_PROMPT : '');
-    if (memories.length) {
-      system += '\n\nThings the user has told you to remember:\n' +
-        memories.map(m => '- ' + m.text).join('\n');
-    }
+    // Smarter memory: pull only the notes & memories RELEVANT to this query
+    // (C++ core when the bridge is up, a JS ranking otherwise) instead of
+    // dumping everything — so Zero actually knows you without drowning the prompt.
+    const ctx = await relevantContext(q);
+    if (ctx) system += '\n\n' + ctx;
     const learned = profileSummary();
     if (learned) system += '\n\nWhat you have learned about this user:\n' + learned;
-    const messages = [{ role: 'system', content: system }, ...chatHistory.slice(-24), { role: 'user', content: q }];
+
+    // Attachments: fold text files into the prompt; carry images per the
+    // provider's own vision format so a capable model can actually see them.
+    const textAtts = attachments.filter(a => a.kind === 'text');
+    const imgAtts = attachments.filter(a => a.kind === 'image');
+    let qFull = q || (imgAtts.length ? 'Look at the attached image(s) and respond.' : '');
+    textAtts.forEach(a => { qFull += `\n\n[Attached file: ${a.name}]\n${a.text}`; });
+    const b64 = u => (u.split(',')[1] || '');
+
+    const history = chatHistory.slice(-24);
+    const messages = [{ role: 'system', content: system }, ...history, { role: 'user', content: qFull }];
 
     // Which brain answers. A hosted provider (with a key set in Settings) is
     // called straight from here; otherwise it's the local engine as before.
@@ -2071,7 +2329,11 @@ const Zero = (() => {
 
     if (provider === 'anthropic') {
       if (!key) throw new Error('Add your Anthropic API key in Settings → Zero Core.');
-      const turns = messages.filter(m => m.role !== 'system').map(m => ({ role: m.role, content: m.content }));
+      const turns = history.map(m => ({ role: m.role, content: m.content }));
+      const userContent = imgAtts.length
+        ? [{ type: 'text', text: qFull }, ...imgAtts.map(a => ({ type: 'image', source: { type: 'base64', media_type: a.type, data: b64(a.dataUrl) } }))]
+        : qFull;
+      turns.push({ role: 'user', content: userContent });
       endpoint = (base || 'https://api.anthropic.com') + '/v1/messages';
       body = { model, max_tokens: 1024, stream: true, system, messages: turns };
       headers = { 'content-type': 'application/json', 'x-api-key': key,
@@ -2081,15 +2343,27 @@ const Zero = (() => {
     } else if (provider === 'openai' || provider === 'compatible') {
       if (!key) throw new Error('Add your API key in Settings → Zero Core.');
       const b = base || 'https://api.openai.com/v1';
+      const msgs = imgAtts.length
+        ? [{ role: 'system', content: system }, ...history,
+           { role: 'user', content: [{ type: 'text', text: qFull }, ...imgAtts.map(a => ({ type: 'image_url', image_url: { url: a.dataUrl } }))] }]
+        : messages;
       endpoint = b + '/chat/completions';
-      body = { model, stream: true, messages };
+      body = { model, stream: true, messages: msgs };
       headers = { 'content-type': 'application/json', 'authorization': 'Bearer ' + key };
       pluck = d => d.choices?.[0]?.delta?.content;
       reach = 'the provider';
+    } else if (mode === 'compatible') {
+      const msgs = imgAtts.length
+        ? [{ role: 'system', content: system }, ...history,
+           { role: 'user', content: [{ type: 'text', text: qFull }, ...imgAtts.map(a => ({ type: 'image_url', image_url: { url: a.dataUrl } }))] }]
+        : messages;
+      [endpoint, body, pluck] = [url + '/v1/chat/completions', { model, stream: true, messages: msgs }, d => d.choices?.[0]?.delta?.content];
+      reach = 'the engine at ' + url;
     } else {
-      [endpoint, body, pluck] = mode === 'compatible'
-        ? [url + '/v1/chat/completions', { model, stream: true, messages }, d => d.choices?.[0]?.delta?.content]
-        : [url + '/api/chat',            { model, stream: true, messages }, d => d.message?.content];
+      // Ollama native: images ride as base64 on the user message.
+      const msgs = JSON.parse(JSON.stringify(messages));
+      if (imgAtts.length) msgs[msgs.length - 1].images = imgAtts.map(a => b64(a.dataUrl));
+      [endpoint, body, pluck] = [url + '/api/chat', { model, stream: true, messages: msgs }, d => d.message?.content];
       reach = 'the engine at ' + url;
     }
 
@@ -2215,7 +2489,7 @@ const Zero = (() => {
   function saveEngine() {
     const provider = document.getElementById('engineProvider')?.value || 'local';
     store.rawSet(LS.engineProvider, provider);
-    store.rawSet(LS.engineKey, (document.getElementById('engineKey')?.value || '').trim());
+    setSecret(LS.engineKey, (document.getElementById('engineKey')?.value || '').trim());
     store.rawSet(LS.engineBase, (document.getElementById('engineBase')?.value || '').trim());
     store.rawSet(LS.engineUrl, document.getElementById('engineUrl').value.trim());
     store.rawSet(LS.engineModel, document.getElementById('engineModel').value.trim());
@@ -2299,15 +2573,15 @@ const Zero = (() => {
   function applyVoiceEngine() {
     Voice.configureTTS({
       provider: store.raw(LS.voiceEngine) || 'browser',
-      key: store.raw(LS.elevenKey),
+      key: getSecret(LS.elevenKey),
       voiceId: store.raw(LS.elevenVoice),
     });
   }
   function setVoiceEngine(v) { store.rawSet(LS.voiceEngine, v); applyVoiceEngine(); syncVoiceEngineUi(); }
   function saveEleven() {
-    store.rawSet(LS.elevenKey, (document.getElementById('elevenKey')?.value || '').trim());
+    setSecret(LS.elevenKey, (document.getElementById('elevenKey')?.value || '').trim());
     store.rawSet(LS.elevenVoice, (document.getElementById('elevenVoice')?.value || '').trim());
-    const ready = store.raw(LS.elevenKey) && store.raw(LS.elevenVoice);
+    const ready = getSecret(LS.elevenKey) && store.raw(LS.elevenVoice);
     if (ready) store.rawSet(LS.voiceEngine, 'elevenlabs');
     applyVoiceEngine();
     syncVoiceEngineUi();
@@ -2322,7 +2596,7 @@ const Zero = (() => {
     const engine = store.raw(LS.voiceEngine) || 'browser';
     const sel = document.getElementById('voiceEngine'); if (sel) sel.value = engine;
     const wrap = document.getElementById('elevenFields'); if (wrap) wrap.style.display = engine === 'elevenlabs' ? '' : 'none';
-    const k = document.getElementById('elevenKey'); if (k && !k.value) k.value = store.raw(LS.elevenKey);
+    const k = document.getElementById('elevenKey'); if (k && !k.value) k.value = getSecret(LS.elevenKey);
     const v = document.getElementById('elevenVoice'); if (v && !v.value) v.value = store.raw(LS.elevenVoice);
   }
 
@@ -2334,7 +2608,7 @@ const Zero = (() => {
   }
 
   function saveStockKey() {
-    store.rawSet(LS.stockKey, document.getElementById('stockKey').value.trim());
+    setSecret(LS.stockKey, document.getElementById('stockKey').value.trim());
     store.rawSet(LS.stockSymbols, document.getElementById('stockSymbols').value.trim());
     loadStocks();
   }
@@ -2377,9 +2651,11 @@ const Zero = (() => {
     try {
       await Vault.enable(a);
       await persist();                       // write the current data back, encrypted
+      await persistSecrets();                // seal API keys & tokens too
       // persist() clears localStorage; confirm before telling the user it worked.
       const leaked = PLAINTEXT_KEYS.filter(k => localStorage.getItem(k) !== null);
-      if (leaked.length) throw new Error('Could not remove the unencrypted copy of: ' + leaked.join(', '));
+      const leakedSecrets = SECRET_KEYS.filter(k => localStorage.getItem(k) !== null);
+      if (leaked.length || leakedSecrets.length) throw new Error('Could not remove the unencrypted copy of: ' + [...leaked, ...leakedSecrets].join(', '));
       document.getElementById('vaultPass').value = '';
       document.getElementById('vaultPass2').value = '';
       log('Vault enabled — stored data is now encrypted.');
@@ -2405,6 +2681,9 @@ const Zero = (() => {
       memories = m ? JSON.parse(await Vault.decrypt(m)) : [];
       convo = c ? JSON.parse(await Vault.decrypt(c)) : [];
       profile = pr ? JSON.parse(await Vault.decrypt(pr)) : blankProfile();
+      await loadSecretsEncrypted();          // bring API keys & tokens back into memory
+      applyVoiceEngine();                    // the voice key is available again
+      refreshAiStatus();
     } catch (e) {
       err.textContent = 'Unlocked, but stored data could not be read: ' + e.message;
       tasks = []; notes = []; memories = []; convo = []; profile = blankProfile();
@@ -2417,6 +2696,8 @@ const Zero = (() => {
   function lockVault() {
     Vault.lock();
     tasks = []; notes = []; memories = [];   // drop plaintext from memory too
+    secrets = {}; apiRegistry = [];          // and the keys/tokens
+    applyVoiceEngine();                      // stop using the (now-gone) voice key
     chatHistory = [];
     renderTasks(); renderNotes(); renderMemories(); updateStatus();
     log('Vault locked.');
@@ -2425,9 +2706,13 @@ const Zero = (() => {
 
   async function disableVault() {
     if (!Vault.isUnlocked()) return alert('Unlock the vault first.');
-    if (!confirm('Turn encryption OFF?\n\nTasks and notes will be written back as readable text on this device.')) return;
+    if (!confirm('Turn encryption OFF?\n\nTasks, notes AND your API keys will be written back as readable text on this device.')) return;
     Vault.disable();
     await persistPlain();
+    // write the secrets back out as plaintext and drop the encrypted copy
+    SECRET_KEYS.forEach(k => { if (secrets[k]) localStorage.setItem(k, secrets[k]); });
+    store.rawSet(LS.apiRegistry, JSON.stringify(apiRegistry || []));
+    try { await Store.del('zero.secrets'); } catch {}
     log('Vault disabled — data is stored unencrypted.', true);
     vaultUi();
   }
@@ -2445,6 +2730,7 @@ const Zero = (() => {
     Store.clear().catch(() => {});
     Vault.disable();                       // also clears the salt and check token
     tasks = []; notes = []; memories = []; apps = []; convo = []; profile = blankProfile(); chatHistory = [];
+    secrets = {}; apiRegistry = [];
     const cl = document.getElementById('chatLog'); if (cl) cl.innerHTML = '';
     renderTasks(); renderNotes(); renderMemories(); renderApps(); renderProfile(); refreshAiStatus(); vaultUi();
     alert('All local data wiped.');
@@ -2472,7 +2758,7 @@ const Zero = (() => {
     onProvider();
     setV('agentUrl', agentCfg().url);
     setV('agentToken', agentCfg().token);
-    document.getElementById('stockKey').value = store.raw(LS.stockKey);
+    document.getElementById('stockKey').value = getSecret(LS.stockKey);
     document.getElementById('stockSymbols').value = store.raw(LS.stockSymbols);
     document.getElementById('lockPass')?.addEventListener('keydown', e => {
       if (e.key === 'Enter') unlockVault();
@@ -2510,6 +2796,9 @@ const Zero = (() => {
 
     nativePing();               // detect the C++ core through the bridge
     tick(); setInterval(tick, 1000);
+    checkReminders(); setInterval(checkReminders, 20000);   // proactive reminders & scheduled brief
+    renderReminders();
+    const bt = document.getElementById('briefTime'); if (bt) bt.value = store.raw(LS.briefTime);
     renderTasks(); renderNotes(); renderMemories(); renderApps(); renderPresets(); refreshAiStatus(); updateStatus();
     // Move any records left behind by the localStorage era.
     Store.migrate([LS.tasks, LS.notes, LS.memories, LS.apps])
@@ -2558,6 +2847,7 @@ const Zero = (() => {
   return {
     nav, loadMarkets, addTask, toggleTask, delTask, addNote, delNote,
     send, saveEngine, testEngine, saveStockKey, setThink, updateNow, loadStocks,
+    attachFiles, removeAttachment, pickAttachment,
     loadRates, loadNews, setNewsMode, setSpeak, setVoice, previewVoice, micToggle, stopSpeaking: () => Voice.stop(),
     setVoiceRate, setVoicePitch, voicePreset,
     setVoiceEngine, saveEleven, playZeroSample,
@@ -2569,6 +2859,7 @@ const Zero = (() => {
     agentConnect, agentRun, agentAsk, agentPing,
     nativePing, recall,
     addApi, delApi, testApi, saveApiAi, acOnProvider, saveApiMkt,
+    delReminder, setBriefTime,
     exportData, wipeData, init,
     toggleHalt, killNetwork, panic, setCap, clearLog,
     enableVault, unlockVault, lockVault, disableVault,
