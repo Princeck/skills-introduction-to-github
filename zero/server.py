@@ -145,6 +145,8 @@ class Handler(SimpleHTTPRequestHandler):
             return self._tags()
         if self.path.rstrip("/") == "/api/core/ping":
             return self._core_ping()
+        if self.path.split("?")[0].rstrip("/") == "/api/flights":
+            return self._flights()
         return super().do_GET()
 
     def do_POST(self):
@@ -176,6 +178,40 @@ class Handler(SimpleHTTPRequestHandler):
             return self._send_json(200, {"available": True, "error": "core timed out"})
         except Exception as e:
             return self._send_json(200, {"available": True, "error": str(e)})
+
+    # ---- /api/flights : live aircraft near a point (ADS-B, keyless) -----
+    #   Browsers can't call the ADS-B feeds directly (no CORS), so Zero's
+    #   own server fetches them and hands the data back with CORS. Query:
+    #   /api/flights?lat=..&lon=..&dist=.. (dist in nautical miles, max 250)
+    def _flights(self):
+        from urllib.parse import urlparse, parse_qs
+        q = parse_qs(urlparse(self.path).query)
+        try:
+            lat = float(q.get("lat", ["51.5"])[0])
+            lon = float(q.get("lon", ["-0.1"])[0])
+            dist = max(1, min(250, int(float(q.get("dist", ["100"])[0]))))
+        except Exception:
+            return self._send_json(400, {"error": "bad lat/lon/dist"})
+        url = f"https://opendata.adsb.fi/api/v2/lat/{lat}/lon/{lon}/dist/{dist}"
+        req = urllib.request.Request(url, headers={"User-Agent": "Zero/1.0", "Accept": "application/json"})
+        try:
+            with urllib.request.urlopen(req, timeout=12) as resp:
+                raw = json.loads(resp.read().decode("utf-8", "ignore"))
+            planes = []
+            for a in (raw.get("aircraft") or [])[:200]:
+                if a.get("lat") is None or a.get("lon") is None:
+                    continue
+                planes.append({
+                    "hex": a.get("hex"), "flight": (a.get("flight") or "").strip(),
+                    "lat": a.get("lat"), "lon": a.get("lon"),
+                    "alt": a.get("alt_baro"), "gs": a.get("gs"),
+                    "track": a.get("track"), "type": a.get("t"), "desc": a.get("desc"),
+                })
+            self._send_json(200, {"available": True, "center": {"lat": lat, "lon": lon},
+                                  "count": len(planes), "aircraft": planes})
+        except Exception as e:
+            self._send_json(200, {"available": False, "error": str(e),
+                                  "center": {"lat": lat, "lon": lon}, "aircraft": []})
 
     def _send_json(self, code, obj):
         body = json.dumps(obj).encode()

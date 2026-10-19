@@ -19,6 +19,9 @@ const Zero = (() => {
     mapPlace: 'zero.mapPlace',
     agentUrl: 'zero.agentUrl',      // local operator agent address
     agentToken: 'zero.agentToken',  // pairing token for the operator agent
+    geoLat: 'zero.geoLat',          // your last known latitude (on-device)
+    geoLon: 'zero.geoLon',          // your last known longitude (on-device)
+    skyRange: 'zero.skyRange',      // flight radar range in nautical miles
     apiRegistry: 'zero.apiRegistry',// user-registered custom APIs (name, base, key, header)
     think: 'zero.think',
     stockKey: 'zero.stockKey',
@@ -303,6 +306,7 @@ const Zero = (() => {
     operator:  ['Operator', 'Zero runs commands on your machine — you approve each one.'],
     api:       ['API Center', 'Every key and connection Zero uses — all on this device.'],
     maps:      ['Maps', 'Every map on Earth — search anywhere.'],
+    sky:       ['Sky', 'Live aircraft radar around your location.'],
     news:      ['News', 'What is happening right now.'],
     trading:   ['Trading', 'Live professional charts — every market.'],
     apps:      ['Apps', 'Your things, one keystroke away.'],
@@ -332,6 +336,7 @@ const Zero = (() => {
     if (view === 'tasks') renderReminders();
     if (view === 'memory') { renderMemories(); renderProfile(); }
     if (view === 'maps') renderMap();
+    if (view === 'sky') skyInit();
     if (view === 'operator') agentInit();
     if (view === 'api') apiCenterInit();
   }
@@ -864,6 +869,144 @@ const Zero = (() => {
     if (!store.raw(LS.mapSrc)) store.rawSet(LS.mapSrc, 'osm');
     nav('maps');
     return `Here is ${place} on the map. Switch to Google or satellite with the tabs.`;
+  }
+
+  /* ============================================================
+     SKY — live aircraft radar around your location. A HUD radar
+     scope (no map tiles): your position at centre, planes placed
+     by bearing + distance, with a sweep. Data via the Python
+     bridge's /api/flights proxy (the ADS-B feeds block browsers).
+     ============================================================ */
+  let skyData = { aircraft: [], center: null, ok: false, msg: '' };
+  let skyTimer = null, sweepAngle = 0, sweepRaf = null;
+
+  function skyCenter() {
+    const lat = parseFloat(store.raw(LS.geoLat)), lon = parseFloat(store.raw(LS.geoLon));
+    return isFinite(lat) && isFinite(lon) ? { lat, lon } : { lat: 51.5074, lon: -0.1278 }; // default: London
+  }
+  function skyRange() { const r = parseInt(store.raw(LS.skyRange), 10); return isFinite(r) ? r : 100; }
+
+  function locateMe(then) {
+    const s = document.getElementById('skyStatus');
+    if (!('geolocation' in navigator)) { if (s) s.textContent = 'This browser has no location service.'; return; }
+    if (s) s.textContent = 'Asking your browser for your location…';
+    navigator.geolocation.getCurrentPosition(
+      pos => {
+        store.rawSet(LS.geoLat, String(pos.coords.latitude));
+        store.rawSet(LS.geoLon, String(pos.coords.longitude));
+        log('Location set from your device.');
+        if (s) s.innerHTML = `<b style="color:var(--green)">Located.</b> ${pos.coords.latitude.toFixed(3)}, ${pos.coords.longitude.toFixed(3)} (±${Math.round(pos.coords.accuracy)}m)`;
+        if (then) then(); else loadFlights();
+      },
+      err => { if (s) s.innerHTML = `<b style="color:var(--red)">Location denied.</b> ${esc(err.message)} — you can type a point instead.`; },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
+    );
+  }
+
+  function setSkyRange(v) { store.rawSet(LS.skyRange, String(v)); setText('skyRangeVal', v + ' nm'); loadFlights(); }
+
+  async function loadFlights() {
+    const c = skyCenter();
+    setText('skyCenterLabel', c.lat.toFixed(3) + ', ' + c.lon.toFixed(3));
+    const s = document.getElementById('skyStatus');
+    try {
+      const r = await guardedFetch(`${coreBase()}/api/flights?lat=${c.lat}&lon=${c.lon}&dist=${skyRange()}`, {}, 'market');
+      const d = await r.json();
+      if (d.available === false) { skyData = { aircraft: [], center: c, ok: false, msg: d.error || 'feed down' }; }
+      else skyData = { aircraft: d.aircraft || [], center: c, ok: true, msg: '' };
+    } catch (e) {
+      skyData = { aircraft: [], center: c, ok: false, msg: e.message };
+    }
+    if (s) {
+      if (skyData.ok) s.innerHTML = `<b style="color:var(--green)">${skyData.aircraft.length} aircraft</b> within ${skyRange()} nm · live`;
+      else s.innerHTML = `<b style="color:var(--red)">No live flights.</b> This needs Zero's Python server running (the flight feed blocks browsers). Start <code>python3 server.py</code>. (${esc(skyData.msg)})`;
+    }
+    drawRadar(); renderFlightList();
+  }
+
+  // haversine distance (nm) and bearing (deg) from a→b
+  function geo(aLat, aLon, bLat, bLon) {
+    const R = 3440.065, toR = Math.PI / 180;
+    const dLat = (bLat - aLat) * toR, dLon = (bLon - aLon) * toR;
+    const la1 = aLat * toR, la2 = bLat * toR;
+    const h = Math.sin(dLat / 2) ** 2 + Math.cos(la1) * Math.cos(la2) * Math.sin(dLon / 2) ** 2;
+    const dist = 2 * R * Math.asin(Math.min(1, Math.sqrt(h)));
+    const y = Math.sin(dLon) * Math.cos(la2);
+    const x = Math.cos(la1) * Math.sin(la2) - Math.sin(la1) * Math.cos(la2) * Math.cos(dLon);
+    let brg = Math.atan2(y, x) / toR; brg = (brg + 360) % 360;
+    return { dist, brg };
+  }
+
+  function drawRadar() {
+    const cv = document.getElementById('radar');
+    if (!cv) return;
+    const dpr = window.devicePixelRatio || 1;
+    const size = cv.clientWidth || 420;
+    if (cv.width !== size * dpr) { cv.width = size * dpr; cv.height = size * dpr; }
+    const ctx = cv.getContext('2d');
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, size, size);
+    const cx = size / 2, cy = size / 2, R = size / 2 - 10;
+    const white = 'rgba(255,255,255,';
+    // range rings
+    ctx.strokeStyle = white + '.22)'; ctx.lineWidth = 1;
+    for (let i = 1; i <= 4; i++) { ctx.beginPath(); ctx.arc(cx, cy, R * i / 4, 0, Math.PI * 2); ctx.stroke(); }
+    // cross hairs + cardinal labels
+    ctx.beginPath(); ctx.moveTo(cx - R, cy); ctx.lineTo(cx + R, cy); ctx.moveTo(cx, cy - R); ctx.lineTo(cx, cy + R); ctx.stroke();
+    ctx.fillStyle = white + '.6)'; ctx.font = '10px "IBM Plex Mono", monospace'; ctx.textAlign = 'center';
+    ctx.fillText('N', cx, cy - R + 12); ctx.fillText('S', cx, cy + R - 4);
+    ctx.fillText('E', cx + R - 8, cy + 4); ctx.fillText('W', cx - R + 8, cy + 4);
+    // sweep
+    const g = ctx.createConicGradient ? null : null;
+    ctx.save(); ctx.translate(cx, cy); ctx.rotate(sweepAngle);
+    const grad = ctx.createLinearGradient(0, 0, R, 0);
+    grad.addColorStop(0, white + '.35)'); grad.addColorStop(1, white + '0)');
+    ctx.strokeStyle = grad; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(R, 0); ctx.stroke();
+    ctx.restore();
+    // centre (you)
+    ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(cx, cy, 3, 0, Math.PI * 2); ctx.fill();
+    // planes
+    const c = skyData.center || skyCenter();
+    const rng = skyRange();
+    skyData.aircraft.forEach(a => {
+      if (a.lat == null || a.lon == null) return;
+      const { dist, brg } = geo(c.lat, c.lon, a.lat, a.lon);
+      if (dist > rng) return;
+      const rr = (dist / rng) * R;
+      const px = cx + Math.sin(brg * Math.PI / 180) * rr;
+      const py = cy - Math.cos(brg * Math.PI / 180) * rr;
+      const onGround = a.alt === 'ground';
+      ctx.save(); ctx.translate(px, py); ctx.rotate(((a.track || 0)) * Math.PI / 180);
+      ctx.fillStyle = onGround ? white + '.4)' : '#fff';
+      ctx.beginPath(); ctx.moveTo(0, -5); ctx.lineTo(3.2, 4); ctx.lineTo(0, 2); ctx.lineTo(-3.2, 4); ctx.closePath(); ctx.fill();
+      ctx.restore();
+      if (a.flight) { ctx.fillStyle = white + '.75)'; ctx.font = '9px "IBM Plex Mono", monospace'; ctx.textAlign = 'left'; ctx.fillText(a.flight, px + 6, py + 3); }
+    });
+  }
+
+  function renderFlightList() {
+    const box = document.getElementById('flightList');
+    if (!box) return;
+    const c = skyData.center || skyCenter();
+    const rows = skyData.aircraft
+      .filter(a => a.lat != null && a.lon != null)
+      .map(a => ({ a, d: geo(c.lat, c.lon, a.lat, a.lon).dist }))
+      .sort((x, y) => x.d - y.d).slice(0, 12);
+    if (!rows.length) { box.innerHTML = '<div class="nodata" style="font-size:12px">No aircraft in range.</div>'; return; }
+    box.innerHTML = `<div class="mkt-row mkt-head"><div>Flight</div><div>Alt / Spd</div><div>Dist</div></div>` +
+      rows.map(({ a, d }) => `<div class="mkt-row"><div class="sym">${esc(a.flight || a.hex || '—')}<small>${esc(a.type || '')}</small></div>` +
+        `<div>${a.alt === 'ground' ? 'ground' : (a.alt != null ? a.alt + ' ft' : '—')}${a.gs != null ? ' · ' + Math.round(a.gs) + ' kt' : ''}</div>` +
+        `<div>${d.toFixed(0)} nm</div></div>`).join('');
+  }
+
+  function skyInit() {
+    const rv = document.getElementById('skyRangeSlider'); if (rv) rv.value = skyRange();
+    setText('skyRangeVal', skyRange() + ' nm');
+    loadFlights();
+    if (!sweepRaf) { const spin = () => { sweepAngle += 0.03; if (document.getElementById('view-sky')?.classList.contains('active')) drawRadar(); sweepRaf = requestAnimationFrame(spin); }; sweepRaf = requestAnimationFrame(spin); }
+    if (skyTimer) clearInterval(skyTimer);
+    skyTimer = setInterval(() => { if (document.getElementById('view-sky')?.classList.contains('active')) loadFlights(); }, 15000);
+    Control.timers.add(skyTimer);
   }
 
   /* ---------------- Clock ---------------- */
@@ -2856,6 +2999,7 @@ const Zero = (() => {
     addApp, removeApp, launchApp, forgetMemory, forgetProfile, renderProfile, storageInfo, addPreset,
     openTradingView, allowTradingView, tvSearch, dailyBriefing, setAutoBrief, openEconCalendar, useBridge,
     onProvider, ovSend, mapSearch, mapSource, renderMap,
+    locateMe, setSkyRange, loadFlights, skyInit,
     agentConnect, agentRun, agentAsk, agentPing,
     nativePing, recall,
     addApi, delApi, testApi, saveApiAi, acOnProvider, saveApiMkt,

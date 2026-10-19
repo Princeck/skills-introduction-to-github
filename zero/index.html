@@ -64,6 +64,7 @@
         <li data-view="control"><span class="ic">⏻</span> Control Panel</li>
         <li data-view="markets"><span class="ic">▲</span> Markets</li>
         <li data-view="maps"><span class="ic">◍</span> Maps</li>
+        <li data-view="sky"><span class="ic">✈</span> Sky</li>
         <li data-view="news"><span class="ic">◉</span> News</li>
         <li data-view="trading"><span class="ic">▤</span> Trading</li>
         <li data-view="apps"><span class="ic">◱</span> Apps</li>
@@ -340,6 +341,32 @@
           <div class="hint" style="font-family:var(--mono);margin-bottom:8px">Showing: <span id="mapNow">—</span></div>
           <iframe id="mapFrame" title="Map" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>
           <div class="notice">Maps are drawn by OpenStreetMap and Google — those servers see the place you look up (that is unavoidable for a live map), but nothing else in Zero leaves your machine. Update the view any time; Zero keeps the last place you looked.</div>
+        </div>
+      </section>
+
+      <!-- SKY — live aircraft radar -->
+      <section class="view" id="view-sky">
+        <div class="card">
+          <h2>Sky — Live Flight Radar <span class="pill">ADS-B · live</span></h2>
+          <p class="hint">Real aircraft flying around you right now — a HUD radar scope with your position at the centre. Share your location for a radar around you, or set a point.</p>
+          <div style="margin-top:12px;display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+            <button class="btn" onclick="Zero.locateMe()">📍 Use my location</button>
+            <button class="btn ghost" onclick="Zero.loadFlights()">↻ Refresh</button>
+            <span class="hint" style="font-family:var(--mono)">Centre: <span id="skyCenterLabel">—</span></span>
+          </div>
+          <div style="margin-top:12px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+            <label class="hint">Range <span id="skyRangeVal" style="color:#fff"></span></label>
+            <input type="range" id="skyRangeSlider" min="20" max="250" step="10" value="100" oninput="Zero.setSkyRange(this.value)" style="flex:1;min-width:160px" />
+          </div>
+          <div id="skyStatus" class="hint" style="margin-top:10px;font-family:var(--mono)"></div>
+          <div class="sky-grid">
+            <div class="radar-wrap"><canvas id="radar"></canvas></div>
+            <div>
+              <h2 style="margin-top:0">Nearest aircraft</h2>
+              <div id="flightList"></div>
+            </div>
+          </div>
+          <div class="notice">Live positions come from the open ADS-B network. Because those feeds block direct browser calls, the radar needs <b>Zero's Python server</b> running (<code>python3 server.py</code>) — it fetches the data for you. Your location stays on this device; only the search centre is sent, to find nearby flights.</div>
         </div>
       </section>
 
