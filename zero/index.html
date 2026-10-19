@@ -65,6 +65,7 @@
         <li data-view="markets"><span class="ic">▲</span> Markets</li>
         <li data-view="maps"><span class="ic">◍</span> Maps</li>
         <li data-view="sky"><span class="ic">✈</span> Sky</li>
+        <li data-view="space"><span class="ic">☉</span> Space</li>
         <li data-view="news"><span class="ic">◉</span> News</li>
         <li data-view="trading"><span class="ic">▤</span> Trading</li>
         <li data-view="apps"><span class="ic">◱</span> Apps</li>
@@ -367,6 +368,49 @@
             </div>
           </div>
           <div class="notice">Live positions come from the open ADS-B network. Because those feeds block direct browser calls, the radar needs <b>Zero's Python server</b> running (<code>python3 server.py</code>) — it fetches the data for you. Your location stays on this device; only the search centre is sent, to find nearby flights.</div>
+        </div>
+      </section>
+
+      <!-- SPACE — solar system, ISS, Earth from orbit -->
+      <section class="view" id="view-space">
+        <div class="grid cols-2">
+          <div class="card">
+            <h2>Solar System <span class="pill">live orrery</span></h2>
+            <p class="hint">Real planetary positions, computed on this device — no network. Speed it up to watch the orbits, or snap back to now.</p>
+            <div class="radar-wrap" style="max-width:460px"><canvas id="orrery"></canvas></div>
+            <div style="margin-top:10px;display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+              <span class="hint" style="font-family:var(--mono)">Date: <span id="orreryDate">—</span></span>
+              <span style="flex:1"></span>
+              <button class="btn ghost" onclick="Zero.orreryNow()">Now</button>
+            </div>
+            <label class="hint" style="margin-top:10px;display:block">Speed <span id="orrerySpeedVal" style="color:#fff"></span></label>
+            <input type="range" id="orrerySpeed" min="0" max="200" step="5" value="20" oninput="Zero.setOrrerySpeed(this.value)" style="width:100%" />
+          </div>
+
+          <div class="card">
+            <h2>Space Station <span class="pill">ISS · live</span></h2>
+            <p class="hint">The International Space Station, tracked in real time — updates every few seconds.</p>
+            <canvas id="issMap" style="width:100%;border:1px solid rgba(255,255,255,.18);margin-top:8px"></canvas>
+            <div id="issReadout" style="margin-top:10px"></div>
+            <div style="margin-top:10px"><button class="btn ghost" onclick="Zero.loadISS()">↻ Refresh</button></div>
+          </div>
+        </div>
+
+        <div class="grid cols-2" style="margin-top:16px">
+          <div class="card">
+            <h2>Earth From Space <span class="pill">NASA · today</span></h2>
+            <p class="hint">The whole sunlit face of Earth, photographed from a million miles out by NASA's EPIC camera on DSCOVR.</p>
+            <img id="earthShot" alt="Earth from space" style="display:none;width:100%;margin-top:10px;border:1px solid rgba(255,255,255,.18)" />
+            <div class="hint" id="earthCap" style="margin-top:8px;font-family:var(--mono)">loading…</div>
+            <div style="margin-top:10px"><button class="btn ghost" onclick="Zero.loadEarthShot()">↻ Latest</button></div>
+          </div>
+
+          <div class="card">
+            <h2>Live Satellite · Whole Earth <span class="pill">weather &amp; cloud</span></h2>
+            <p class="hint">Real-time global satellite and weather, the entire planet at once. Pan and zoom anywhere.</p>
+            <iframe title="Live satellite" src="https://embed.windy.com/embed2.html?type=map&metricWind=default&metricTemp=default&radarRange=-1&level=surface&overlay=satellite" style="width:100%;height:420px;border:1px solid rgba(255,255,255,.18);margin-top:10px;background:#000" loading="lazy"></iframe>
+            <div class="notice">The satellite map is drawn by Windy.com (their servers serve the imagery). Everything else on this page — the orrery, ISS and Earth photo — comes straight from NASA/open feeds to your browser.</div>
+          </div>
         </div>
       </section>
 

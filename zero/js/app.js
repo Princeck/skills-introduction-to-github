@@ -307,6 +307,7 @@ const Zero = (() => {
     api:       ['API Center', 'Every key and connection Zero uses — all on this device.'],
     maps:      ['Maps', 'Every map on Earth — search anywhere.'],
     sky:       ['Sky', 'Live aircraft radar around your location.'],
+    space:     ['Space', 'The solar system, the ISS, and Earth from orbit.'],
     news:      ['News', 'What is happening right now.'],
     trading:   ['Trading', 'Live professional charts — every market.'],
     apps:      ['Apps', 'Your things, one keystroke away.'],
@@ -337,6 +338,7 @@ const Zero = (() => {
     if (view === 'memory') { renderMemories(); renderProfile(); }
     if (view === 'maps') renderMap();
     if (view === 'sky') skyInit();
+    if (view === 'space') spaceInit();
     if (view === 'operator') agentInit();
     if (view === 'api') apiCenterInit();
   }
@@ -1007,6 +1009,131 @@ const Zero = (() => {
     if (skyTimer) clearInterval(skyTimer);
     skyTimer = setInterval(() => { if (document.getElementById('view-sky')?.classList.contains('active')) loadFlights(); }, 15000);
     Control.timers.add(skyTimer);
+  }
+
+  /* ============================================================
+     SPACE — a live map of the solar system (computed offline), the
+     ISS tracked in real time, and Earth seen from space today.
+     ============================================================ */
+  // name, semi-major axis (AU), period (yr), mean longitude at J2000 (deg)
+  const PLANETS = [
+    ['Mercury', 0.387, 0.2408, 252.25],
+    ['Venus',   0.723, 0.6152, 181.98],
+    ['Earth',   1.000, 1.0000, 100.47],
+    ['Mars',    1.524, 1.8808, 355.43],
+    ['Jupiter', 5.203, 11.862,  34.40],
+    ['Saturn',  9.537, 29.447,  49.94],
+    ['Uranus', 19.191, 84.017, 313.23],
+    ['Neptune',30.070, 164.80, 304.88],
+  ];
+  const J2000 = Date.UTC(2000, 0, 1, 12) / 1;
+  let orreryRaf = null, simDays = 0, orrerySpeed = 20; // sim days advanced per real second
+  let issTimer = null;
+
+  function orreryDays() { return (Date.now() - J2000) / 86400000; }
+
+  function drawOrrery() {
+    const cv = document.getElementById('orrery'); if (!cv) return;
+    const dpr = window.devicePixelRatio || 1;
+    const w = cv.clientWidth || 440, h = cv.clientHeight || 440;
+    if (cv.width !== w * dpr) { cv.width = w * dpr; cv.height = h * dpr; }
+    const ctx = cv.getContext('2d'); ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, w, h);
+    const cx = w / 2, cy = h / 2;
+    const maxR = Math.min(w, h) / 2 - 16;
+    const scale = maxR / Math.log10(PLANETS[PLANETS.length - 1][1] + 1);
+    const rOf = a => Math.log10(a + 1) * scale;
+    const days = orreryDays() + simDays;
+    // sun
+    const sg = ctx.createRadialGradient(cx, cy, 0, cx, cy, 16);
+    sg.addColorStop(0, '#fff'); sg.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = sg; ctx.beginPath(); ctx.arc(cx, cy, 16, 0, Math.PI * 2); ctx.fill();
+    ctx.font = '10px "IBM Plex Mono", monospace'; ctx.textAlign = 'left';
+    PLANETS.forEach(([name, a, T, L0], i) => {
+      const r = rOf(a);
+      // orbit ring
+      ctx.strokeStyle = 'rgba(255,255,255,.14)'; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.stroke();
+      // position
+      const lon = (L0 + 360 * (days / (T * 365.25))) * Math.PI / 180;
+      const px = cx + Math.cos(lon) * r, py = cy + Math.sin(lon) * r;
+      const size = name === 'Jupiter' || name === 'Saturn' ? 4 : name === 'Earth' ? 3.2 : 2.6;
+      ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(px, py, size, 0, Math.PI * 2); ctx.fill();
+      if (name === 'Saturn') { ctx.strokeStyle = 'rgba(255,255,255,.7)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.ellipse(px, py, 7, 2.5, 0.5, 0, Math.PI * 2); ctx.stroke(); }
+      ctx.fillStyle = 'rgba(255,255,255,.72)'; ctx.fillText(name, px + 6, py - 4);
+    });
+    // date readout
+    const simDate = new Date(Date.now() + simDays * 86400000);
+    setText('orreryDate', simDate.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }) + (simDays ? '  (sim)' : '  (now)'));
+  }
+
+  function setOrrerySpeed(v) { orrerySpeed = parseFloat(v); setText('orrerySpeedVal', orrerySpeed === 0 ? 'paused' : orrerySpeed + ' days/s'); }
+  function orreryNow() { simDays = 0; setText('orrerySpeedVal', orrerySpeed + ' days/s'); }
+
+  async function loadISS() {
+    const s = document.getElementById('issReadout');
+    try {
+      const r = await guardedFetch('https://api.wheretheiss.at/v1/satellites/25544', {}, 'market');
+      const d = await r.json();
+      if (s) s.innerHTML =
+        `<div class="readout"><span class="k">Latitude</span><span class="v">${d.latitude.toFixed(3)}°</span></div>` +
+        `<div class="readout"><span class="k">Longitude</span><span class="v">${d.longitude.toFixed(3)}°</span></div>` +
+        `<div class="readout"><span class="k">Altitude</span><span class="v">${Math.round(d.altitude)} km</span></div>` +
+        `<div class="readout"><span class="k">Speed</span><span class="v">${Math.round(d.velocity).toLocaleString()} km/h</span></div>` +
+        `<div class="readout"><span class="k">Over</span><span class="v">${d.visibility === 'daylight' ? 'daylight' : 'night'} side</span></div>`;
+      drawISSMap(d.latitude, d.longitude);
+      window.__issPos = { lat: d.latitude, lon: d.longitude };
+    } catch (e) { if (s) s.innerHTML = `<div class="nodata">ISS feed unreachable (${esc(e.message)}).</div>`; }
+  }
+
+  function drawISSMap(lat, lon) {
+    const cv = document.getElementById('issMap'); if (!cv) return;
+    const dpr = window.devicePixelRatio || 1;
+    const w = cv.clientWidth || 420, h = w / 2;
+    if (cv.width !== w * dpr) { cv.width = w * dpr; cv.height = h * dpr; }
+    cv.style.height = h + 'px';
+    const ctx = cv.getContext('2d'); ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, w, h);
+    ctx.strokeStyle = 'rgba(255,255,255,.14)'; ctx.lineWidth = 1;
+    for (let i = 1; i < 4; i++) { ctx.beginPath(); ctx.moveTo(0, h * i / 4); ctx.lineTo(w, h * i / 4); ctx.stroke(); }
+    for (let i = 1; i < 8; i++) { ctx.beginPath(); ctx.moveTo(w * i / 8, 0); ctx.lineTo(w * i / 8, h); ctx.stroke(); }
+    ctx.strokeStyle = 'rgba(255,255,255,.3)'; ctx.strokeRect(0.5, 0.5, w - 1, h - 1);
+    const x = (lon + 180) / 360 * w, y = (90 - lat) / 180 * h;
+    ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(x, y, 4, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,.5)'; ctx.beginPath(); ctx.arc(x, y, 9, 0, Math.PI * 2); ctx.stroke();
+    ctx.fillStyle = 'rgba(255,255,255,.8)'; ctx.font = '10px "IBM Plex Mono", monospace'; ctx.fillText('ISS', x + 12, y + 3);
+  }
+
+  async function loadEarthShot() {
+    const img = document.getElementById('earthShot'); const cap = document.getElementById('earthCap');
+    if (!img) return;
+    try {
+      const r = await guardedFetch('https://epic.gsfc.nasa.gov/api/natural', {}, 'market');
+      const arr = await r.json();
+      if (!arr.length) throw new Error('no image');
+      const latest = arr[arr.length - 1];
+      const id = latest.identifier; // YYYYMMDDhhmmss
+      const y = id.slice(0, 4), mo = id.slice(4, 6), da = id.slice(6, 8);
+      img.src = `https://epic.gsfc.nasa.gov/archive/natural/${y}/${mo}/${da}/png/${latest.image}.png`;
+      img.style.display = '';
+      if (cap) cap.textContent = `NASA EPIC · DSCOVR at L1 · ${latest.date} UTC`;
+    } catch (e) { if (cap) cap.textContent = 'Earth image unreachable (' + e.message + ').'; }
+  }
+
+  function spaceInit() {
+    setText('orrerySpeedVal', orrerySpeed + ' days/s');
+    const sp = document.getElementById('orrerySpeed'); if (sp) sp.value = orrerySpeed;
+    if (!orreryRaf) {
+      let last = performance.now();
+      const loop = now => { const dt = (now - last) / 1000; last = now; simDays += orrerySpeed * dt;
+        if (document.getElementById('view-space')?.classList.contains('active')) drawOrrery();
+        orreryRaf = requestAnimationFrame(loop); };
+      orreryRaf = requestAnimationFrame(loop);
+    }
+    loadISS(); loadEarthShot();
+    if (issTimer) clearInterval(issTimer);
+    issTimer = setInterval(() => { if (document.getElementById('view-space')?.classList.contains('active')) loadISS(); }, 5000);
+    Control.timers.add(issTimer);
   }
 
   /* ---------------- Clock ---------------- */
@@ -3000,6 +3127,7 @@ const Zero = (() => {
     openTradingView, allowTradingView, tvSearch, dailyBriefing, setAutoBrief, openEconCalendar, useBridge,
     onProvider, ovSend, mapSearch, mapSource, renderMap,
     locateMe, setSkyRange, loadFlights, skyInit,
+    spaceInit, setOrrerySpeed, orreryNow, loadISS, loadEarthShot,
     agentConnect, agentRun, agentAsk, agentPing,
     nativePing, recall,
     addApi, delApi, testApi, saveApiAi, acOnProvider, saveApiMkt,
