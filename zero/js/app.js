@@ -837,40 +837,112 @@ const Zero = (() => {
     if (chat) { chat.value = q; send(); }
   }
 
-  /* ---------------- Maps: every map on Earth, keyless ---------------- */
-  function mapUrl(src, place) {
-    const q = encodeURIComponent(place || 'World');
-    if (src === 'google')    return `https://www.google.com/maps?q=${q}&output=embed`;
-    if (src === 'satellite') return `https://www.google.com/maps?q=${q}&t=k&output=embed`;
-    // OpenStreetMap search embed (no key, no account)
-    return `https://www.openstreetmap.org/export/embed.html?bbox=-180,-60,180,80&layer=mapnik&search=${q}`;
+  /* ---------------- Maps: a real interactive world map (Leaflet) ----------------
+     Pannable/zoomable, HUD-styled, with search, your location, and a live
+     aircraft overlay. Falls back to a message if the map library can't load. */
+  let lmap = null, lmarker = null, llayer = null, mapFlights = { on: false, layer: null, timer: null };
+  const TILE = {
+    dark: { url: 'https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png', sub: 'abcd', attr: '© OpenStreetMap, © CARTO' },
+    osm:  { url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', sub: 'abc', attr: '© OpenStreetMap' },
+    sat:  { url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', sub: '', attr: 'Imagery © Esri' },
+  };
+
+  function mapReady() { return typeof L !== 'undefined'; }
+
+  function initMap() {
+    if (!mapReady()) { const el = document.getElementById('mapCanvas'); if (el) el.innerHTML = '<div class="nodata" style="padding:30px;text-align:center">The map library could not load (no internet?). Maps need a connection.</div>'; return; }
+    if (lmap) { setTimeout(() => lmap.invalidateSize(), 60); return; }
+    const lat = parseFloat(store.raw(LS.geoLat)), lon = parseFloat(store.raw(LS.geoLon));
+    const center = (isFinite(lat) && isFinite(lon)) ? [lat, lon] : [20, 0];
+    lmap = L.map('mapCanvas', { zoomControl: true, attributionControl: true, worldCopyJump: true })
+      .setView(center, (isFinite(lat) ? 9 : 2));
+    setMapLayer(store.raw(LS.mapSrc) || 'dark');
+    setTimeout(() => lmap.invalidateSize(), 60);
   }
+
+  function setMapLayer(src) {
+    if (!lmap) return;
+    const t = TILE[src] || TILE.dark;
+    if (llayer) lmap.removeLayer(llayer);
+    llayer = L.tileLayer(t.url, { subdomains: t.sub || 'abc', maxZoom: 19, detectRetina: true, attribution: t.attr }).addTo(lmap);
+    store.rawSet(LS.mapSrc, src);
+    document.querySelectorAll('#mapTabs .chip[data-src]').forEach(c => c.classList.toggle('on', c.dataset.src === src));
+  }
+
   function renderMap() {
-    const src = store.raw(LS.mapSrc) || 'osm';
-    const place = store.raw(LS.mapPlace) || 'World';
-    const frame = document.getElementById('mapFrame');
-    if (frame) frame.src = mapUrl(src, place);
-    setText('mapNow', place + '  ·  ' + src);
-    document.querySelectorAll('#mapTabs .chip').forEach(c =>
-      c.classList.toggle('on', c.dataset.src === src));
+    initMap();
+    setText('mapNow', (store.raw(LS.mapPlace) || 'the world') + '  ·  ' + (store.raw(LS.mapSrc) || 'dark'));
   }
-  function mapSource(src) { store.rawSet(LS.mapSrc, src); renderMap(); log('Map source: ' + src + '.'); }
-  function mapSearch(place) {
-    const p = (place || document.getElementById('mapInput')?.value || '').trim();
+
+  function mapSource(src) { if (!lmap) initMap(); setMapLayer(src); setText('mapNow', (store.raw(LS.mapPlace) || 'the world') + '  ·  ' + src); log('Map layer: ' + src + '.'); }
+
+  function mapDrop(lat, lon, label, zoom) {
+    if (!lmap) return;
+    lmap.setView([lat, lon], zoom || 12);
+    if (lmarker) lmap.removeLayer(lmarker);
+    lmarker = L.marker([lat, lon], { icon: L.divIcon({ className: 'zpin', html: '<span></span>', iconSize: [16, 16] }) }).addTo(lmap);
+    if (label) lmarker.bindPopup(label).openPopup();
+  }
+
+  async function mapSearch(place) {
+    const p = (typeof place === 'string' ? place : (document.getElementById('mapInput')?.value || '')).trim();
     if (!p) return;
+    if (!lmap) initMap();
     store.rawSet(LS.mapPlace, p);
-    renderMap();
-    log('Map moved to "' + p + '".');
+    setText('mapNow', 'searching “' + p + '”…');
+    try {
+      const r = await guardedFetch('https://nominatim.openstreetmap.org/search?format=json&limit=1&q=' + encodeURIComponent(p), {}, 'network');
+      const d = await r.json();
+      if (!d.length) { setText('mapNow', 'no match for “' + p + '”'); return; }
+      mapDrop(parseFloat(d[0].lat), parseFloat(d[0].lon), d[0].display_name, 12);
+      setText('mapNow', d[0].display_name + '  ·  ' + (store.raw(LS.mapSrc) || 'dark'));
+      log('Map → ' + p + '.');
+    } catch (e) { setText('mapNow', 'search failed: ' + e.message); }
   }
+
+  function mapLocate() {
+    locateMe(() => { const lat = parseFloat(store.raw(LS.geoLat)), lon = parseFloat(store.raw(LS.geoLon)); if (lmap && isFinite(lat)) mapDrop(lat, lon, 'You are here', 12); });
+  }
+
+  function mapToggleFlights() {
+    mapFlights.on = !mapFlights.on;
+    const chip = document.getElementById('mapFlightsChip');
+    if (chip) chip.classList.toggle('on', mapFlights.on);
+    if (mapFlights.on) { mapLoadFlights(); mapFlights.timer = setInterval(() => { if (document.getElementById('view-maps')?.classList.contains('active')) mapLoadFlights(); }, 15000); Control.timers.add(mapFlights.timer); }
+    else { if (mapFlights.layer) lmap.removeLayer(mapFlights.layer); mapFlights.layer = null; if (mapFlights.timer) { clearInterval(mapFlights.timer); mapFlights.timer = null; } }
+  }
+
+  async function mapLoadFlights() {
+    if (!lmap || !mapFlights.on) return;
+    const c = lmap.getCenter();
+    try {
+      const r = await guardedFetch(`${coreBase()}/api/flights?lat=${c.lat.toFixed(3)}&lon=${c.lng.toFixed(3)}&dist=150`, {}, 'market');
+      const d = await r.json();
+      if (mapFlights.layer) lmap.removeLayer(mapFlights.layer);
+      mapFlights.layer = L.layerGroup();
+      (d.aircraft || []).forEach(a => {
+        if (a.lat == null || a.lon == null) return;
+        const icon = L.divIcon({ className: 'zplane', html: `<span style="transform:rotate(${a.track || 0}deg)">✈</span>`, iconSize: [18, 18] });
+        const m = L.marker([a.lat, a.lon], { icon });
+        m.bindPopup(`<b>${a.flight || a.hex || '—'}</b><br>${a.desc || a.type || ''}<br>${a.alt === 'ground' ? 'on ground' : (a.alt != null ? a.alt + ' ft' : '')} ${a.gs != null ? '· ' + Math.round(a.gs) + ' kt' : ''}`);
+        mapFlights.layer.addLayer(m);
+      });
+      mapFlights.layer.addTo(lmap);
+      setText('mapNow', (d.aircraft || []).length + ' aircraft shown  ·  ' + (store.raw(LS.mapSrc) || 'dark'));
+    } catch (e) {
+      setText('mapNow', 'flights need Zero’s server running (python3 server.py)');
+      mapFlights.on = false; const chip = document.getElementById('mapFlightsChip'); if (chip) chip.classList.remove('on');
+    }
+  }
+
   /* Let chat drive it: "map tokyo" / "navigate to paris" / "where is berlin". */
   function mapCommand(q) {
     const m = q.match(/^(?:map|navigate to|show me|where is|directions to)\s+(.+)$/i);
     if (!m) return null;
     const place = m[1].replace(/[.?!]$/, '').trim();
-    store.rawSet(LS.mapPlace, place);
-    if (!store.raw(LS.mapSrc)) store.rawSet(LS.mapSrc, 'osm');
     nav('maps');
-    return `Here is ${place} on the map. Switch to Google or satellite with the tabs.`;
+    setTimeout(() => mapSearch(place), 120);
+    return `Opening ${place} on the map.`;
   }
 
   /* ============================================================
@@ -3125,7 +3197,7 @@ const Zero = (() => {
     openAFile, saveBack, saveNew, connectFolder, listFolder, openFromFolder, disconnectFolder,
     addApp, removeApp, launchApp, forgetMemory, forgetProfile, renderProfile, storageInfo, addPreset,
     openTradingView, allowTradingView, tvSearch, dailyBriefing, setAutoBrief, openEconCalendar, useBridge,
-    onProvider, ovSend, mapSearch, mapSource, renderMap,
+    onProvider, ovSend, mapSearch, mapSource, renderMap, mapLocate, mapToggleFlights,
     locateMe, setSkyRange, loadFlights, skyInit,
     spaceInit, setOrrerySpeed, orreryNow, loadISS, loadEarthShot,
     agentConnect, agentRun, agentAsk, agentPing,

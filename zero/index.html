@@ -12,6 +12,8 @@
   <link rel="manifest" href="manifest.webmanifest" />
   <link rel="apple-touch-icon" href="assets/icon-192.png" />
   <title>ZERO</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
   <link rel="stylesheet" href="css/styles.css" />
 </head>
 <body>
@@ -328,20 +330,23 @@
       <!-- MAPS -->
       <section class="view" id="view-maps">
         <div class="card">
-          <h2>World Maps <span class="pill">live · no key</span></h2>
-          <p class="hint">Every map on Earth. Search any place; Zero drops it on the map and remembers your last view. Ask Zero <b>map paris</b> or <b>navigate to tokyo</b> in chat too.</p>
+          <h2>World Map <span class="pill">live · interactive</span></h2>
+          <p class="hint">A real interactive map of the whole Earth, in Zero's own HUD. Pan, zoom, search any place, drop your location, and plot live aircraft right on the map. Ask Zero <b>map tokyo</b> in chat too.</p>
           <div class="chat-input" style="margin-top:12px">
             <input id="mapInput" placeholder="Search anywhere — a city, address, landmark…" onkeydown="if(event.key==='Enter')Zero.mapSearch()" />
             <button class="btn" onclick="Zero.mapSearch()">Go</button>
           </div>
           <div class="map-tabs" id="mapTabs">
-            <button class="chip on" data-src="osm" onclick="Zero.mapSource('osm')">🗺 OpenStreetMap</button>
-            <button class="chip" data-src="google" onclick="Zero.mapSource('google')">🌍 Google Maps</button>
-            <button class="chip" data-src="satellite" onclick="Zero.mapSource('satellite')">🛰 Satellite</button>
+            <button class="chip on" data-src="dark" onclick="Zero.mapSource('dark')">◼ HUD dark</button>
+            <button class="chip" data-src="osm" onclick="Zero.mapSource('osm')">🗺 Streets</button>
+            <button class="chip" data-src="sat" onclick="Zero.mapSource('sat')">🛰 Satellite</button>
+            <span style="flex:1"></span>
+            <button class="chip" onclick="Zero.mapLocate()">📍 My location</button>
+            <button class="chip" id="mapFlightsChip" onclick="Zero.mapToggleFlights()">✈ Live flights</button>
           </div>
           <div class="hint" style="font-family:var(--mono);margin-bottom:8px">Showing: <span id="mapNow">—</span></div>
-          <iframe id="mapFrame" title="Map" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>
-          <div class="notice">Maps are drawn by OpenStreetMap and Google — those servers see the place you look up (that is unavoidable for a live map), but nothing else in Zero leaves your machine. Update the view any time; Zero keeps the last place you looked.</div>
+          <div id="mapCanvas"></div>
+          <div class="notice">Map tiles come from OpenStreetMap / Carto / Esri and live flights from the open ADS-B network (the small ✈ overlay needs Zero's Python server running). The tiny attribution in the corner is required by those free tile services — leave it and they keep serving you.</div>
         </div>
       </section>
 
