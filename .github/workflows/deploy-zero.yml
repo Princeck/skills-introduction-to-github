@@ -1,0 +1,35 @@
+name: Deploy Zero to GitHub Pages
+
+# Publishes the zero/ folder to GitHub Pages, giving Zero a real https URL
+# so it installs as an app (PWA install, mic, file access all need https).
+# One-time setup: repo Settings → Pages → Source = "GitHub Actions".
+
+on:
+  push:
+    branches: [main]
+    paths: ['zero/**']
+  workflow_dispatch:            # lets you run it by hand from the Actions tab
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: zero              # serve the app folder as the site root
+      - id: deployment
+        uses: actions/deploy-pages@v4
